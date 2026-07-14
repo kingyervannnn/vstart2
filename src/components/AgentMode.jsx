@@ -44,6 +44,7 @@ export const AgentMode = forwardRef(function AgentMode({
   onStateChange,
 }, ref) {
   const clientRef = useRef(null)
+  const transcriptRef = useRef(null)
   const preferencesRef = useRef(preferences)
   const runtimeSessionRef = useRef('')
   const storedSessionRef = useRef('')
@@ -74,6 +75,15 @@ export const AgentMode = forwardRef(function AgentMode({
   useEffect(() => {
     onStateChange?.({ running, ready: connection.state === 'ready', state: connection.state })
   }, [connection.state, onStateChange, running])
+
+  useEffect(() => {
+    const transcript = transcriptRef.current
+    if (!transcript) return undefined
+    const frame = requestAnimationFrame(() => {
+      transcript.scrollTop = transcript.scrollHeight
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [activities, approvals, clarifications, messages])
 
   useEffect(() => {
     let cancelled = false
@@ -346,6 +356,24 @@ export const AgentMode = forwardRef(function AgentMode({
           </select>
           <button type="button" onClick={() => onNavigate('new')} aria-label="New agent session"><Plus /></button>
         </div>
+      </header>
+
+      <div ref={transcriptRef} className="agent-transcript" aria-live="polite">
+        <div className="agent-transcript-stack">
+          {!messages.length && <div className="agent-empty"><Bot /><h2>What should Hermes work on?</h2><p>This session uses local tools through the loopback Agent Bridge. Tool actions remain approval-gated.</p></div>}
+          {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><p>{message.text || (message.streaming ? '…' : '')}</p></article>)}
+
+          {settings.agent?.showToolActivity !== false && activities.length > 0 && <section className="agent-activity" aria-label="Tool activity">
+            <h3><Wrench /> Tool activity</h3>
+            {activities.slice(-8).map((activity) => { const label = toolLabel(activity.payload); return <div key={activity.id}><span>{activity.type === 'tool.complete' ? <Check /> : activity.type === 'steer' ? <Pin /> : <LoaderCircle />}</span><strong>{label.name}</strong>{label.detail && <small>{label.detail}</small>}</div> })}
+          </section>}
+
+          {approvals.map((request) => { const label = toolLabel(request.payload); return <section className="agent-approval" key={request.payload.requestId}><ShieldAlert /><div><small>APPROVAL REQUIRED</small><strong>{label.name}</strong>{label.detail && <code>{label.detail}</code>}<div><button type="button" onClick={() => void resolveApproval(request, 'deny')}><X /> Deny</button><button type="button" className="primary" onClick={() => void resolveApproval(request, 'once')}><Check /> Allow once</button></div></div></section> })}
+          {clarifications.map((request) => <ClarificationCard key={request.payload.requestId} request={request} onResolve={(answer) => void resolveClarification(request, answer)} />)}
+        </div>
+      </div>
+
+      <footer className="agent-control-deck">
         <div className="agent-runtime-controls">
           <button type="button" className="agent-directory" onClick={() => void chooseWorkingDirectory()} disabled={running} title={workingDirectory || 'Choose working directory'}><FolderOpen /><span>{workingDirectory ? workingDirectory.split('/').filter(Boolean).at(-1) : 'Folder'}</span></button>
           <select value={selectedModel} onChange={(event) => void changeModel(event.target.value)} disabled={running} aria-label="Agent model">
@@ -359,27 +387,13 @@ export const AgentMode = forwardRef(function AgentMode({
           </select>
           <button type="button" className={fastMode ? 'active' : ''} onClick={() => void changeFastMode()} disabled={running}>Fast</button>
         </div>
-      </header>
-
-      <div className="agent-transcript" aria-live="polite">
-        {!messages.length && <div className="agent-empty"><Bot /><h2>What should Hermes work on?</h2><p>This session uses local tools through the loopback Agent Bridge. Tool actions remain approval-gated.</p></div>}
-        {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><p>{message.text || (message.streaming ? '…' : '')}</p></article>)}
-
-        {settings.agent?.showToolActivity !== false && activities.length > 0 && <section className="agent-activity" aria-label="Tool activity">
-          <h3><Wrench /> Tool activity</h3>
-          {activities.slice(-8).map((activity) => { const label = toolLabel(activity.payload); return <div key={activity.id}><span>{activity.type === 'tool.complete' ? <Check /> : activity.type === 'steer' ? <Pin /> : <LoaderCircle />}</span><strong>{label.name}</strong>{label.detail && <small>{label.detail}</small>}</div> })}
-        </section>}
-
-        {approvals.map((request) => { const label = toolLabel(request.payload); return <section className="agent-approval" key={request.payload.requestId}><ShieldAlert /><div><small>APPROVAL REQUIRED</small><strong>{label.name}</strong>{label.detail && <code>{label.detail}</code>}<div><button type="button" onClick={() => void resolveApproval(request, 'deny')}><X /> Deny</button><button type="button" className="primary" onClick={() => void resolveApproval(request, 'once')}><Check /> Allow once</button></div></div></section> })}
-        {clarifications.map((request) => <ClarificationCard key={request.payload.requestId} request={request} onResolve={(answer) => void resolveClarification(request, answer)} />)}
-      </div>
-
-      <footer className="agent-statusbar">
-        <span className={running ? 'running' : ''}>{running ? <><LoaderCircle className="spin" /> Hermes is working</> : <><Check /> Ready</>}</span>
-        <span>{connection.health?.profile || 'Hermes'}</span>
-        {settings.agent?.showUsage && usage && <span>{usage.total || 0} tokens</span>}
-        {controlError && <span className="agent-control-error" title={controlError}>{controlError}</span>}
-        {running && <button type="button" onClick={() => void clientRef.current?.interrupt(runtimeSessionRef.current)}><CircleStop /> Stop</button>}
+        <div className="agent-statusbar">
+          <span className={running ? 'running' : ''}>{running ? <><LoaderCircle className="spin" /> Hermes is working</> : <><Check /> Ready</>}</span>
+          <span>{connection.health?.profile || 'Hermes'}</span>
+          {settings.agent?.showUsage && usage && <span>{usage.total || 0} tokens</span>}
+          {controlError && <span className="agent-control-error" title={controlError}>{controlError}</span>}
+          {running && <button type="button" onClick={() => void clientRef.current?.interrupt(runtimeSessionRef.current)}><CircleStop /> Stop</button>}
+        </div>
       </footer>
     </section>
   )
