@@ -29,9 +29,9 @@ function intersects(a, b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
-function openPlacements(bootstrap, workspaceId, preferredItemId = null) {
+function openPlacements(bootstrap, workspaceId, preferredItemId = null, containerKey = 'root') {
   return Object.fromEntries(Object.entries(canvases).map(([profile, canvas]) => {
-    const occupied = bootstrap.placements.filter((value) => value.workspaceId === workspaceId && value.profile === profile && value.containerKey === 'root')
+    const occupied = bootstrap.placements.filter((value) => value.workspaceId === workspaceId && value.profile === profile && value.containerKey === containerKey)
     const source = preferredItemId ? bootstrap.placements.find((value) => value.itemId === preferredItemId && value.profile === profile) : null
     const width = canvas.tileWidth
     const height = canvas.tileHeight
@@ -48,10 +48,11 @@ function openPlacements(bootstrap, workspaceId, preferredItemId = null) {
 
 const initial = (await call('/bootstrap')).body
 assert.ok(initial.workspaces[0], 'default workspace exists')
-const createdWorkspace = await mutation('/workspaces', 'POST', { name: `Smoke ${runId}` }, `${runId}:workspace-a`)
+const createdWorkspace = await mutation('/workspaces', 'POST', { name: `Smoke ${runId}`, icon: 'Briefcase' }, `${runId}:workspace-a`)
 assert.equal(createdWorkspace.response.status, 201)
 const workspace = createdWorkspace.body.bootstrap.workspaces.find((value) => value.id === createdWorkspace.body.workspaceId)
 assert.ok(workspace, 'isolated smoke workspace exists')
+assert.equal(workspace.icon, 'Briefcase', 'workspace glyph is persisted')
 
 const makeShortcut = (title, x, compactX) => ({
   workspaceId: workspace.id,
@@ -95,6 +96,22 @@ const merged = await mutation('/folders/merge', 'POST', {
 assert.equal(merged.response.status, 201)
 const folderId = merged.body.folderId
 assert.equal(merged.body.bootstrap.items.filter((item) => item.parentFolderId === folderId).length, 2)
+
+const nested = await mutation('/shortcuts', 'POST', {
+  workspaceId: workspace.id,
+  parentFolderId: folderId,
+  title: 'Smoke created in folder',
+  url: 'https://example.com/nested',
+  iconData: tinyPng,
+  iconMimeType: 'image/png',
+  placements: openPlacements(merged.body.bootstrap, workspace.id, null, folderId),
+}, `${runId}:create-in-folder`)
+assert.equal(nested.response.status, 201)
+const nestedItem = nested.body.bootstrap.items.find((item) => item.id === nested.body.itemId)
+assert.equal(nestedItem.parentFolderId, folderId, 'shortcut is created directly inside a folder')
+assert.ok(nested.body.bootstrap.placements.filter((value) => value.itemId === nested.body.itemId).every((value) => value.containerKey === folderId), 'nested shortcut placements use the folder container')
+const nestedDeleted = await mutation(`/items/${nested.body.itemId}`, 'DELETE', { action: 'deleteChildren' }, `${runId}:delete-nested`)
+assert.equal(nestedDeleted.response.status, 200)
 
 const returned = await mutation(`/items/${folderId}`, 'DELETE', { action: 'returnChildren' }, `${runId}:return`)
 assert.equal(returned.response.status, 200)
@@ -171,4 +188,4 @@ for (const workspaceId of [destinationWorkspaceId, workspace.id]) {
   assert.equal(deleted.response.status, 200)
 }
 
-console.log('V Start 2 integration smoke passed: persistence, idempotency, collision, free placement, folders, workspace move, synchronized pinning, deletion, and settings.')
+console.log('V Start 2 integration smoke passed: persistence, idempotency, collision, free placement, direct folder creation, workspace glyphs/moves, synchronized pinning, deletion, and settings.')

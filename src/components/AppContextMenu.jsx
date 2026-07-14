@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { FolderInput, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowUpRight, FolderInput, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 
 function MenuButton({ children, icon: Icon, danger = false, disabled = false, onClick }) {
   return (
@@ -10,7 +10,7 @@ function MenuButton({ children, icon: Icon, danger = false, disabled = false, on
   )
 }
 
-export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onToggleEdit, onEditItem, onMoveItem, onPinItem, onUnpinItem, onDeleteItem }) {
+export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onToggleEdit, onEditItem, onMoveItem, onMoveOut, onPinItem, onUnpinItem, onDeleteItem }) {
   const ref = useRef(null)
   const [position, setPosition] = useState({ left: menu.x, top: menu.y })
 
@@ -43,23 +43,25 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
     action()
   }
   const item = menu.item
-  const destinations = item ? workspaces.filter((workspace) => workspace.id !== item.workspaceId) : []
+  const destinations = item && !item.parentFolderId ? workspaces.filter((workspace) => workspace.id !== item.workspaceId) : []
 
   return (
     <div ref={ref} className="app-context-menu" role="menu" aria-label={item ? `${item.title} options` : 'Speed dial options'} style={position}>
       {!item ? <>
-        <MenuButton icon={Plus} onClick={run(() => onCreate(menu.point))}>Create shortcut</MenuButton>
+        {menu.folder && <div className="context-menu-heading"><strong>{menu.folder.title}</strong><span>Folder space</span></div>}
+        <MenuButton icon={Plus} onClick={run(() => onCreate(menu.point, menu.folder?.id || null))}>Create shortcut{menu.folder ? ' here' : ''}</MenuButton>
         <MenuButton icon={Pencil} onClick={run(onToggleEdit)}>{editMode ? 'Finish editing' : 'Enter edit mode'}</MenuButton>
       </> : <>
         <div className="context-menu-heading"><strong>{item.title}</strong><span>{item.kind === 'folder' ? 'Folder' : item.pinGroupId ? 'Pinned shortcut' : 'Shortcut'}</span></div>
         <MenuButton icon={Pencil} onClick={run(() => onEditItem(item))}>{item.kind === 'folder' ? 'Rename folder' : 'Rename / change icon'}</MenuButton>
+        {item.parentFolderId && <MenuButton icon={ArrowUpRight} onClick={run(() => onMoveOut(item))}>Move out of folder</MenuButton>}
         {!!destinations.length && <>
           <div className="context-menu-separator" />
           <div className="context-menu-label"><FolderInput /> Move to workspace</div>
           {destinations.map((workspace) => <MenuButton key={workspace.id} disabled={!!item.pinGroupId} onClick={run(() => onMoveItem(item, workspace))}>{workspace.name}</MenuButton>)}
           {item.pinGroupId && <div className="context-menu-hint">Unpin before moving to one workspace.</div>}
         </>}
-        {item.kind === 'shortcut' && <>
+        {item.kind === 'shortcut' && !item.parentFolderId && <>
           <div className="context-menu-separator" />
           {item.pinGroupId
             ? <MenuButton icon={PinOff} onClick={run(() => onUnpinItem(item))}>Unpin across workspaces</MenuButton>

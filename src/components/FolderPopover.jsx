@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUpRight, FolderOpen, Pencil, X } from 'lucide-react'
+import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
 
-export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, onClose, onEdit, onMove, onMoveOut }) {
+export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, onClose, onEdit, onMove, onMoveOut, onCreate, onBlankContextMenu, onItemContextMenu }) {
   const canvasRef = useRef(null)
   const dragRef = useRef(null)
   const [preview, setPreview] = useState(null)
   if (!folder) return null
   const childPlacements = placements.filter((value) => value.containerKey === folder.id && value.profile === profile)
+  const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
 
   const beginDrag = (event, child, value) => {
     if (!editMode || event.button !== 0) return
@@ -44,8 +45,17 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
   return createPortal(
     <div className="folder-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="folder-popover" role="dialog" aria-modal="true" aria-label={folder.title}>
-        <header><FolderOpen /><h2>{folder.title}</h2>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
-        <div ref={canvasRef} className="folder-canvas">
+        <header><FolderOpen /><h2>{folder.title}</h2><button type="button" onClick={() => onCreate(null)}><Plus /> Add shortcut</button>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
+        <div
+          ref={canvasRef}
+          className="folder-canvas"
+          onDoubleClick={(event) => !event.target.closest('.folder-child, button') && onCreate(logicalPoint(event))}
+          onContextMenu={(event) => {
+            if (event.target.closest('.folder-child')) return
+            event.preventDefault()
+            onBlankContextMenu({ x: event.clientX, y: event.clientY, point: logicalPoint(event), folder })
+          }}
+        >
           {children.map((child) => {
             const childPlacement = childPlacements.find((value) => value.itemId === child.id)
             if (!childPlacement) return null
@@ -58,6 +68,11 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
                 role="link"
                 tabIndex={0}
                 aria-label={child.title}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onItemContextMenu({ x: event.clientX, y: event.clientY, item: child, folder })
+                }}
                 onPointerDown={(event) => beginDrag(event, child, childPlacement)}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}

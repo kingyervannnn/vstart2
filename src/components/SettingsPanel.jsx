@@ -28,6 +28,9 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
   const [backgroundError, setBackgroundError] = useState('')
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
+  const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
+  const searchAppearance = settings.search?.appearance || {}
+  const searchBlur = Math.max(0, Math.min(40, Number(searchAppearance.blur) || 0))
 
   const addWorkspace = async (event) => {
     event.preventDefault()
@@ -85,6 +88,8 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
               <Toggle label="Show folder labels" checked={settings.speedDial?.showFolderLabels} onChange={(value) => onPatch({ speedDial: { showFolderLabels: value } })} />
               <label className="setting-field range-setting"><span>Shortcut and folder size <output aria-hidden="true">{shortcutSize}%</output></span><input type="range" min="56" max="92" step="2" value={shortcutSize} aria-label="Shortcut and folder size" onChange={(event) => onPatch({ speedDial: { shortcutSize: Number(event.target.value) } })} /></label>
               <p className="field-help">Changes icon and folder-preview size without moving saved positions.</p>
+              <label className="setting-field range-setting"><span>Workspace scroll resistance <output aria-hidden="true">{wheelResistance <= 20 ? 'Snappy' : wheelResistance >= 70 ? 'Resistant' : 'Balanced'} · {wheelResistance}</output></span><input type="range" min="0" max="100" step="5" value={wheelResistance} aria-label="Workspace scroll resistance" onChange={(event) => onPatch({ speedDial: { wheelResistance: Number(event.target.value) } })} /></label>
+              <p className="field-help">Lower values switch workspaces sooner and shorten the wheel cooldown.</p>
               <div className="setting-note"><strong>Free placement is always enabled.</strong><span>There is no grid snapping, auto-arrange, or gravity setting.</span></div>
             </>}
             {page === 'search' && <>
@@ -92,6 +97,11 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
               <label className="setting-field"><span>Default search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option></select></label>
               <Toggle label="Inline results" checked={settings.search?.inlineEnabled !== false} onChange={(value) => onPatch({ search: { inlineEnabled: value } })} />
               <Toggle label="Image search" checked={settings.search?.imageSearchEnabled !== false} onChange={(value) => onPatch({ search: { imageSearchEnabled: value } })} />
+              <Toggle label="Search bar outline" checked={searchAppearance.outline !== false} onChange={(value) => onPatch({ search: { appearance: { outline: value } } })} />
+              <Toggle label="Outer glow" detail="Adds an accent-colored halo around the search bar." checked={searchAppearance.outerGlow} onChange={(value) => onPatch({ search: { appearance: { outerGlow: value } } })} />
+              {searchAppearance.outerGlow && <Toggle label="Glow only while focused" checked={searchAppearance.glowOnFocus !== false} onChange={(value) => onPatch({ search: { appearance: { glowOnFocus: value } } })} />}
+              <label className="setting-field range-setting"><span>Search bar blur <output aria-hidden="true">{searchBlur}px</output></span><input type="range" min="0" max="40" step="1" value={searchBlur} aria-label="Search bar blur" onChange={(event) => onPatch({ search: { appearance: { blur: Number(event.target.value) } } })} /></label>
+              <p className="field-help">In edit mode, drag the handle beside the workspace buttons to set their horizontal relationship to the search bar.</p>
               <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search</span></div>
               <div className="setting-note"><strong>AI control</strong><span>The V Start 1 glyph is a clickable local placeholder. No backend or provider settings are included.</span></div>
             </>}

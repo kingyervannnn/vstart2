@@ -33,7 +33,7 @@ function mutation(path, method, body, prefix) {
 export const api = {
   bootstrap: () => request('/api/bootstrap'),
   patchSettings: (version, patch) => mutation('/api/settings', 'PATCH', { version, patch }, 'settings'),
-  createWorkspace: (name, slug) => mutation('/api/workspaces', 'POST', { name, slug }, 'workspace-create'),
+  createWorkspace: (name, slug, icon) => mutation('/api/workspaces', 'POST', { name, slug, icon }, 'workspace-create'),
   updateWorkspace: (id, changes) => mutation(`/api/workspaces/${id}`, 'PATCH', changes, 'workspace-update'),
   deleteWorkspace: (id) => mutation(`/api/workspaces/${id}`, 'DELETE', {}, 'workspace-delete'),
   reorderWorkspaces: (ids) => mutation('/api/workspaces/reorder', 'PUT', { ids }, 'workspace-reorder'),

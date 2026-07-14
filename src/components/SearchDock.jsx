@@ -18,12 +18,15 @@ export function SearchDock({
   workspaces,
   activeWorkspaceId,
   onWorkspaceSelect,
+  onWorkspaceContextMenu,
   onGeometryCommit,
+  onWorkspaceOffsetCommit,
   onInlineResults,
 }) {
   const dockRef = useRef(null)
   const inputRef = useRef(null)
   const interactionRef = useRef(null)
+  const workspaceDragRef = useRef(null)
   const geometryRef = useRef(null)
   const mediaRef = useRef(null)
   const chunksRef = useRef([])
@@ -31,6 +34,8 @@ export function SearchDock({
   const configuredX = configured.x
   const configuredY = configured.y
   const configuredWidth = configured.width
+  const configuredWorkspaceOffset = Number(settings.search?.workspaceOffset?.[profile]) || 0
+  const searchAppearance = settings.search?.appearance || {}
   const [geometry, setGeometry] = useState({ x: configuredX, y: configuredY, width: configuredWidth })
   const [query, setQuery] = useState('')
   const [inline, setInline] = useState(false)
@@ -42,12 +47,15 @@ export function SearchDock({
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [suggestionsDropUp, setSuggestionsDropUp] = useState(false)
   const [interactionKind, setInteractionKind] = useState(null)
+  const [workspaceOffset, setWorkspaceOffset] = useState(configuredWorkspaceOffset)
+  const [workspaceMoving, setWorkspaceMoving] = useState(false)
 
   useEffect(() => {
     const next = { x: configuredX, y: configuredY, width: configuredWidth }
     geometryRef.current = next
     setGeometry(next)
   }, [configuredX, configuredY, configuredWidth])
+  useEffect(() => setWorkspaceOffset(configuredWorkspaceOffset), [configuredWorkspaceOffset])
   useEffect(() => {
     if (settings.general?.autofocusSearch) inputRef.current?.focus({ preventScroll: true })
   }, [settings.general?.autofocusSearch])
@@ -151,6 +159,46 @@ export function SearchDock({
     }
   }, [endInteraction, interactionKind, moveInteraction])
 
+  const beginWorkspaceMove = (event) => {
+    if (!editMode || (event.button !== undefined && event.button !== 0)) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    workspaceDragRef.current = { pointerId: event.pointerId, startX: event.clientX, initial: workspaceOffset }
+    setWorkspaceMoving(true)
+  }
+
+  const moveWorkspace = useCallback((event) => {
+    const value = workspaceDragRef.current
+    if (!value || value.pointerId !== event.pointerId) return
+    const next = Math.round(Math.max(-260, Math.min(260, value.initial + event.clientX - value.startX)))
+    value.last = next
+    setWorkspaceOffset(next)
+  }, [])
+
+  const endWorkspaceMove = useCallback(async (event) => {
+    const value = workspaceDragRef.current
+    if (!value || value.pointerId !== event.pointerId) return
+    workspaceDragRef.current = null
+    setWorkspaceMoving(false)
+    const next = value.last ?? value.initial
+    setWorkspaceOffset(next)
+    await onWorkspaceOffsetCommit(profile, next)
+  }, [onWorkspaceOffsetCommit, profile])
+
+  useEffect(() => {
+    if (!workspaceMoving) return undefined
+    const move = (event) => moveWorkspace(event)
+    const finish = (event) => endWorkspaceMove(event)
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('pointerup', finish, true)
+    window.addEventListener('pointercancel', finish, true)
+    return () => {
+      window.removeEventListener('pointermove', move, true)
+      window.removeEventListener('pointerup', finish, true)
+      window.removeEventListener('pointercancel', finish, true)
+    }
+  }, [endWorkspaceMove, moveWorkspace, workspaceMoving])
+
   const submit = (event) => {
     event.preventDefault()
     const value = query.trim()
@@ -203,8 +251,12 @@ export function SearchDock({
       onPointerCancel={endInteraction}
       onLostPointerCapture={endInteraction}
     >
-      <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} />
-      <form className={`search-dock ${inline ? 'inline-mode' : ''} ${aiActive ? 'ai-placeholder-active' : ''}`} onSubmit={submit}>
+      <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />
+      <form
+        className={`search-dock ${inline ? 'inline-mode' : ''} ${aiActive ? 'ai-placeholder-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} ${searchAppearance.outerGlow ? 'search-outer-glow' : ''} ${searchAppearance.glowOnFocus !== false ? 'glow-on-focus' : ''}`}
+        style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
+        onSubmit={submit}
+      >
         <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
         <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
         <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>

@@ -16,6 +16,7 @@ const CANVASES = {
 const workspaceCreateSchema = z.object({
   name: z.string().trim().min(1).max(80),
   slug: z.string().trim().optional(),
+  icon: z.string().trim().max(80).optional(),
 })
 
 const workspaceUpdateSchema = z.object({
@@ -31,6 +32,7 @@ const workspaceUpdateSchema = z.object({
 
 const shortcutCreateSchema = z.object({
   workspaceId: uuid,
+  parentFolderId: uuid.nullable().optional(),
   title: z.string().trim().min(1).max(120),
   url: httpUrl,
   iconOverrideUrl: z.union([httpUrl, z.literal(''), z.null()]).optional(),
@@ -256,8 +258,8 @@ async function handleRequest(request, response) {
       const order = await client.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM workspaces')
       await client.query(`
         INSERT INTO workspaces(id, name, slug, sort_order, icon)
-        VALUES ($1, $2, $3, $4, 'layers')
-      `, [id, data.name, slug, order.rows[0].next])
+        VALUES ($1, $2, $3, $4, $5)
+      `, [id, data.name, slug, order.rows[0].next, data.icon || 'Layers'])
       return { status: 201, body: await bootstrapResponse(client, { workspaceId: id }) }
     })
   }
@@ -344,6 +346,11 @@ async function handleRequest(request, response) {
     return mutate(request, response, 'shortcut.create', data, async (client) => {
       const workspace = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [data.workspaceId])
       if (!workspace.rowCount) throw new HttpError(404, 'Workspace not found')
+      if (data.parentFolderId) {
+        const folder = await client.query('SELECT kind, workspace_id FROM shortcut_items WHERE id = $1 FOR SHARE', [data.parentFolderId])
+        if (!folder.rowCount || folder.rows[0].kind !== 'folder') throw new HttpError(404, 'Folder not found')
+        if (folder.rows[0].workspace_id !== data.workspaceId) throw new HttpError(409, 'Folder belongs to a different workspace')
+      }
       const icon = data.iconData
         ? {
             iconAssetId: await insertUploadedIcon(client, data.iconMimeType || 'application/octet-stream', Buffer.from(data.iconData, 'base64')),
@@ -354,15 +361,15 @@ async function handleRequest(request, response) {
       const id = crypto.randomUUID()
       await client.query(`
         INSERT INTO shortcut_items(
-          id, workspace_id, kind, title, url, icon_asset_id, icon_override_url, favicon_url
-        ) VALUES ($1, $2, 'shortcut', $3, $4, $5, $6, $7)
-      `, [id, data.workspaceId, data.title, data.url, icon.iconAssetId, data.iconOverrideUrl || null, icon.faviconUrl])
+          id, workspace_id, parent_folder_id, kind, title, url, icon_asset_id, icon_override_url, favicon_url
+        ) VALUES ($1, $2, $3, 'shortcut', $4, $5, $6, $7, $8)
+      `, [id, data.workspaceId, data.parentFolderId || null, data.title, data.url, icon.iconAssetId, data.iconOverrideUrl || null, icon.faviconUrl])
       for (const profileName of Object.keys(CANVASES)) {
         const value = data.placements[profileName]
         await client.query(`
           INSERT INTO item_placements(item_id, workspace_id, container_key, profile, x, y, width, height)
-          VALUES ($1, $2, 'root', $3, $4, $5, $6, $7)
-        `, [id, data.workspaceId, profileName, value.x, value.y, value.width, value.height])
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [id, data.workspaceId, data.parentFolderId || 'root', profileName, value.x, value.y, value.width, value.height])
       }
       return { status: 201, body: await bootstrapResponse(client, { itemId: id, iconWarning: icon.warning }) }
     })

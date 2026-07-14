@@ -14,6 +14,8 @@ import { SettingsPanel } from './components/SettingsPanel.jsx'
 import { ShortcutDialog } from './components/ShortcutDialog.jsx'
 import { WidgetRail } from './components/WidgetRail.jsx'
 import { AppContextMenu } from './components/AppContextMenu.jsx'
+import { WorkspaceContextMenu } from './components/WorkspaceContextMenu.jsx'
+import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 
 function LoadingShell({ error, onRetry }) {
   return (
@@ -38,6 +40,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dialog, setDialog] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
+  const [workspaceMenu, setWorkspaceMenu] = useState(null)
+  const [workspaceDialog, setWorkspaceDialog] = useState(null)
   const [folderId, setFolderId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCount, setSavingCount] = useState(0)
@@ -106,13 +110,13 @@ export function App() {
     if (wheel.cooldown) return
     wheel.total += Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX
     clearTimeout(wheel.timer)
-    wheel.timer = setTimeout(() => { wheel.total = 0 }, 110)
-    const resistance = Math.max(0.5, Number(settings.speedDial?.wheelResistance) || 1)
-    if (Math.abs(wheel.total) < 36 * resistance) return
+    const resistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
+    wheel.timer = setTimeout(() => { wheel.total = 0 }, 80 + resistance * 0.6)
+    if (Math.abs(wheel.total) < 10 + resistance * 0.55) return
     wheel.cooldown = true
     cycleWorkspace(wheel.total > 0 ? 1 : -1)
     wheel.total = 0
-    setTimeout(() => { wheel.cooldown = false }, 260)
+    setTimeout(() => { wheel.cooldown = false }, 100 + resistance * 1.5)
   }
 
   const patchSettings = useCallback((patch) => {
@@ -165,8 +169,10 @@ export function App() {
         applyBootstrap(result.bootstrap)
         if (result.iconWarning) setToast({ type: 'warning', message: result.iconWarning })
       } else {
+        const parentFolderId = dialog.parentFolderId || null
+        const containerKey = parentFolderId || 'root'
         const activeCanvas = CANVASES[profile]
-        const activeOccupied = placementsFor(activeWorkspace.id, profile)
+        const activeOccupied = placementsFor(activeWorkspace.id, profile, containerKey)
         const preferred = values.point ? {
           x: values.point.x - activeCanvas.tileWidth / 2,
           y: values.point.y - activeCanvas.tileHeight / 2,
@@ -175,7 +181,7 @@ export function App() {
         if (!activePlacement) throw new Error(`No free space remains in the ${profile} layout`)
         const otherProfile = profile === 'wide' ? 'compact' : 'wide'
         const projection = projectPlacement(activePlacement, profile, otherProfile)
-        const otherOccupied = placementsFor(activeWorkspace.id, otherProfile)
+        const otherOccupied = placementsFor(activeWorkspace.id, otherProfile, containerKey)
         const otherPlacement = collides(projection, otherOccupied)
           ? findOpenPlacement(otherOccupied, otherProfile, projection)
           : projection
@@ -187,11 +193,13 @@ export function App() {
           iconOverrideUrl: values.iconOverrideUrl,
           iconData: values.iconData || undefined,
           iconMimeType: values.iconMimeType || undefined,
+          parentFolderId,
           placements: profile === 'wide'
             ? { wide: activePlacement, compact: otherPlacement }
             : { compact: activePlacement, wide: otherPlacement },
         })
         applyBootstrap(result.bootstrap)
+        if (parentFolderId) setFolderId(parentFolderId)
         if (result.iconWarning) setToast({ type: 'warning', message: result.iconWarning })
       }
       setDialog(null)
@@ -386,8 +394,9 @@ export function App() {
     }
   }
 
-  const createWorkspace = async (name) => {
-    const result = await api.createWorkspace(name)
+  const createWorkspace = async (nameOrValues) => {
+    const values = typeof nameOrValues === 'string' ? { name: nameOrValues } : nameOrValues
+    const result = await api.createWorkspace(values.name, values.slug || undefined, values.icon || undefined)
     applyBootstrap(result.bootstrap)
     const workspace = result.bootstrap.workspaces.find((value) => value.id === result.workspaceId)
     selectWorkspace(workspace)
@@ -407,6 +416,36 @@ export function App() {
       setToast({ type: 'error', message: error.message })
       await load()
       throw error
+    }
+  }
+
+  const saveWorkspaceDialog = async (values) => {
+    setBusy(true)
+    try {
+      if (workspaceDialog?.workspace) {
+        await updateWorkspace(workspaceDialog.workspace, values)
+      } else {
+        await createWorkspace(values)
+      }
+      setWorkspaceDialog(null)
+      setWorkspaceMenu(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteWorkspaceFromMenu = async (workspace) => {
+    if (workspaces.length <= 1) return
+    if (!window.confirm(`Delete ${workspace.name}? Its shortcuts will also be removed.`)) return
+    setBusy(true)
+    try {
+      await deleteWorkspace(workspace.id)
+      setWorkspaceMenu(null)
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+      await load()
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -491,8 +530,8 @@ export function App() {
             onDropOnItem={dropOnItem}
             onOpenFolder={(item) => setFolderId(item.id)}
             onEdit={(item) => setDialog({ item, point: null })}
-            onBlankContextMenu={({ x, y, point }) => setContextMenu({ x, y, point, item: null })}
-            onItemContextMenu={({ x, y, item }) => setContextMenu({ x, y, point: null, item })}
+            onBlankContextMenu={({ x, y, point }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null }) }}
+            onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
         <SearchDock
@@ -503,6 +542,8 @@ export function App() {
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspace.id}
           onWorkspaceSelect={selectWorkspace}
+          onWorkspaceContextMenu={(payload) => { setContextMenu(null); setWorkspaceMenu(payload) }}
+          onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
         />
@@ -518,15 +559,40 @@ export function App() {
         workspaces={workspaces}
         editMode={editMode}
         onClose={closeContextMenu}
-        onCreate={(point) => setDialog({ item: null, point })}
+        onCreate={(point, parentFolderId = null) => { if (parentFolderId) setFolderId(null); setDialog({ item: null, point, parentFolderId }) }}
         onToggleEdit={() => setEditMode((value) => !value)}
-        onEditItem={(item) => setDialog({ item, point: null })}
+        onEditItem={(item) => { setFolderId(null); setDialog({ item, point: null }) }}
         onMoveItem={moveItemToWorkspace}
         onPinItem={pinItemAcrossWorkspaces}
         onUnpinItem={unpinItemAcrossWorkspaces}
+        onMoveOut={moveOutOfFolder}
         onDeleteItem={(item) => deleteItem(item, 'deleteChildren')}
       />}
-      <FolderPopover folder={currentFolder} children={folderChildren} placements={bootstrap.placements} profile={profile} editMode={editMode} openInNewTab={settings.general?.openLinksInNewTab !== false} onClose={() => setFolderId(null)} onEdit={(item) => { setFolderId(null); setDialog({ item, point: null }) }} onMove={moveItem} onMoveOut={moveOutOfFolder} />
+      <FolderPopover
+        folder={currentFolder}
+        children={folderChildren}
+        placements={bootstrap.placements}
+        profile={profile}
+        editMode={editMode}
+        openInNewTab={settings.general?.openLinksInNewTab !== false}
+        onClose={() => setFolderId(null)}
+        onCreate={(point) => { setFolderId(null); setDialog({ item: null, point, parentFolderId: currentFolder.id }) }}
+        onBlankContextMenu={({ x, y, point, folder }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null, folder }) }}
+        onItemContextMenu={({ x, y, item, folder }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item, folder }) }}
+        onEdit={(item) => { setFolderId(null); setDialog({ item, point: null }) }}
+        onMove={moveItem}
+        onMoveOut={moveOutOfFolder}
+      />
+      {workspaceMenu && <WorkspaceContextMenu
+        menu={workspaceMenu}
+        workspaceCount={workspaces.length}
+        onClose={() => setWorkspaceMenu(null)}
+        onCreate={() => { setWorkspaceMenu(null); setWorkspaceDialog({ workspace: null }) }}
+        onRename={(workspace) => { setWorkspaceMenu(null); setWorkspaceDialog({ workspace }) }}
+        onChangeIcon={(workspace, icon) => updateWorkspace(workspace, { icon })}
+        onDelete={deleteWorkspaceFromMenu}
+      />}
+      {workspaceDialog && <WorkspaceDialog workspace={workspaceDialog.workspace} busy={busy} onClose={() => setWorkspaceDialog(null)} onSubmit={saveWorkspaceDialog} />}
       {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={deleteWorkspace} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}
