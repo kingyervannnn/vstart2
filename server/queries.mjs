@@ -20,7 +20,7 @@ export async function loadBootstrap(client) {
   const state = await client.query('SELECT key, value, version FROM app_state ORDER BY key')
   const workspaces = await client.query('SELECT * FROM workspaces ORDER BY sort_order, created_at')
   const items = await client.query(`
-      SELECT id, workspace_id, parent_folder_id, kind, title, url, icon_asset_id,
+      SELECT id, workspace_id, parent_folder_id, pin_group_id, kind, title, url, icon_asset_id,
              icon_override_url, favicon_url, version, created_at, updated_at
       FROM shortcut_items
       ORDER BY created_at
@@ -51,6 +51,7 @@ export async function loadBootstrap(client) {
       id: row.id,
       workspaceId: row.workspace_id,
       parentFolderId: row.parent_folder_id,
+      pinGroupId: row.pin_group_id,
       kind: row.kind,
       title: row.title,
       url: row.url,

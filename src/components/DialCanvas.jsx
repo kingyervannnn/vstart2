@@ -17,6 +17,8 @@ export function DialCanvas({
   onDropOnItem,
   onOpenFolder,
   onEdit,
+  onBlankContextMenu,
+  onItemContextMenu,
 }) {
   const canvasRef = useRef(null)
   const dragRef = useRef(null)
@@ -88,12 +90,18 @@ export function DialCanvas({
   }
 
   const handleDoubleClick = (event) => {
-    if (!editMode || event.target.closest('.shortcut-tile')) return
+    if (event.target.closest('.shortcut-tile, .add-shortcut-button')) return
     onCreateAt(logicalPoint(event))
   }
 
+  const handleContextMenu = (event) => {
+    if (event.target.closest('.shortcut-tile')) return
+    event.preventDefault()
+    onBlankContextMenu({ x: event.clientX, y: event.clientY, point: logicalPoint(event) })
+  }
+
   return (
-    <section ref={canvasRef} className={`dial-canvas ${alwaysShowNames ? 'labels-always' : 'labels-hover'}`} onDoubleClick={handleDoubleClick} aria-label={`${workspace.name} speed dial`}>
+    <section ref={canvasRef} className={`dial-canvas ${alwaysShowNames ? 'labels-always' : 'labels-hover'}`} onDoubleClick={handleDoubleClick} onContextMenu={handleContextMenu} aria-label={`${workspace.name} speed dial`}>
       {editMode && (
         <button className="add-shortcut-button" type="button" onClick={() => onCreateAt(null)}>
           <Plus size={17} /> Add shortcut
@@ -112,6 +120,11 @@ export function DialCanvas({
             role="link"
             tabIndex={0}
             aria-label={item.title}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onItemContextMenu({ x: event.clientX, y: event.clientY, item })
+            }}
             onPointerDown={(event) => beginDrag(event, item, stored)}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
@@ -138,7 +151,7 @@ export function DialCanvas({
           </div>
         )
       })}
-      {!rootItems.length && !editMode && <div className="empty-dial"><p>No shortcuts yet.</p><small>Enter edit mode to pin one anywhere on this side.</small></div>}
+      {!rootItems.length && !editMode && <div className="empty-dial"><p>No shortcuts yet.</p><small>Double-click anywhere or right-click to create one.</small></div>}
     </section>
   )
 }

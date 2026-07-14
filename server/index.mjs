@@ -56,6 +56,22 @@ const placementUpdateSchema = placement.pick({ x: true, y: true }).extend({
   mutationId: z.string().max(200).optional(),
 })
 
+const itemWorkspaceSchema = z.object({
+  destinationWorkspaceId: uuid,
+  placements,
+  version: z.number().int().positive(),
+  mutationId: z.string().max(200).optional(),
+})
+
+const pinItemSchema = z.object({
+  destinations: z.array(z.object({
+    workspaceId: uuid,
+    placements,
+  })).min(1).max(80),
+  version: z.number().int().positive(),
+  mutationId: z.string().max(200).optional(),
+})
+
 function assertPlacementBounds(profileName, value) {
   const canvas = CANVASES[profileName]
   if (value.x + value.width > canvas.width || value.y + value.height > canvas.height) {
@@ -376,11 +392,12 @@ async function handleRequest(request, response) {
       } else if (row.kind === 'shortcut' && (data.url !== undefined || data.iconOverrideUrl !== undefined)) {
         icon = await resolveShortcutIcon(client, destination, override)
       }
+      const itemSelector = row.pin_group_id ? 'pin_group_id = $1' : 'id = $1'
       await client.query(`
         UPDATE shortcut_items SET title = $2, url = $3, icon_override_url = $4,
           icon_asset_id = $5, favicon_url = $6, version = version + 1, updated_at = now()
-        WHERE id = $1
-      `, [match[0], data.title ?? row.title, destination, override, icon.iconAssetId, icon.faviconUrl])
+        WHERE ${itemSelector}
+      `, [row.pin_group_id || match[0], data.title ?? row.title, destination, override, icon.iconAssetId, icon.faviconUrl])
       return bootstrapResponse(client, { iconWarning: icon.warning })
     })
   }
@@ -394,7 +411,17 @@ async function handleRequest(request, response) {
       if (item.rows[0].kind === 'folder' && body.action === 'returnChildren') {
         await moveFolderChildrenToRoot(client, match[0], item.rows[0].workspace_id)
       }
+      const pinGroupId = item.rows[0].pin_group_id
       await client.query('DELETE FROM shortcut_items WHERE id = $1', [match[0]])
+      if (pinGroupId) {
+        const remaining = await client.query('SELECT id FROM shortcut_items WHERE pin_group_id = $1 FOR UPDATE', [pinGroupId])
+        if (remaining.rowCount === 1) {
+          await client.query(`
+            UPDATE shortcut_items SET pin_group_id = NULL, version = version + 1, updated_at = now()
+            WHERE id = $1
+          `, [remaining.rows[0].id])
+        }
+      }
       return bootstrapResponse(client)
     })
   }
@@ -420,6 +447,120 @@ async function handleRequest(request, response) {
     })
   }
 
+  match = routeMatch(pathname, /^\/api\/items\/([0-9a-f-]+)\/workspace$/)
+  if (request.method === 'PUT' && match) {
+    const body = await readJson(request)
+    const data = parse(itemWorkspaceSchema, body)
+    for (const profileName of Object.keys(CANVASES)) assertPlacementBounds(profileName, data.placements[profileName])
+    return mutate(request, response, `item.workspace:${match[0]}`, data, async (client) => {
+      await client.query('SET CONSTRAINTS item_placements_no_overlap DEFERRED')
+      const item = await client.query('SELECT * FROM shortcut_items WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!item.rowCount) throw new HttpError(404, 'Item not found')
+      const row = item.rows[0]
+      if (Number(row.version) !== data.version) throw new HttpError(409, 'Item changed elsewhere')
+      if (row.parent_folder_id) throw new HttpError(409, 'Move this shortcut out of its folder first')
+      if (row.pin_group_id) throw new HttpError(409, 'Unpin this shortcut before moving it to one workspace')
+      if (row.workspace_id === data.destinationWorkspaceId) throw new HttpError(400, 'Choose a different workspace')
+      const destination = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [data.destinationWorkspaceId])
+      if (!destination.rowCount) throw new HttpError(404, 'Destination workspace not found')
+
+      const members = await client.query(`
+        SELECT id FROM shortcut_items WHERE id = $1 OR parent_folder_id = $1 FOR UPDATE
+      `, [match[0]])
+      const itemIds = members.rows.map((value) => value.id)
+      await client.query(`
+        UPDATE shortcut_items SET workspace_id = $2, version = version + 1, updated_at = now()
+        WHERE id = ANY($1::uuid[])
+      `, [itemIds, data.destinationWorkspaceId])
+      await client.query(`
+        UPDATE item_placements SET workspace_id = $2, version = version + 1, updated_at = now()
+        WHERE item_id = ANY($1::uuid[])
+      `, [itemIds, data.destinationWorkspaceId])
+      for (const profileName of Object.keys(CANVASES)) {
+        const value = data.placements[profileName]
+        await client.query(`
+          UPDATE item_placements SET container_key = 'root', x = $3, y = $4,
+            width = $5, height = $6, version = version + 1, updated_at = now()
+          WHERE item_id = $1 AND profile = $2
+        `, [match[0], profileName, value.x, value.y, value.width, value.height])
+      }
+      return bootstrapResponse(client)
+    })
+  }
+
+  match = routeMatch(pathname, /^\/api\/items\/([0-9a-f-]+)\/pin$/)
+  if (request.method === 'POST' && match) {
+    const body = await readJson(request)
+    const data = parse(pinItemSchema, body)
+    const destinationIds = data.destinations.map((value) => value.workspaceId)
+    if (new Set(destinationIds).size !== destinationIds.length) throw new HttpError(400, 'A workspace can only appear once')
+    for (const destination of data.destinations) {
+      for (const profileName of Object.keys(CANVASES)) assertPlacementBounds(profileName, destination.placements[profileName])
+    }
+    return mutate(request, response, `item.pin:${match[0]}`, data, async (client) => {
+      await client.query('SET CONSTRAINTS item_placements_no_overlap DEFERRED')
+      const item = await client.query('SELECT * FROM shortcut_items WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!item.rowCount) throw new HttpError(404, 'Shortcut not found')
+      const row = item.rows[0]
+      if (Number(row.version) !== data.version) throw new HttpError(409, 'Shortcut changed elsewhere')
+      if (row.kind !== 'shortcut' || row.parent_folder_id) throw new HttpError(409, 'Only root shortcuts can be pinned across workspaces')
+      if (row.pin_group_id) throw new HttpError(409, 'This shortcut is already pinned across workspaces')
+
+      const workspaceRows = await client.query('SELECT id FROM workspaces ORDER BY sort_order FOR SHARE')
+      const expectedIds = workspaceRows.rows.map((value) => value.id).filter((id) => id !== row.workspace_id)
+      if (expectedIds.length !== destinationIds.length || expectedIds.some((id) => !destinationIds.includes(id))) {
+        throw new HttpError(409, 'Workspace list changed; reopen the menu and try pinning again')
+      }
+
+      const pinGroupId = crypto.randomUUID()
+      await client.query(`
+        UPDATE shortcut_items SET pin_group_id = $2, version = version + 1, updated_at = now()
+        WHERE id = $1
+      `, [match[0], pinGroupId])
+      for (const destination of data.destinations) {
+        const cloneId = crypto.randomUUID()
+        await client.query(`
+          INSERT INTO shortcut_items(
+            id, workspace_id, pin_group_id, kind, title, url, icon_asset_id,
+            icon_override_url, favicon_url
+          ) VALUES ($1, $2, $3, 'shortcut', $4, $5, $6, $7, $8)
+        `, [
+          cloneId, destination.workspaceId, pinGroupId, row.title, row.url,
+          row.icon_asset_id, row.icon_override_url, row.favicon_url,
+        ])
+        for (const profileName of Object.keys(CANVASES)) {
+          const value = destination.placements[profileName]
+          await client.query(`
+            INSERT INTO item_placements(item_id, workspace_id, container_key, profile, x, y, width, height)
+            VALUES ($1, $2, 'root', $3, $4, $5, $6, $7)
+          `, [cloneId, destination.workspaceId, profileName, value.x, value.y, value.width, value.height])
+        }
+      }
+      return bootstrapResponse(client)
+    })
+  }
+
+  if (request.method === 'DELETE' && match) {
+    const body = await readJson(request)
+    const data = parse(z.object({
+      version: z.number().int().positive(),
+      mutationId: z.string().max(200).optional(),
+    }), body)
+    return mutate(request, response, `item.unpin:${match[0]}`, data, async (client) => {
+      const item = await client.query('SELECT * FROM shortcut_items WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!item.rowCount) throw new HttpError(404, 'Shortcut not found')
+      const row = item.rows[0]
+      if (Number(row.version) !== data.version) throw new HttpError(409, 'Shortcut changed elsewhere')
+      if (!row.pin_group_id) throw new HttpError(409, 'This shortcut is not pinned across workspaces')
+      await client.query('DELETE FROM shortcut_items WHERE pin_group_id = $1 AND id <> $2', [row.pin_group_id, match[0]])
+      await client.query(`
+        UPDATE shortcut_items SET pin_group_id = NULL, version = version + 1, updated_at = now()
+        WHERE id = $1
+      `, [match[0]])
+      return bootstrapResponse(client)
+    })
+  }
+
   if (request.method === 'POST' && pathname === '/api/folders/merge') {
     const body = await readJson(request)
     const data = parse(z.object({
@@ -435,8 +576,8 @@ async function handleRequest(request, response) {
         SELECT * FROM shortcut_items WHERE id = ANY($1::uuid[]) FOR UPDATE
       `, [[data.sourceId, data.targetId]])
       if (items.rowCount !== 2) throw new HttpError(404, 'One of the shortcuts no longer exists')
-      if (items.rows.some((row) => row.kind !== 'shortcut' || row.parent_folder_id)) {
-        throw new HttpError(409, 'Only root shortcuts can be merged into a new folder')
+      if (items.rows.some((row) => row.kind !== 'shortcut' || row.parent_folder_id || row.pin_group_id)) {
+        throw new HttpError(409, 'Only unpinned root shortcuts can be merged into a new folder')
       }
       if (items.rows[0].workspace_id !== items.rows[1].workspace_id) throw new HttpError(409, 'Shortcuts must share a workspace')
       const workspaceId = items.rows[0].workspace_id
@@ -489,6 +630,7 @@ async function handleRequest(request, response) {
       await client.query('SET CONSTRAINTS item_placements_no_overlap DEFERRED')
       const item = await client.query('SELECT * FROM shortcut_items WHERE id = $1 FOR UPDATE', [match[0]])
       if (!item.rowCount) throw new HttpError(404, 'Item not found')
+      if (item.rows[0].pin_group_id) throw new HttpError(409, 'Unpin this shortcut before moving it into or out of a folder')
       if (item.rows[0].kind === 'folder' && data.parentFolderId) throw new HttpError(409, 'Folders cannot be nested')
       if (data.parentFolderId) {
         const folder = await client.query(`

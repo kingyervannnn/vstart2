@@ -13,6 +13,7 @@ import { ServiceRailView } from './components/ServiceRailView.jsx'
 import { SettingsPanel } from './components/SettingsPanel.jsx'
 import { ShortcutDialog } from './components/ShortcutDialog.jsx'
 import { WidgetRail } from './components/WidgetRail.jsx'
+import { AppContextMenu } from './components/AppContextMenu.jsx'
 
 function LoadingShell({ error, onRetry }) {
   return (
@@ -36,6 +37,7 @@ export function App() {
   const [editMode, setEditMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dialog, setDialog] = useState(null)
+  const [contextMenu, setContextMenu] = useState(null)
   const [folderId, setFolderId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCount, setSavingCount] = useState(0)
@@ -128,6 +130,20 @@ export function App() {
 
   const placementsFor = useCallback((workspaceId, profileName, containerKey = 'root') =>
     (bootstrapRef.current?.placements || []).filter((value) => value.workspaceId === workspaceId && value.profile === profileName && value.containerKey === containerKey), [])
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+  const placementsInWorkspace = useCallback((item, workspaceId) => {
+    const result = {}
+    for (const profileName of Object.keys(CANVASES)) {
+      const source = bootstrapRef.current?.placements.find((value) => value.itemId === item.id && value.profile === profileName)
+      const occupied = placementsFor(workspaceId, profileName)
+      const position = findOpenPlacement(occupied, profileName, source || undefined)
+      if (!position) throw new Error(`No free space remains in ${profileName} view for that workspace`)
+      result[profileName] = position
+    }
+    return result
+  }, [placementsFor])
 
   const saveDialog = async (values) => {
     if (!activeWorkspace) return
@@ -300,6 +316,65 @@ export function App() {
     }
   }
 
+  const moveItemToWorkspace = async (item, workspace) => {
+    setBusy(true)
+    try {
+      const nextPlacements = placementsInWorkspace(item, workspace.id)
+      const result = await api.moveItemToWorkspace(item.id, {
+        destinationWorkspaceId: workspace.id,
+        placements: nextPlacements,
+        version: item.version,
+      })
+      applyBootstrap(result.bootstrap)
+      setFolderId(null)
+      setToast({ type: 'success', message: `${item.title} moved to ${workspace.name}.` })
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pinItemAcrossWorkspaces = async (item) => {
+    const destinations = workspaces.filter((workspace) => workspace.id !== item.workspaceId)
+    if (!destinations.length) {
+      setToast({ type: 'warning', message: 'Create another workspace before pinning across workspaces.' })
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await api.pinItem(item.id, {
+        version: item.version,
+        destinations: destinations.map((workspace) => ({
+          workspaceId: workspace.id,
+          placements: placementsInWorkspace(item, workspace.id),
+        })),
+      })
+      applyBootstrap(result.bootstrap)
+      setToast({ type: 'success', message: `${item.title} is pinned across all workspaces.` })
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const unpinItemAcrossWorkspaces = async (item) => {
+    setBusy(true)
+    try {
+      const result = await api.unpinItem(item.id, item.version)
+      applyBootstrap(result.bootstrap)
+      setToast({ type: 'success', message: `${item.title} now belongs only to this workspace.` })
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const runInlineSearch = async (query) => {
     setWidgetView(null)
     setInlineResults({ query, results: [], loading: true, error: '' })
@@ -415,6 +490,8 @@ export function App() {
             onDropOnItem={dropOnItem}
             onOpenFolder={(item) => setFolderId(item.id)}
             onEdit={(item) => setDialog({ item, point: null })}
+            onBlankContextMenu={({ x, y, point }) => setContextMenu({ x, y, point, item: null })}
+            onItemContextMenu={({ x, y, item }) => setContextMenu({ x, y, point: null, item })}
           />
         )}
         <SearchDock
@@ -435,6 +512,19 @@ export function App() {
       </section>
 
       {dialog && <ShortcutDialog item={dialog.item} point={dialog.point} onClose={() => setDialog(null)} onSubmit={saveDialog} onDelete={deleteItem} onDuplicate={duplicateItem} busy={busy} />}
+      {contextMenu && <AppContextMenu
+        menu={contextMenu}
+        workspaces={workspaces}
+        editMode={editMode}
+        onClose={closeContextMenu}
+        onCreate={(point) => setDialog({ item: null, point })}
+        onToggleEdit={() => setEditMode((value) => !value)}
+        onEditItem={(item) => setDialog({ item, point: null })}
+        onMoveItem={moveItemToWorkspace}
+        onPinItem={pinItemAcrossWorkspaces}
+        onUnpinItem={unpinItemAcrossWorkspaces}
+        onDeleteItem={(item) => deleteItem(item, 'deleteChildren')}
+      />}
       <FolderPopover folder={currentFolder} children={folderChildren} placements={bootstrap.placements} profile={profile} editMode={editMode} openInNewTab={settings.general?.openLinksInNewTab !== false} onClose={() => setFolderId(null)} onEdit={(item) => { setFolderId(null); setDialog({ item, point: null }) }} onMove={moveItem} onMoveOut={moveOutOfFolder} />
       {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={deleteWorkspace} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}

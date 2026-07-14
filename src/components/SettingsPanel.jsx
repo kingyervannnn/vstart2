@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, Database, Image, LayoutGrid, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
+import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 
 const PAGES = [
   ['general', 'General', SlidersHorizontal],
@@ -25,6 +26,7 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
+  const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
 
   const addWorkspace = async (event) => {
     event.preventDefault()
@@ -63,7 +65,11 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
                     <label>URL slug<input defaultValue={workspace.slug} onBlur={(event) => event.target.value.trim() && event.target.value.trim() !== workspace.slug && onUpdateWorkspace(workspace, { slug: event.target.value.trim() })} /></label>
                   </div>
                   {settings.workspaces?.individualTypography && <div className="workspace-theme-fields">
-                    <label>Font<input defaultValue={workspace.fontFamily || ''} placeholder="Use global font" onBlur={(event) => onUpdateWorkspace(workspace, { fontFamily: event.target.value.trim() || null })} /></label>
+                    <label>Font<select value={workspace.fontFamily || ''} onChange={(event) => onUpdateWorkspace(workspace, { fontFamily: event.target.value || null })}>
+                      <option value="">Use global font</option>
+                      {workspace.fontFamily && !FONT_OPTIONS.some((font) => font.value === workspace.fontFamily) && <option value={workspace.fontFamily}>Current custom font</option>}
+                      {FONT_OPTIONS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+                    </select></label>
                     <label>Text<input type="color" value={workspace.textColor || '#f4f6ff'} onChange={(event) => onUpdateWorkspace(workspace, { textColor: event.target.value })} /></label>
                     <label>Accent<input type="color" value={workspace.accentColor || '#8ba6ff'} onChange={(event) => onUpdateWorkspace(workspace, { accentColor: event.target.value })} /></label>
                   </div>}
@@ -91,7 +97,10 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
               <Toggle label="Edge effect" checked={settings.appearance?.edgeEffect} onChange={(value) => onPatch({ appearance: { edgeEffect: value } })} />
               <Toggle label="Edge glow" checked={settings.appearance?.edgeGlow} onChange={(value) => onPatch({ appearance: { edgeGlow: value } })} />
               <Toggle label="Animated overlay" checked={settings.appearance?.animatedOverlay} onChange={(value) => onPatch({ appearance: { animatedOverlay: value } })} />
-              <label className="setting-field"><span>Global font family</span><input className="text-setting-input" defaultValue={settings.appearance?.fontFamily || ''} onBlur={(event) => onPatch({ appearance: { fontFamily: event.target.value.trim() || 'Inter, system-ui, sans-serif' } })} /></label>
+              <label className="setting-field"><span>Global font family</span><select value={globalFontFamily} onChange={(event) => onPatch({ appearance: { fontFamily: event.target.value } })}>
+                {!FONT_OPTIONS.some((font) => font.value === globalFontFamily) && <option value={globalFontFamily}>Current custom font</option>}
+                {FONT_OPTIONS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+              </select></label>
               <label className="setting-field"><span>Accent color</span><input type="color" value={settings.appearance?.accentColor || '#8ba6ff'} onChange={(event) => onPatch({ appearance: { accentColor: event.target.value } })} /></label>
               <label className="setting-field"><span>Text color</span><input type="color" value={settings.appearance?.textColor || '#f4f6ff'} onChange={(event) => onPatch({ appearance: { textColor: event.target.value } })} /></label>
             </>}

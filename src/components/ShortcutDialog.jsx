@@ -48,8 +48,8 @@ export function ShortcutDialog({ item, point, onClose, onSubmit, onDelete, onDup
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <form className="shortcut-dialog" onSubmit={submit}>
-        <header><h2>{item ? 'Edit shortcut' : 'New shortcut'}</h2><button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
+      <form className="shortcut-dialog" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="shortcut-dialog-title">
+        <header><h2 id="shortcut-dialog-title">{item ? 'Edit shortcut' : 'New shortcut'}</h2><button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
         <label>Shortcut name<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={120} /></label>
         {item?.kind !== 'folder' && (
           <>

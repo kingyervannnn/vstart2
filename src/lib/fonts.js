@@ -1,0 +1,28 @@
+export const FONT_OPTIONS = Object.freeze([
+  { label: 'Industrial', value: 'Noto Sans JP, Inter, system-ui, sans-serif' },
+  { label: 'Modern', value: 'Inter, system-ui, Arial, sans-serif' },
+  { label: 'Roboto', value: 'Roboto, system-ui, Arial, sans-serif' },
+  { label: 'Bauhaus', value: 'Josefin Sans, system-ui, Arial, sans-serif' },
+  { label: 'Terminal', value: 'Fira Code, Menlo, Monaco, Consolas, "Courier New", monospace' },
+  { label: 'Minecraft', value: 'Press Start 2P, VT323, monospace' },
+  { label: 'Orbitron', value: 'Orbitron, Inter, system-ui, sans-serif' },
+  { label: 'System', value: 'system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, sans-serif' },
+  { label: 'Bebas Neue', value: '"Bebas Neue", Inter, system-ui, sans-serif' },
+  { label: 'Exo 2', value: '"Exo 2", Inter, system-ui, sans-serif' },
+  { label: 'Audiowide', value: 'Audiowide, Inter, system-ui, sans-serif' },
+  { label: 'Saira', value: 'Saira, Inter, system-ui, sans-serif' },
+  { label: 'Kanit', value: 'Kanit, Inter, system-ui, sans-serif' },
+  { label: 'Lexend', value: 'Lexend, Inter, system-ui, sans-serif' },
+  { label: 'Montserrat', value: 'Montserrat, Inter, system-ui, sans-serif' },
+  { label: 'Josefin Sans', value: 'Josefin Sans, system-ui, Arial, sans-serif' },
+  { label: 'Space Grotesk', value: 'Space Grotesk, Inter, system-ui, sans-serif' },
+  { label: 'Manrope', value: 'Manrope, Inter, system-ui, sans-serif' },
+  { label: 'TR2N', value: '"TR2N", "Tron Legacy", Orbitron, system-ui, sans-serif' },
+  { label: 'Tron Legacy', value: '"Tron Legacy", "TR2N", Orbitron, system-ui, sans-serif' },
+  { label: 'Neuropol X', value: '"Neuropol X", Neuropol, Orbitron, system-ui, sans-serif' },
+  { label: 'Prisma', value: 'Prisma, "Outrunner", "Retro Wave", system-ui, sans-serif' },
+  { label: 'Outrunner', value: 'Outrunner, "Retro Wave", "Neuropol X", system-ui, sans-serif' },
+  { label: 'Retro Wave', value: '"Retro Wave", Outrunner, "Neuropol X", system-ui, sans-serif' },
+])
+
+export const DEFAULT_FONT_FAMILY = FONT_OPTIONS[1].value

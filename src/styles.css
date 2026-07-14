@@ -272,6 +272,35 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .page-controls button:hover, .page-controls button.active { color: var(--app-text); background: rgba(255,255,255,.13); backdrop-filter: blur(12px); }
 .page-controls svg { width: 17px; }
 
+.app-context-menu {
+  position: fixed;
+  z-index: 350;
+  width: 238px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 13px;
+  color: #f5f7ff;
+  background: rgba(15,20,29,.94);
+  box-shadow: 0 18px 55px rgba(0,0,0,.42), inset 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(22px) saturate(1.25);
+  user-select: none;
+}
+.app-context-menu button { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 8px; padding: 7px 9px; color: rgba(245,247,255,.88); background: transparent; cursor: pointer; text-align: left; font-size: 11px; }
+.app-context-menu button:hover, .app-context-menu button:focus-visible { outline: 0; color: #fff; background: rgba(255,255,255,.1); }
+.app-context-menu button:disabled { cursor: default; opacity: .34; }
+.app-context-menu button:disabled:hover { background: transparent; }
+.app-context-menu button.danger { color: #ffb5bc; }
+.app-context-menu button.danger:hover { background: rgba(255,76,94,.12); }
+.app-context-menu button svg, .context-menu-label svg { width: 15px; height: 15px; flex: none; opacity: .72; }
+.context-menu-heading { display: flex; flex-direction: column; gap: 2px; padding: 7px 9px 9px; }
+.context-menu-heading strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.context-menu-heading span { font-size: 8px; text-transform: uppercase; letter-spacing: .11em; opacity: .46; }
+.context-menu-separator { height: 1px; margin: 5px 4px; background: rgba(255,255,255,.11); }
+.context-menu-label { display: flex; align-items: center; gap: 9px; padding: 5px 9px 3px; color: rgba(245,247,255,.45); font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
+.context-menu-hint { padding: 1px 9px 6px 33px; color: rgba(245,247,255,.42); font-size: 8px; line-height: 1.35; }
+
 .modal-backdrop, .settings-backdrop, .folder-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(4,7,12,.48); backdrop-filter: blur(11px); }
 .shortcut-dialog { width: min(470px, 100%); padding: 21px; border: 1px solid rgba(255,255,255,.2); border-radius: 22px; color: #f6f8ff; background: rgba(16,21,31,.9); box-shadow: 0 28px 80px rgba(0,0,0,.4); }
 .shortcut-dialog header, .shortcut-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -353,7 +382,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .workspace-settings-list button:disabled { opacity: .3; }
 .workspace-editor-fields, .workspace-theme-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .workspace-editor-fields label, .workspace-theme-fields label { display: grid; gap: 4px; color: rgba(238,242,255,.5); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
-.workspace-editor-fields input, .workspace-theme-fields input:not([type="color"]) { width: 100%; height: 32px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 0 8px; color: #eef2ff; background: rgba(255,255,255,.045); font-size: 10px; text-transform: none; letter-spacing: normal; }
+.workspace-editor-fields input, .workspace-theme-fields input:not([type="color"]), .workspace-theme-fields select { width: 100%; height: 32px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 0 8px; color: #eef2ff; background: rgba(255,255,255,.045); font-size: 10px; text-transform: none; letter-spacing: normal; }
 .workspace-theme-fields { grid-template-columns: 1fr auto auto; }
 .workspace-theme-fields input[type="color"] { width: 34px; height: 32px; border: 0; background: transparent; }
 .add-workspace-form { display: flex; gap: 8px; margin: 13px 0 18px; }
