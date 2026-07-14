@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:integration": "node scripts/integration-smoke.mjs",
     "migrate:v1": "node scripts/migrate-v1.mjs",
+    "backfill:icons": "node scripts/backfill-shortcut-icons.mjs",
     "test:watch": "vitest",
     "check:persistence": "node scripts/check-browser-persistence.mjs",
     "verify": "npm run lint && npm run check:persistence && npm test && npm run build"

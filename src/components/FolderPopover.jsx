@@ -82,7 +82,13 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
 }
 
 export function ShortcutIcon({ item }) {
-  if (item.iconAssetId) return <img src={`/api/assets/${item.iconAssetId}`} alt="" draggable="false" />
+  const source = item.iconAssetId
+    ? `/api/assets/${item.iconAssetId}`
+    : item.iconOverrideUrl || item.faviconUrl || null
+  const [failedSource, setFailedSource] = useState(null)
+  if (source && source !== failedSource) {
+    return <img src={source} alt="" draggable="false" loading="eager" referrerPolicy="no-referrer" onError={() => setFailedSource(source)} />
+  }
   const letter = (item.title || '?').trim().charAt(0).toUpperCase()
   return <span className="generated-icon" aria-hidden="true">{letter}</span>
 }

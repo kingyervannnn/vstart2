@@ -57,6 +57,20 @@ export function WidgetRail({ compact, settings, onOpenWidget }) {
   const [musicPlaying, setMusicPlaying] = useState(false)
   const widgets = settings.widgets || {}
 
+  if (compact) {
+    return (
+      <nav className="compact-widget-dock" aria-label="Widget access">
+        {widgets.notes !== false && <button type="button" onClick={() => onOpenWidget('notes')} aria-label="Open notes"><NotebookPen /></button>}
+        {widgets.email !== false && <button type="button" onClick={() => onOpenWidget('mail')} aria-label="Open inbox"><Mail /></button>}
+        {widgets.music !== false && (
+          <button type="button" onClick={() => setMusicPlaying((value) => !value)} aria-label={musicPlaying ? 'Pause music' : 'Play music'}>
+            {musicPlaying ? <Pause /> : <Play />}
+          </button>
+        )}
+      </nav>
+    )
+  }
+
   return (
     <aside className="widget-rail" aria-label="Widgets">
       {widgets.clock !== false && <ClockWidget compact={compact} />}

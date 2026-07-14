@@ -47,6 +47,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .vstart-app.edge-glow { box-shadow: inset 0 0 25px color-mix(in srgb, var(--app-accent) 62%, transparent), 0 0 22px color-mix(in srgb, var(--app-accent) 35%, transparent); }
 .vstart-app.mirrored { flex-direction: row-reverse; }
 
+.compact-mode .dial-rail { width: 100%; flex-basis: 100%; }
+
 .widget-rail {
   flex: 0 0 clamp(260px, 28vw, 430px);
   position: relative;
@@ -58,6 +60,24 @@ button, a { -webkit-tap-highlight-color: transparent; }
   text-shadow: 0 1px 12px rgba(255, 255, 255, .16), 0 1px 4px rgba(0, 0, 0, .25);
 }
 .widget-rail::-webkit-scrollbar { display: none; }
+
+.compact-widget-dock {
+  position: absolute;
+  z-index: 42;
+  left: 14px;
+  bottom: 13px;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  background: rgba(14,20,29,.14);
+  backdrop-filter: blur(14px);
+}
+.mirrored .compact-widget-dock { right: 14px; left: auto; }
+.compact-widget-dock button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 68%, transparent); background: transparent; cursor: pointer; }
+.compact-widget-dock button:hover, .compact-widget-dock button:focus-visible { color: var(--app-text); }
+.compact-widget-dock svg { width: 15px; height: 15px; }
 
 .clock-widget { display: grid; grid-template-columns: auto 1fr; align-items: start; width: max-content; }
 .clock-widget strong { font-size: clamp(48px, 5vw, 74px); line-height: .86; letter-spacing: -.065em; font-weight: 560; }
@@ -133,7 +153,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font-size: clamp(12px, 1.35vw, 21px);
   font-weight: 650;
 }
-.scrolling-header span { flex: none; min-width: max-content; padding-right: 1.5em; animation: marquee-left 34s linear infinite; }
+.scrolling-header span { flex: none; min-width: max-content; padding-right: 1.5em; animation: marquee-left 32s linear infinite; will-change: transform; }
 .scrolling-header.direction-right { justify-content: flex-end; }
 .scrolling-header.direction-right span { animation-name: marquee-right; }
 @keyframes marquee-left { to { transform: translateX(-100%); } }
@@ -169,17 +189,24 @@ button, a { -webkit-tap-highlight-color: transparent; }
   border-radius: 18px;
   cursor: pointer;
   outline: 0;
-  transition: filter 150ms ease, border-color 150ms ease, background 150ms ease, transform 90ms ease;
+  transition: filter 150ms ease, transform 120ms ease;
 }
-.shortcut-tile:hover, .shortcut-tile:focus-visible { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); }
+.shortcut-tile:hover, .shortcut-tile:focus-visible { filter: brightness(1.08) drop-shadow(0 5px 8px rgba(0,0,0,.16)); transform: translateY(-2px); }
 .shortcut-tile.dragging { z-index: 30; filter: drop-shadow(0 13px 20px rgba(0,0,0,.28)); transform: scale(1.035); }
 .shortcut-tile.invalid { border-color: #ff5c69; background: rgba(255, 30, 58, .18); }
 .shortcut-tile.drop-target { border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 22%, transparent); transform: scale(1.06); }
-.shortcut-icon-shell { width: min(58%, 72px); aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
-.shortcut-icon-shell img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 14px; }
+.shortcut-icon-shell { flex: 0 0 auto; width: min(62%, 72px); height: auto; aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
+.shortcut-icon-shell img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; }
 .shortcut-icon-shell > svg { width: 78%; height: 78%; padding: 15%; border-radius: 18px; color: #1d2430; fill: rgba(255,255,255,.76); stroke-width: 1.2; }
-.generated-icon { width: 100%; height: 100%; display: grid; place-items: center; border-radius: 18px; color: #192338; background: rgba(249,251,255,.9); font-size: clamp(22px, 3vw, 42px); font-weight: 800; }
-.shortcut-name { max-width: 100%; padding: 2px 6px; border-radius: 7px; color: var(--app-text); background: rgba(9,13,20,.26); backdrop-filter: blur(6px); font-size: clamp(8px, .75vw, 12px); line-height: 1.1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; text-shadow: 0 1px 3px #000; transition: opacity 150ms ease, transform 150ms ease; }
+.generated-icon { width: 100%; height: 100%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; color: #192338; background: rgba(249,251,255,.9); font-size: clamp(20px, 2.5vw, 38px); font-weight: 800; }
+.folder-preview-shell { width: min(68%, 78px); }
+.folder-preview { width: 100%; height: 100%; display: grid; gap: 3px; }
+.folder-preview.two-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.folder-preview.three-column { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.folder-preview-cell { min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; border-radius: 6px; }
+.folder-preview-cell img, .folder-preview-cell .generated-icon { width: 100%; height: 100%; border-radius: 6px; }
+.folder-preview-cell .generated-icon { font-size: clamp(8px, 1.05vw, 15px); }
+.shortcut-name { max-width: 100%; padding: 2px 0; color: var(--app-text); background: transparent; font-size: clamp(8px, .75vw, 12px); line-height: 1.1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; text-shadow: 0 1px 3px #000; transition: opacity 150ms ease, transform 150ms ease; }
 .labels-hover .shortcut-name { opacity: 0; transform: translateY(-3px); }
 .labels-hover .shortcut-tile:hover .shortcut-name, .labels-hover .shortcut-tile:focus-visible .shortcut-name { opacity: 1; transform: none; }
 .tile-edit { position: absolute; top: 1px; right: 1px; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.24); border-radius: 50%; background: rgba(8,12,18,.62); cursor: pointer; }
@@ -354,8 +381,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .loading-shell p { max-width: 430px; margin: 0; color: rgba(238,242,255,.57); font-size: 11px; }
 .loading-shell button { display: flex; gap: 7px; margin-top: 10px; padding: 9px 14px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; background: rgba(255,255,255,.08); cursor: pointer; }
 
-@media (max-width: 979px) {
-  .widget-rail { flex-basis: clamp(150px, 31vw, 235px); padding: 67px 12px 20px 16px; }
+@media (max-width: 1099px) {
   .clock-widget strong { font-size: clamp(30px, 6vw, 48px); }
   .clock-widget > span { padding-left: 6px; font-size: 9px; }
   .clock-widget small { margin-top: 7px; max-width: 145px; font-size: 8px; }
@@ -385,10 +411,6 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 }
 
 @media (max-width: 560px) {
-  .widget-rail { flex-basis: 132px; padding-left: 10px; padding-right: 8px; }
-  .clock-widget strong { font-size: 28px; }
-  .weather-widget svg { display: none; }
-  .music-widget > div { display: none; }
   .search-dock-wrap { min-width: 190px; }
   .search-dock input { font-size: 11px; }
   .search-dock > button:nth-of-type(2) { display: none; }
@@ -397,7 +419,5 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  .scrolling-header { justify-content: center; }
-  .scrolling-header span { animation: none; }
-  .scrolling-header span + span { display: none; }
+  .scrolling-header span { animation-duration: 32s !important; animation-iteration-count: infinite !important; }
 }

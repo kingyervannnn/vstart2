@@ -24,6 +24,13 @@ export function DialCanvas({
   const rootItems = items.filter((item) => item.workspaceId === workspace.id && !item.parentFolderId)
   const rootPlacements = placements.filter((value) => value.workspaceId === workspace.id && value.containerKey === 'root' && value.profile === profile)
   const placementByItem = new Map(rootPlacements.map((value) => [value.itemId, value]))
+  const childrenByFolder = new Map()
+  for (const item of items) {
+    if (!item.parentFolderId) continue
+    const children = childrenByFolder.get(item.parentFolderId) || []
+    children.push(item)
+    childrenByFolder.set(item.parentFolderId, children)
+  }
 
   const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
 
@@ -121,7 +128,11 @@ export function DialCanvas({
               event.preventDefault()
             }}
           >
-            <div className="shortcut-icon-shell">{item.kind === 'folder' ? <Folder /> : <ShortcutIcon item={item} />}</div>
+            <div className={`shortcut-icon-shell ${item.kind === 'folder' ? 'folder-preview-shell' : ''}`}>
+              {item.kind === 'folder'
+                ? <FolderPreview children={childrenByFolder.get(item.id) || []} />
+                : <ShortcutIcon item={item} />}
+            </div>
             {(item.kind !== 'folder' || showFolderLabels) && <span className="shortcut-name">{item.title}</span>}
             {editMode && <button className="tile-edit" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onEdit(item) }} aria-label={`Edit ${item.title}`}><Pencil size={12} /></button>}
           </div>
@@ -129,5 +140,15 @@ export function DialCanvas({
       })}
       {!rootItems.length && !editMode && <div className="empty-dial"><p>No shortcuts yet.</p><small>Enter edit mode to pin one anywhere on this side.</small></div>}
     </section>
+  )
+}
+
+function FolderPreview({ children }) {
+  if (!children.length) return <Folder className="empty-folder-glyph" />
+  const visible = children.slice(0, 9)
+  return (
+    <span className={`folder-preview ${visible.length <= 4 ? 'two-column' : 'three-column'}`} aria-hidden="true">
+      {visible.map((child) => <span className="folder-preview-cell" key={child.id}><ShortcutIcon item={child} /></span>)}
+    </span>
   )
 }

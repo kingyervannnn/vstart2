@@ -22,8 +22,8 @@ state.
   Shortcut rectangles may not overlap, and there is no automatic packing or gravity.
 - Wide and Compact Mode have separate automatic placement canvases, not user-selectable
   speed-dial modes.
-- The widget rail remains present in Wide and Compact Mode; the dial rail always dominates
-  the remaining page width.
+- Wide Mode uses the widget and dial columns. Compact Mode automatically removes the
+  widget column, hides clock/weather, and retains a small widget-access dock.
 - "Edge effect" is visual styling only. It never changes layout behavior.
 - The exact V Start 1 AI glyph remains as a clickable local placeholder, but V Start 2
   ships without an AI backend, provider settings, API keys, or AI API calls.
@@ -75,6 +75,9 @@ To migrate an empty V Start 2 database from a running V Start 1 stack, use
 `npm run migrate:v1`. The migration reads V1 through its state API and writes V2 in one
 PostgreSQL transaction. It preserves the source database and refuses to add duplicates
 when V2 already contains shortcuts.
+
+Run `npm run backfill:icons` after importing legacy data to copy retrievable shortcut
+images into PostgreSQL. Normal shortcut creation performs the same retrieval automatically.
 
 ## Verify it
 

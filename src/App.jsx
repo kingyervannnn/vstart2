@@ -104,12 +104,13 @@ export function App() {
     if (wheel.cooldown) return
     wheel.total += Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX
     clearTimeout(wheel.timer)
-    wheel.timer = setTimeout(() => { wheel.total = 0 }, 180)
-    if (Math.abs(wheel.total) < 75 * (settings.speedDial?.wheelResistance || 1)) return
+    wheel.timer = setTimeout(() => { wheel.total = 0 }, 110)
+    const resistance = Math.max(0.5, Number(settings.speedDial?.wheelResistance) || 1)
+    if (Math.abs(wheel.total) < 36 * resistance) return
     wheel.cooldown = true
     cycleWorkspace(wheel.total > 0 ? 1 : -1)
     wheel.total = 0
-    setTimeout(() => { wheel.cooldown = false }, 480)
+    setTimeout(() => { wheel.cooldown = false }, 260)
   }
 
   const patchSettings = useCallback((patch) => {
@@ -392,9 +393,9 @@ export function App() {
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
     >
+      <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
       <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => { setInlineResults(null); setWidgetView(kind) }} />
       <section className="dial-rail" onWheel={onDialWheel}>
-        <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
         {inlineResults ? (
           <InlineResults {...inlineResults} onClose={() => setInlineResults(null)} />
         ) : widgetView ? (

@@ -60,20 +60,20 @@ layout implementation and does not change persisted shortcut order.
 The only responsive state is called **Compact Mode**. The implementation and settings
 must not use Stage 1 or Stage 2 terminology.
 
-Provisional breakpoint behavior:
+Breakpoint behavior:
 
-- Enter Compact Mode below 920 CSS pixels.
-- Exit Compact Mode above 980 CSS pixels.
+- Enter Compact Mode below 1100 CSS pixels.
+- Exit Compact Mode at 1160 CSS pixels or wider.
 - Use hysteresis to prevent rapid oscillation around the breakpoint.
 - Measure the app container/visual viewport rather than relying on a collection of
   unrelated media-query branches.
 
 In Compact Mode:
 
-- The page remains a two-column layout.
-- The widget rail and all enabled widgets remain rendered and usable.
-- The widget rail uses its compact sizing while the dial rail continues to dominate the
-  remaining page width.
+- The widget column is removed and the dial rail occupies the full page width.
+- Clock and weather are automatically hidden.
+- Notes, mail, and music remain reachable through a small widget-access dock rather than
+  a retained left column.
 - Workspace buttons above the search dock are automatically hidden.
 - The scrolling workspace header remains visible and interactive.
 - The speed dial uses its independent compact placement canvas without overlap.
@@ -311,8 +311,9 @@ The result view:
 - Occupies the dial rail from below the scrolling header to the safe area above/around
   the search dock.
 - Uses the full dial-rail width and height.
-- Keeps the widget rail and widgets visible in Wide and Compact Mode.
-- Occupies only the dial half/rail, never the widget rail.
+- Keeps the widget rail visible in Wide Mode and the widget-access dock available in
+  Compact Mode.
+- Occupies the dial rail without covering the Wide widget rail.
 - Keeps the search dock accessible for query refinement.
 - Provides a clear Back to Speed Dial control.
 - Has one internal scroll container; page scroll remains locked/stable.
@@ -416,11 +417,11 @@ V Start 2 is not ready for default use until all of the following pass:
    because the viewport changed.
 5. Workspace direct URLs, back/forward, reload, and rename behavior are deterministic.
 6. Mirror mode flips the rails without changing data or losing dock placement.
-7. Compact Mode has no Stage 1/Stage 2 branching, retains the two-column widget/dial
-   composition, and automatically hides workspace buttons.
+7. Compact Mode has no Stage 1/Stage 2 branching, automatically removes the widget
+   column, retains compact widget access, and hides workspace buttons.
 8. Folder popovers work at wide, narrow, mirrored, and compact sizes.
-9. Inline results transiently hide shortcuts, use the full dial rail only, keep widgets
-   visible, embed no page/iframe, and return cleanly.
+9. Inline results transiently hide shortcuts, use the full dial rail, retain the active
+   profile's widget access, embed no page/iframe, and return cleanly.
 10. A stopped database shows a reconnect/error shell and does not silently fall back to
     defaults that can overwrite user data.
 11. The Docker stack contains no AI backend and the frontend makes no AI API request.
