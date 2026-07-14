@@ -27,6 +27,7 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
+  const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
 
   const addWorkspace = async (event) => {
     event.preventDefault()
@@ -82,6 +83,8 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
               <h3>Speed Dial</h3>
               <Toggle label="Always show shortcut names" detail="Turn off to reveal names only on hover or keyboard focus." checked={settings.speedDial?.alwaysShowNames} onChange={(value) => onPatch({ speedDial: { alwaysShowNames: value } })} />
               <Toggle label="Show folder labels" checked={settings.speedDial?.showFolderLabels} onChange={(value) => onPatch({ speedDial: { showFolderLabels: value } })} />
+              <label className="setting-field range-setting"><span>Shortcut and folder size <output aria-hidden="true">{shortcutSize}%</output></span><input type="range" min="56" max="92" step="2" value={shortcutSize} aria-label="Shortcut and folder size" onChange={(event) => onPatch({ speedDial: { shortcutSize: Number(event.target.value) } })} /></label>
+              <p className="field-help">Changes icon and folder-preview size without moving saved positions.</p>
               <div className="setting-note"><strong>Free placement is always enabled.</strong><span>There is no grid snapping, auto-arrange, or gravity setting.</span></div>
             </>}
             {page === 'search' && <>

@@ -460,6 +460,7 @@ export function App() {
     '--app-text': activeWorkspace.textColor && settings.workspaces?.individualTypography ? activeWorkspace.textColor : settings.appearance?.textColor || '#f4f6ff',
     '--app-accent': activeWorkspace.accentColor && settings.workspaces?.individualTypography ? activeWorkspace.accentColor : settings.appearance?.accentColor || '#8ba6ff',
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
+    '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
     ...(backgroundId ? { '--app-background-image': `url(/api/assets/${backgroundId})` } : {}),
   }
 

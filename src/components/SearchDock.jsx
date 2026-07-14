@@ -1,21 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { Globe2, Image, LoaderCircle, Mic, Search, Sparkles, Square, GripHorizontal } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Globe2, Image, LoaderCircle, Mic, Sparkles, Square } from 'lucide-react'
 import { api } from '../lib/api.js'
+import { clampDockGeometry, shouldDropSuggestionsUp } from '../lib/searchDock.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
 
 const ENGINES = {
   google: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`,
   duckduckgo: (query) => `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
   brave: (query) => `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
-}
-
-function clampGeometry(value) {
-  const width = Math.max(0.28, Math.min(0.94, value.width))
-  return {
-    width,
-    x: Math.max(width / 2, Math.min(1 - width / 2, value.x)),
-    y: Math.max(0.16, Math.min(0.94, value.y)),
-  }
 }
 
 export function SearchDock({
@@ -48,6 +40,8 @@ export function SearchDock({
   const [transcribing, setTranscribing] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [suggestionsDropUp, setSuggestionsDropUp] = useState(false)
+  const [interactionKind, setInteractionKind] = useState(null)
 
   useEffect(() => {
     const next = { x: configuredX, y: configuredY, width: configuredWidth }
@@ -92,8 +86,19 @@ export function SearchDock({
     return () => clearTimeout(timer)
   }, [query])
 
+  useEffect(() => {
+    const updateDirection = () => {
+      const bounds = dockRef.current?.getBoundingClientRect()
+      setSuggestionsDropUp(shouldDropSuggestionsUp(bounds, window.innerHeight, suggestions.length))
+    }
+    updateDirection()
+    window.addEventListener('resize', updateDirection)
+    return () => window.removeEventListener('resize', updateDirection)
+  }, [geometry, suggestions.length, suggestionsOpen])
+
   const beginInteraction = (event, kind) => {
-    if (!editMode) return
+    if (kind === 'resize' && !editMode) return
+    if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     interactionRef.current = {
@@ -104,26 +109,47 @@ export function SearchDock({
       initial: geometry,
       bounds: dockRef.current.parentElement.getBoundingClientRect(),
     }
+    setInteractionKind(kind)
   }
 
-  const moveInteraction = (event) => {
+  const beginDockMove = (event) => {
+    if (event.target.closest('input, textarea, select, button, a, [role="button"], [contenteditable="true"]')) return
+    beginInteraction(event, 'move')
+  }
+
+  const moveInteraction = useCallback((event) => {
     const value = interactionRef.current
     if (!value || value.pointerId !== event.pointerId) return
     const dx = (event.clientX - value.startX) / Math.max(1, value.bounds.width)
     const dy = (event.clientY - value.startY) / Math.max(1, value.bounds.height)
-    const next = clampGeometry(value.kind === 'move'
+    const next = clampDockGeometry(value.kind === 'move'
       ? { ...value.initial, x: value.initial.x + dx, y: value.initial.y + dy }
       : { ...value.initial, width: value.initial.width + dx * 2 })
     geometryRef.current = next
     setGeometry(next)
-  }
+  }, [])
 
-  const endInteraction = async (event) => {
+  const endInteraction = useCallback(async (event) => {
     const value = interactionRef.current
     if (!value || value.pointerId !== event.pointerId) return
     interactionRef.current = null
-    await onGeometryCommit(profile, geometryRef.current || geometry)
-  }
+    setInteractionKind(null)
+    await onGeometryCommit(profile, geometryRef.current || value.initial)
+  }, [onGeometryCommit, profile])
+
+  useEffect(() => {
+    if (!interactionKind) return undefined
+    const move = (event) => moveInteraction(event)
+    const finish = (event) => endInteraction(event)
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('pointerup', finish, true)
+    window.addEventListener('pointercancel', finish, true)
+    return () => {
+      window.removeEventListener('pointermove', move, true)
+      window.removeEventListener('pointerup', finish, true)
+      window.removeEventListener('pointercancel', finish, true)
+    }
+  }, [endInteraction, interactionKind, moveInteraction])
 
   const submit = (event) => {
     event.preventDefault()
@@ -169,23 +195,26 @@ export function SearchDock({
   return (
     <div
       ref={dockRef}
-      className={`search-dock-wrap ${editMode ? 'editing' : ''}`}
+      className={`search-dock-wrap ${editMode ? 'editing' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
       style={{ left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%` }}
+      onPointerDown={beginDockMove}
+      onPointerMove={moveInteraction}
+      onPointerUp={endInteraction}
+      onPointerCancel={endInteraction}
+      onLostPointerCapture={endInteraction}
     >
       <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} />
-      {editMode && <button className="dock-drag-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'move')} onPointerMove={moveInteraction} onPointerUp={endInteraction} onPointerCancel={endInteraction} aria-label="Move search bar"><GripHorizontal size={17} /></button>}
       <form className={`search-dock ${inline ? 'inline-mode' : ''} ${aiActive ? 'ai-placeholder-active' : ''}`} onSubmit={submit}>
         <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
-        <Search size={16} className="search-mark" aria-hidden="true" />
         <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
         <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
         <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
         <button type="button" className={aiActive ? 'active' : ''} onClick={() => setAiActive((value) => !value)} aria-label="AI mode placeholder" aria-pressed={aiActive}><Sparkles size={18} /></button>
       </form>
-      {suggestionsOpen && suggestions.length > 0 && <ul className="search-suggestions" role="listbox" aria-label="Search suggestions">
+      {suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
         {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
       </ul>}
-      {editMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} onPointerMove={moveInteraction} onPointerUp={endInteraction} onPointerCancel={endInteraction} aria-label="Resize search bar" />}
+      {editMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>
   )
 }

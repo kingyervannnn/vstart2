@@ -2,8 +2,10 @@ import { Layers3 } from 'lucide-react'
 
 export function WorkspaceSwitcher({ workspaces, activeId, onSelect, compact }) {
   if (compact) return null
+  const activeIndex = Math.max(0, workspaces.findIndex((workspace) => workspace.id === activeId))
   return (
-    <nav className="workspace-switcher" aria-label="Workspaces">
+    <nav className="workspace-switcher" aria-label="Workspaces" style={{ '--workspace-active-x': `${activeIndex * 35}px` }}>
+      {!!workspaces.length && <span className="workspace-switcher-active" aria-hidden="true" />}
       {workspaces.map((workspace) => (
         <button
           key={workspace.id}

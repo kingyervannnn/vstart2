@@ -139,8 +139,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   left: 0;
   width: 100%;
   height: 52px;
-  display: flex;
-  align-items: center;
+  display: block;
   overflow: hidden;
   border: 0;
   padding: 0;
@@ -153,11 +152,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font-size: clamp(12px, 1.35vw, 21px);
   font-weight: 650;
 }
-.scrolling-header span { flex: none; min-width: max-content; padding-right: 1.5em; animation: marquee-left 32s linear infinite; will-change: transform; }
-.scrolling-header.direction-right { justify-content: flex-end; }
-.scrolling-header.direction-right span { animation-name: marquee-right; }
-@keyframes marquee-left { to { transform: translateX(-100%); } }
-@keyframes marquee-right { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.scrolling-header-track { height: 100%; width: max-content; display: flex; animation: marquee-loop 32s linear infinite; will-change: transform; }
+.scrolling-header.direction-right .scrolling-header-track { animation-direction: reverse; }
+.scrolling-header-group { min-width: 100vw; height: 100%; flex: none; display: flex; align-items: center; gap: 2rem; padding-right: 2rem; }
+.scrolling-header-group > span { flex: none; }
+@keyframes marquee-loop { to { transform: translateX(-50%); } }
 
 .dial-canvas { position: absolute; z-index: 3; inset: 52px 0 0; user-select: none; touch-action: none; }
 .add-shortcut-button {
@@ -195,11 +194,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .shortcut-tile.dragging { z-index: 30; filter: drop-shadow(0 13px 20px rgba(0,0,0,.28)); transform: scale(1.035); }
 .shortcut-tile.invalid { border-color: #ff5c69; background: rgba(255, 30, 58, .18); }
 .shortcut-tile.drop-target { border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 22%, transparent); transform: scale(1.06); }
-.shortcut-icon-shell { flex: 0 0 auto; width: min(62%, 72px); height: auto; aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
+.shortcut-icon-shell { flex: 0 0 auto; width: min(var(--shortcut-icon-size, 78%), 92px); height: auto; aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
 .shortcut-icon-shell img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; }
 .shortcut-icon-shell > svg { width: 78%; height: 78%; padding: 15%; border-radius: 18px; color: #1d2430; fill: rgba(255,255,255,.76); stroke-width: 1.2; }
 .generated-icon { width: 100%; height: 100%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; color: #192338; background: rgba(249,251,255,.9); font-size: clamp(20px, 2.5vw, 38px); font-weight: 800; }
-.folder-preview-shell { width: min(68%, 78px); }
+.folder-preview-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 4%), 98px); }
 .folder-preview { width: 100%; height: 100%; display: grid; gap: 3px; }
 .folder-preview.two-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .folder-preview.three-column { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -214,24 +213,26 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .empty-dial p { margin: 0; font-weight: 700; }
 .empty-dial small { margin-top: 5px; }
 
-.search-dock-wrap { position: absolute; z-index: 40; transform: translate(-50%, -50%); min-width: 260px; }
-.workspace-switcher { display: flex; justify-content: center; gap: 8px; margin: 0 auto 8px; width: max-content; padding: 5px 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(15, 20, 29, .12); backdrop-filter: blur(14px); }
-.workspace-switcher button { width: 27px; height: 27px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 52%, transparent); background: transparent; cursor: pointer; transition: transform 180ms cubic-bezier(.2,.8,.2,1), color 180ms, background 180ms; }
+.search-dock-wrap { position: absolute; z-index: 40; transform: translate(-50%, -50%); min-width: 260px; touch-action: none; }
+.search-dock-wrap.interacting { transition: none; }
+.search-dock-wrap.move { cursor: grabbing; }
+.workspace-switcher { position: relative; isolation: isolate; display: flex; justify-content: center; gap: 8px; margin: 0 auto 8px; width: max-content; padding: 5px 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(15, 20, 29, .12); backdrop-filter: blur(14px); }
+.workspace-switcher-active { position: absolute; z-index: 0; top: 5px; left: 7px; width: 27px; height: 27px; border-radius: 50%; transform: translate3d(var(--workspace-active-x, 0), 0, 0); background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); box-shadow: 0 6px 18px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.15); transition: transform 560ms cubic-bezier(.18,.92,.22,1); will-change: transform; pointer-events: none; }
+.workspace-switcher button { position: relative; z-index: 1; width: 27px; height: 27px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 52%, transparent); background: transparent; cursor: pointer; transition: transform 180ms cubic-bezier(.2,.8,.2,1), color 180ms; }
 .workspace-switcher button:hover { transform: translateY(-2px); color: var(--app-text); }
-.workspace-switcher button.active { color: var(--app-text); background: rgba(255,255,255,.18); transform: scale(1.08); }
+.workspace-switcher button.active { color: var(--app-text); }
 
-.search-dock { height: 52px; display: flex; align-items: center; gap: 3px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(39, 43, 49, .24); box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13); backdrop-filter: blur(19px) saturate(1.25); -webkit-backdrop-filter: blur(19px) saturate(1.25); }
+.search-dock { height: 52px; display: flex; align-items: center; gap: 3px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(39, 43, 49, .24); box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13); backdrop-filter: blur(19px) saturate(1.25); -webkit-backdrop-filter: blur(19px) saturate(1.25); cursor: grab; }
 .search-dock.inline-mode { border-color: color-mix(in srgb, var(--app-accent) 62%, white 10%); }
 .search-dock.ai-placeholder-active { box-shadow: 0 0 0 1px rgba(137,103,255,.45), 0 0 26px rgba(118,94,255,.22); }
 .search-dock > button { width: 33px; height: 33px; flex: none; display: grid; place-items: center; border: 0; border-radius: 10px; color: color-mix(in srgb, var(--app-text) 60%, transparent); background: transparent; cursor: pointer; }
 .search-dock > button:hover, .search-dock > button.active { color: var(--app-text); background: rgba(255,255,255,.12); }
 .search-dock > button.recording { color: #ff6771; }
-.search-mark { margin-left: 3px; opacity: .52; }
-.search-dock input { width: 100%; min-width: 0; height: 38px; border: 0; outline: 0; color: var(--app-text); background: transparent; font-size: 13px; }
+.search-dock input { width: 100%; min-width: 0; height: 38px; border: 0; outline: 0; color: var(--app-text); background: transparent; font-size: 13px; cursor: text; }
 .search-dock input::placeholder { color: color-mix(in srgb, var(--app-text) 45%, transparent); }
-.dock-drag-handle { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); width: 42px; height: 20px; display: grid; place-items: center; border: 1px solid var(--app-accent); border-radius: 999px; color: var(--app-text); background: rgba(8,12,18,.72); cursor: move; touch-action: none; }
 .dock-resize-handle { position: absolute; right: -7px; top: calc(50% - 7px); width: 14px; height: 28px; border: 1px solid var(--app-accent); border-radius: 7px; background: rgba(8,12,18,.78); cursor: ew-resize; touch-action: none; }
 .search-suggestions { position: absolute; left: 8px; right: 8px; top: calc(100% + 6px); z-index: 4; list-style: none; margin: 0; padding: 6px; border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(12,17,25,.88); box-shadow: 0 15px 40px rgba(0,0,0,.28); backdrop-filter: blur(20px); }
+.search-suggestions.drop-up { top: auto; bottom: calc(100% + 6px); box-shadow: 0 -15px 40px rgba(0,0,0,.28); }
 .search-suggestions button { width: 100%; border: 0; border-radius: 8px; padding: 7px 9px; color: rgba(244,246,255,.76); background: transparent; text-align: left; cursor: pointer; font-size: 11px; }
 .search-suggestions button:hover, .search-suggestions button:focus-visible { color: #fff; background: rgba(255,255,255,.09); }
 
@@ -365,6 +366,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .setting-field .text-setting-input { width: min(340px, 60%); height: 36px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 0 9px; color: #eef2ff; background: rgba(255,255,255,.05); }
 .setting-field input[type="color"] { width: 42px; height: 30px; border: 0; border-radius: 7px; background: transparent; }
 .setting-field input[type="range"] { width: 200px; accent-color: var(--app-accent); }
+.range-setting output { margin-left: 7px; color: var(--app-text); opacity: .82; }
 .setting-note { display: flex; flex-direction: column; gap: 5px; margin-top: 18px; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.035); }
 .setting-note strong { font-size: 11px; }
 .setting-note span { font-size: 10px; line-height: 1.45; opacity: .57; }
@@ -424,8 +426,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
   .search-dock-wrap { min-width: 220px; }
   .search-dock { height: 47px; padding: 4px 7px; }
   .search-dock > button { width: 29px; }
-  .search-dock .search-mark { display: none; }
-  .shortcut-icon-shell { width: min(62%, 56px); }
+  .shortcut-icon-shell { width: min(var(--shortcut-icon-size, 78%), 72px); }
   .scrolling-header { height: 45px; }
   .dial-canvas, .inline-results, .service-rail-view { top: 45px; }
   .settings-backdrop { padding: 10px; }
@@ -448,5 +449,5 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  .scrolling-header span { animation-duration: 32s !important; animation-iteration-count: infinite !important; }
+  .scrolling-header-track { animation-duration: 32s !important; animation-iteration-count: infinite !important; }
 }
