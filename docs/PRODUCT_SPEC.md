@@ -2,7 +2,7 @@
 
 Status: draft for implementation
 Working name: V Start 2
-Target URL during parallel development: `http://localhost:3001`
+Target URL: `http://localhost:3000`
 
 ## 1. Product boundaries
 

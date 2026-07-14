@@ -43,7 +43,7 @@ cd /Users/vbitzx/SS/vstart2
 ./scripts/stack.sh up
 ```
 
-Open [http://localhost:3001](http://localhost:3001). The root route resolves to the
+Open [http://localhost:3000](http://localhost:3000). The root route resolves to the
 database-backed last active workspace at `/w/:slug`.
 
 Useful stack commands:
@@ -59,7 +59,7 @@ Parallel host ports:
 
 | Service | Port |
 | --- | ---: |
-| Application | `3001` |
+| Application | `3000` |
 | Storage/application API | `3110` |
 | PostgreSQL | `55432` |
 | Image search | `3310` |
@@ -70,6 +70,11 @@ Parallel host ports:
 Configure `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `IMGBB_API_KEY`, and optionally
 `VSTART2_NOTES_ROOT` in the shell or an untracked `.env` file before stack startup.
 There is intentionally no AI service or AI-provider configuration.
+
+To migrate an empty V Start 2 database from a running V Start 1 stack, use
+`npm run migrate:v1`. The migration reads V1 through its state API and writes V2 in one
+PostgreSQL transaction. It preserves the source database and refuses to add duplicates
+when V2 already contains shortcuts.
 
 ## Verify it
 

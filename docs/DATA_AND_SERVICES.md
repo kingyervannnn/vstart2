@@ -302,13 +302,13 @@ it can run beside V Start 1 without touching it.
 The music controller continues to use its existing external/local music backend contract;
 it is not a new V Start 2 Compose service unless later requested.
 
-### Parallel-development ports
+### Host ports
 
-Provisional host ports:
+Current host ports:
 
 | Service | Host port |
 | --- | --- |
-| app | `3001` |
+| app | `3000` |
 | storage API | `3110` |
 | image search API | `3310` |
 | notes API | `3410` |
