@@ -74,6 +74,28 @@ const pinItemSchema = z.object({
   mutationId: z.string().max(200).optional(),
 })
 
+const workspaceAgentPreferencesSchema = z.object({
+  cwd: z.string().trim().min(1).max(4096).nullable().optional(),
+  provider: z.string().trim().min(1).max(100).nullable().optional(),
+  model: z.string().trim().min(1).max(240).nullable().optional(),
+  version: z.number().int().nonnegative(),
+  mutationId: z.string().max(200).optional(),
+})
+
+const agentSessionLinkSchema = z.object({
+  workspaceId: uuid,
+  hermesSessionId: z.string().trim().min(1).max(200),
+  titleOverride: z.string().trim().min(1).max(200).nullable().optional(),
+  mutationId: z.string().max(200).optional(),
+})
+
+const agentSessionUpdateSchema = z.object({
+  titleOverride: z.string().trim().min(1).max(200).nullable().optional(),
+  pinned: z.boolean().optional(),
+  version: z.number().int().positive(),
+  mutationId: z.string().max(200).optional(),
+})
+
 function assertPlacementBounds(profileName, value) {
   const canvas = CANVASES[profileName]
   if (value.x + value.width > canvas.width || value.y + value.height > canvas.height) {
@@ -195,6 +217,7 @@ async function handleRequest(request, response) {
       kind: z.enum(['background', 'shortcut_icon']),
       mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
       data: z.string().max(27 * 1024 * 1024),
+      originalName: z.string().trim().min(1).max(255).optional(),
       mutationId: z.string().max(200).optional(),
     }), body)
     return mutate(request, response, `asset.create:${data.kind}`, data, async (client) => {
@@ -204,11 +227,12 @@ async function handleRequest(request, response) {
       const sha256 = crypto.createHash('sha256').update(content).digest('hex')
       const id = crypto.randomUUID()
       const asset = await client.query(`
-        INSERT INTO assets(id, kind, mime_type, sha256, byte_length, content)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (kind, sha256) DO UPDATE SET sha256 = EXCLUDED.sha256
+        INSERT INTO assets(id, kind, mime_type, sha256, byte_length, content, original_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (kind, sha256) DO UPDATE
+          SET original_name = COALESCE(assets.original_name, EXCLUDED.original_name)
         RETURNING id
-      `, [id, data.kind, data.mimeType, sha256, content.length, content])
+      `, [id, data.kind, data.mimeType, sha256, content.length, content, data.originalName || null])
       return { status: 201, body: { assetId: asset.rows[0].id } }
     })
   }
@@ -226,6 +250,26 @@ async function handleRequest(request, response) {
       'x-content-type-options': 'nosniff',
     })
     return response.end(asset.content)
+  }
+
+  if (request.method === 'DELETE' && match) {
+    const body = await readJson(request)
+    const data = parse(z.object({ mutationId: z.string().max(200).optional() }), body)
+    return mutate(request, response, 'asset.delete', data, async (client) => {
+      const asset = await client.query('SELECT kind FROM assets WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!asset.rowCount) throw new HttpError(404, 'Asset not found')
+      if (asset.rows[0].kind !== 'background') throw new HttpError(400, 'Only background assets can be removed from the library')
+      const referenced = await client.query(`
+        SELECT EXISTS(SELECT 1 FROM workspaces WHERE background_asset_id = $1::uuid)
+          OR EXISTS(
+            SELECT 1 FROM app_settings
+            WHERE document #>> '{backgrounds,globalAssetId}' = $1::text
+          ) AS value
+      `, [match[0]])
+      if (referenced.rows[0].value) throw new HttpError(409, 'Select another background before removing this one')
+      await client.query('DELETE FROM assets WHERE id = $1', [match[0]])
+      return { status: 200, body: { bootstrap: await loadBootstrap(client) } }
+    })
   }
 
   if (request.method === 'PATCH' && pathname === '/api/settings') {
@@ -336,6 +380,90 @@ async function handleRequest(request, response) {
         SET value = EXCLUDED.value, version = app_state.version + 1, updated_at = now()
       `, [data.workspaceId])
       return { ok: true }
+    })
+  }
+
+  match = routeMatch(pathname, /^\/api\/workspaces\/([0-9a-f-]+)\/agent-preferences$/)
+  if (request.method === 'PUT' && match) {
+    const body = await readJson(request)
+    const data = parse(workspaceAgentPreferencesSchema, body)
+    return mutate(request, response, `agent.preferences:${match[0]}`, data, async (client) => {
+      const workspace = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [match[0]])
+      if (!workspace.rowCount) throw new HttpError(404, 'Workspace not found')
+      const current = await client.query('SELECT * FROM workspace_agent_preferences WHERE workspace_id = $1 FOR UPDATE', [match[0]])
+      if (!current.rowCount) {
+        if (data.version !== 0) throw new HttpError(409, 'Agent preferences changed elsewhere')
+        await client.query(`
+          INSERT INTO workspace_agent_preferences(workspace_id, cwd, provider, model)
+          VALUES ($1, $2, $3, $4)
+        `, [match[0], data.cwd || null, data.provider || null, data.model || null])
+      } else {
+        const row = current.rows[0]
+        if (Number(row.version) !== data.version) throw new HttpError(409, 'Agent preferences changed elsewhere')
+        await client.query(`
+          UPDATE workspace_agent_preferences
+          SET cwd = $2, provider = $3, model = $4,
+              version = version + 1, updated_at = now()
+          WHERE workspace_id = $1
+        `, [
+          match[0],
+          data.cwd === undefined ? row.cwd : data.cwd,
+          data.provider === undefined ? row.provider : data.provider,
+          data.model === undefined ? row.model : data.model,
+        ])
+      }
+      return bootstrapResponse(client)
+    })
+  }
+
+  if (request.method === 'POST' && pathname === '/api/agent/sessions') {
+    const body = await readJson(request)
+    const data = parse(agentSessionLinkSchema, body)
+    return mutate(request, response, `agent.session.link:${data.workspaceId}:${data.hermesSessionId}`, data, async (client) => {
+      const workspace = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [data.workspaceId])
+      if (!workspace.rowCount) throw new HttpError(404, 'Workspace not found')
+      const id = crypto.randomUUID()
+      const linked = await client.query(`
+        INSERT INTO agent_session_links(id, workspace_id, hermes_session_id, title_override)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (workspace_id, hermes_session_id) DO UPDATE
+        SET title_override = COALESCE(EXCLUDED.title_override, agent_session_links.title_override),
+            last_opened_at = now(), version = agent_session_links.version + 1, updated_at = now()
+        RETURNING id
+      `, [id, data.workspaceId, data.hermesSessionId, data.titleOverride || null])
+      return bootstrapResponse(client, { agentSessionLinkId: linked.rows[0].id })
+    })
+  }
+
+  match = routeMatch(pathname, /^\/api\/agent\/sessions\/([0-9a-f-]+)$/)
+  if (request.method === 'PATCH' && match) {
+    const body = await readJson(request)
+    const data = parse(agentSessionUpdateSchema, body)
+    return mutate(request, response, `agent.session.update:${match[0]}`, data, async (client) => {
+      const current = await client.query('SELECT * FROM agent_session_links WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!current.rowCount) throw new HttpError(404, 'Agent session link not found')
+      const row = current.rows[0]
+      if (Number(row.version) !== data.version) throw new HttpError(409, 'Agent session link changed elsewhere')
+      await client.query(`
+        UPDATE agent_session_links
+        SET title_override = $2, pinned = $3, version = version + 1, updated_at = now()
+        WHERE id = $1
+      `, [
+        match[0],
+        data.titleOverride === undefined ? row.title_override : data.titleOverride,
+        data.pinned === undefined ? row.pinned : data.pinned,
+      ])
+      return bootstrapResponse(client)
+    })
+  }
+
+  if (request.method === 'DELETE' && match) {
+    const body = await readJson(request)
+    const data = parse(z.object({ version: z.number().int().positive(), mutationId: z.string().max(200).optional() }), body)
+    return mutate(request, response, `agent.session.unlink:${match[0]}`, data, async (client) => {
+      const deleted = await client.query('DELETE FROM agent_session_links WHERE id = $1 AND version = $2 RETURNING id', [match[0], data.version])
+      if (!deleted.rowCount) throw new HttpError(409, 'Agent session link changed or no longer exists')
+      return bootstrapResponse(client)
     })
   }
 

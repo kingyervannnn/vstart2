@@ -164,15 +164,15 @@ Build:
 - Higher-layer rendering that explicitly allows the dock to overlap shortcuts.
 - Open-in-new-tab and autofocus behavior.
 - Keyboard shortcut capture/dispatch.
-- Clickable exact V Start 1 AI glyph with an inert local placeholder only and no
-  integration-status copy.
+- Clickable exact V Start 1 AI glyph with an inert local placeholder only until the
+  separately gated Agent Mode phase, and no integration-status copy.
 
 Gate:
 
 - Dock placement and width survive refresh from PostgreSQL and remain visible after
   resize/mirror.
 - Normal search, engine selection, suggestions, autofocus, and shortcuts pass.
-- Network tests prove the AI control makes no API request.
+- Network tests prove the AI control makes no request before Agent Mode is installed.
 - Search glyphs, resizable edit handles, and workspace-switcher transitions visually match
   their V Start 1 sources.
 
@@ -303,13 +303,37 @@ Run:
 - PostgreSQL backup/restore drill.
 - Service restart/recovery drill.
 - Long trackpad/drag/folder/inline interaction soak.
-- Verification that no AI backend or browser persistence slipped into the bundle.
+- Verification that no provider-specific AI backend, direct provider request, or browser
+  persistence slipped into the bundle.
 
 Cutover gate:
 
 - All twelve release acceptance criteria in `PRODUCT_SPEC.md` pass.
 - V Start 1 remains available as rollback until V Start 2 has been used successfully for
   an agreed trial period.
+
+## Phase 15 — Hermes-backed Agent Mode
+
+Agent Mode is a post-core extension. Implement it only through the native loopback bridge
+and sequence defined in `AGENT_MODE.md`:
+
+1. Prove the Hermes `tui_gateway` protocol with a disposable harness.
+2. Build and harden the native host bridge.
+3. Add V Start database preferences and Hermes session links.
+4. Build the full-rail Agent Mode shell and routes.
+5. Add conversation streaming, sessions, models, reasoning, and interruption.
+6. Add tool activity and explicit approvals.
+7. Complete the Agent Mode security and recovery gate.
+
+Current status (2026-07-14): steps 1–6 are implemented. The active Hermes profile uses
+`manual` approvals, the per-user launchd bridge is installed and loaded, and live
+Copilot `gpt-4o-mini` gateway, HTTP-bridge, approval, restart/resume, and browser reload
+checks pass. The bridge and UI still fail closed if approvals are changed to `off`.
+Step 7 remains open only for the extended hardening matrix; V Start will not alter the
+global Hermes policy automatically.
+
+Agent Mode must not introduce provider API keys, direct provider requests, browser
+persistence, an AI container, or a generic executable/CLI registry into V Start.
 
 ## Recommended first implementation milestone
 

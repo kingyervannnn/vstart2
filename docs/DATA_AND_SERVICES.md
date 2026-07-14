@@ -84,10 +84,12 @@ Database-backed user media.
 | `sha256` | text unique | Deduplication |
 | `byte_length` | bigint | Upload validation |
 | `width` / `height` | integer nullable | Image metadata |
+| `original_name` | text nullable | Display name for the background library/import tooling |
 | `content` | bytea | Durable binary content |
 | `created_at` | timestamptz | Server timestamp |
 
-The API streams asset content from `/api/assets/:id`. Custom backgrounds and shortcut
+The API streams asset content from `/api/assets/:id`. Bootstrap includes background asset
+metadata—not binary content—so Settings can render the database-backed library. Custom backgrounds and shortcut
 icons do not rely on a host upload folder. Built-in application assets remain compiled.
 
 ### `workspaces`
@@ -195,6 +197,12 @@ search history is omitted rather than stored in the browser.
 Mail OAuth/account data and notes content remain owned by their backend services, but no
 corresponding durable state may live in the browser. Provider credentials must be stored
 server-side and encrypted at rest or supplied through Docker secrets/environment variables.
+
+Optional Agent Mode follows the same ownership rule. PostgreSQL stores V Start agent
+preferences and links to canonical Hermes session ids; Hermes SessionDB remains
+authoritative for conversation messages, tool traces, usage, and session history. V Start
+does not duplicate those records. The exact schema and ownership rules are defined in
+`AGENT_MODE.md`.
 Raw secrets must never be embedded in `app_settings` responses.
 
 ## 4. API contract
@@ -302,6 +310,14 @@ it can run beside V Start 1 without touching it.
 The music controller continues to use its existing external/local music backend contract;
 it is not a new V Start 2 Compose service unless later requested.
 
+### Optional native host service
+
+Hermes-backed Agent Mode uses `agent-bridge`, a separately installed native macOS process.
+It is versioned in this repository but is not part of Docker Compose because it must reach
+the user's host-local Hermes runtime, authenticated providers, tools, Keychain state, and
+applications. It binds only to loopback and exposes the constrained contract in
+`AGENT_MODE.md`; it is not a generic command or JSON-RPC proxy.
+
 ### Host ports
 
 Current host ports:
@@ -314,6 +330,7 @@ Current host ports:
 | notes API | `3410` |
 | Gmail API | `3510` |
 | STT API | `8091` |
+| Agent bridge (optional native host service) | `3120`, loopback only |
 
 PostgreSQL and SearXNG need only be reachable inside `vstart2-network` unless a debugging
 profile explicitly publishes them.

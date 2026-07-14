@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Database, Image, LayoutGrid, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 
 const PAGES = [
@@ -7,6 +7,7 @@ const PAGES = [
   ['workspaces', 'Workspaces', PanelsTopLeft],
   ['speedDial', 'Speed Dial', LayoutGrid],
   ['search', 'Search', Search],
+  ['agent', 'Agent', Bot],
   ['appearance', 'Appearance', Palette],
   ['backgrounds', 'Backgrounds', Image],
   ['widgets', 'Widgets', PanelsTopLeft],
@@ -22,7 +23,7 @@ function Toggle({ label, detail, checked, onChange }) {
   )
 }
 
-export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackground }) {
+export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBackgroundId, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackground, onSelectBackground }) {
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
@@ -103,7 +104,18 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
               <label className="setting-field range-setting"><span>Search bar blur <output aria-hidden="true">{searchBlur}px</output></span><input type="range" min="0" max="40" step="1" value={searchBlur} aria-label="Search bar blur" onChange={(event) => onPatch({ search: { appearance: { blur: Number(event.target.value) } } })} /></label>
               <p className="field-help">In edit mode, drag the handle beside the workspace buttons to set their horizontal relationship to the search bar.</p>
               <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search</span></div>
-              <div className="setting-note"><strong>AI control</strong><span>The V Start 1 glyph is a clickable local placeholder. No backend or provider settings are included.</span></div>
+              <div className="setting-note"><strong>AI control</strong><span>The V Start 1 glyph opens the local Hermes Agent Mode. Search never stores provider credentials.</span></div>
+            </>}
+            {page === 'agent' && <>
+              <h3>Agent</h3>
+              <Toggle label="Enable Agent Mode" detail="Uses the native loopback Hermes bridge; no provider API is embedded in V Start." checked={settings.agent?.enabled !== false} onChange={(value) => onPatch({ agent: { enabled: value } })} />
+              <label className="setting-field"><span>Loopback bridge URL</span><input className="text-setting-input" defaultValue={settings.agent?.bridgeUrl || 'http://127.0.0.1:3120'} onBlur={(event) => event.target.value.trim() && event.target.value.trim() !== settings.agent?.bridgeUrl && onPatch({ agent: { bridgeUrl: event.target.value.trim() } })} /></label>
+              <label className="setting-field"><span>Hermes-profile reasoning default</span><select value={settings.agent?.defaultReasoningEffort || 'medium'} onChange={(event) => onPatch({ agent: { defaultReasoningEffort: event.target.value } })}><option value="none">Off</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Max</option></select></label>
+              <Toggle label="Fast mode by default" detail="Applied only when the selected Hermes model supports it." checked={settings.agent?.defaultFastMode} onChange={(value) => onPatch({ agent: { defaultFastMode: value } })} />
+              <Toggle label="Show tool activity" checked={settings.agent?.showToolActivity !== false} onChange={(value) => onPatch({ agent: { showToolActivity: value } })} />
+              <Toggle label="Show token usage" checked={settings.agent?.showUsage} onChange={(value) => onPatch({ agent: { showUsage: value } })} />
+              <Toggle label="Workspace-specific agent defaults" detail="Stores working-directory and model preferences in PostgreSQL." checked={settings.agent?.workspaceDefaultsEnabled !== false} onChange={(value) => onPatch({ agent: { workspaceDefaultsEnabled: value } })} />
+              <div className="setting-note"><strong>Credentials stay in Hermes.</strong><span>V Start contains no provider key, OAuth, sudo, secret, executable, or arbitrary CLI controls. If Hermes approvals are off, Agent Mode locks rather than running tools automatically.</span></div>
             </>}
             {page === 'appearance' && <>
               <h3>Appearance</h3>
@@ -120,6 +132,18 @@ export function SettingsPanel({ settings, workspaces, saving, onClose, onPatch, 
             {page === 'backgrounds' && <>
               <h3>Backgrounds</h3>
               <Toggle label="Workspace-specific backgrounds" checked={settings.backgrounds?.workspaceSpecific} onChange={(value) => onPatch({ backgrounds: { workspaceSpecific: value } })} />
+              <div className="background-library" aria-label="Background library">
+                <button type="button" className={!activeBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null)} aria-pressed={!activeBackgroundId}>
+                  <span>None</span>
+                </button>
+                {backgroundAssets.map((asset) => <button type="button" key={asset.id} className={activeBackgroundId === asset.id ? 'active' : ''} onClick={() => onSelectBackground(asset.id)} aria-pressed={activeBackgroundId === asset.id} title={asset.originalName || 'Background'}>
+                  {asset.byteLength <= 8 * 1024 * 1024
+                    ? <img src={`/api/assets/${asset.id}`} alt="" loading="lazy" />
+                    : <span className="background-large-preview">{asset.mimeType === 'image/gif' ? 'Animated GIF' : 'Large image'}</span>}
+                  <span>{asset.originalName || 'Background'}</span>
+                  <small>{Math.max(1, Math.round(asset.byteLength / 1024))} KiB</small>
+                </button>)}
+              </div>
               <label className="background-upload"><strong>Upload background</strong><span>{settings.backgrounds?.workspaceSpecific ? 'Applies to the active workspace.' : 'Applies globally.'} Images are stored in PostgreSQL.</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={async (event) => {
                 setBackgroundError('')
                 try { await onUploadBackground(event.target.files?.[0]) }

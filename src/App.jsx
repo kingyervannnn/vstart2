@@ -14,6 +14,7 @@ import { SettingsPanel } from './components/SettingsPanel.jsx'
 import { ShortcutDialog } from './components/ShortcutDialog.jsx'
 import { WidgetRail } from './components/WidgetRail.jsx'
 import { AppContextMenu } from './components/AppContextMenu.jsx'
+import { AgentMode } from './components/AgentMode.jsx'
 import { WorkspaceContextMenu } from './components/WorkspaceContextMenu.jsx'
 import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 
@@ -49,7 +50,9 @@ export function App() {
   const [headerDirection, setHeaderDirection] = useState('left')
   const [inlineResults, setInlineResults] = useState(null)
   const [widgetView, setWidgetView] = useState(null)
+  const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const activeRef = useRef(null)
+  const agentRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
   const wheelRef = useRef({ total: 0, cooldown: false, timer: null })
 
@@ -75,7 +78,10 @@ export function App() {
   }, [toast])
 
   const workspaces = useMemo(() => bootstrap?.workspaces || [], [bootstrap?.workspaces])
-  const slug = decodeURIComponent(location.pathname.match(/^\/w\/([^/]+)$/)?.[1] || '')
+  const workspaceRoute = location.pathname.match(/^\/w\/([^/]+)(?:\/agent(?:\/([^/]+))?)?$/)
+  const slug = decodeURIComponent(workspaceRoute?.[1] || '')
+  const agentMode = Boolean(workspaceRoute && location.pathname.includes('/agent'))
+  const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const activeWorkspace = workspaces.find((workspace) => workspace.slug === slug) || null
   const settings = bootstrap?.settings?.document || {}
 
@@ -95,8 +101,8 @@ export function App() {
   }, [activeWorkspace])
 
   const selectWorkspace = useCallback((workspace) => {
-    if (workspace) navigate(`/w/${workspace.slug}`)
-  }, [navigate])
+    if (workspace) navigate(agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`)
+  }, [agentMode, navigate])
 
   const cycleWorkspace = useCallback((delta) => {
     if (!activeWorkspace || workspaces.length < 2) return
@@ -131,6 +137,33 @@ export function App() {
     }).finally(() => setSavingCount((value) => Math.max(0, value - 1)))
     return settingsQueueRef.current
   }, [applyBootstrap, load])
+
+  const linkAgentSession = useCallback(async (workspaceId, hermesSessionId, titleOverride = null) => {
+    const result = await api.linkAgentSession({ workspaceId, hermesSessionId, titleOverride })
+    applyBootstrap(result.bootstrap)
+    return result
+  }, [applyBootstrap])
+
+  const saveAgentPreferences = useCallback(async (workspaceId, changes) => {
+    const current = (bootstrapRef.current?.agentPreferences || []).find((preference) => preference.workspaceId === workspaceId)
+    const result = await api.saveAgentPreferences(workspaceId, { ...changes, version: current?.version || 0 })
+    applyBootstrap(result.bootstrap)
+    return result
+  }, [applyBootstrap])
+
+  const activeWorkspaceSlug = activeWorkspace?.slug || ''
+  const navigateAgent = useCallback((sessionId, options = {}) => {
+    if (!activeWorkspaceSlug) return
+    navigate(`/w/${activeWorkspaceSlug}/agent/${encodeURIComponent(sessionId || 'new')}`, options)
+  }, [activeWorkspaceSlug, navigate])
+
+  const toggleAgentMode = useCallback(() => {
+    if (!activeWorkspace) return
+    setInlineResults(null)
+    setWidgetView(null)
+    setFolderId(null)
+    navigate(agentMode ? `/w/${activeWorkspace.slug}` : `/w/${activeWorkspace.slug}/agent/new`)
+  }, [activeWorkspace, agentMode, navigate])
 
   const placementsFor = useCallback((workspaceId, profileName, containerKey = 'root') =>
     (bootstrapRef.current?.placements || []).filter((value) => value.workspaceId === workspaceId && value.profile === profileName && value.containerKey === containerKey), [])
@@ -475,12 +508,26 @@ export function App() {
     })
     setSavingCount((value) => value + 1)
     try {
-      const asset = await api.uploadAsset('background', file.type, data)
+      const asset = await api.uploadAsset('background', file.type, data, file.name)
       if (settings.backgrounds?.workspaceSpecific) {
         const result = await api.updateWorkspace(activeWorkspace.id, { backgroundAssetId: asset.assetId, version: activeWorkspace.version })
         applyBootstrap(result.bootstrap)
       } else {
         await patchSettings({ backgrounds: { globalAssetId: asset.assetId } })
+      }
+    } finally {
+      setSavingCount((value) => Math.max(0, value - 1))
+    }
+  }
+
+  const selectBackground = async (assetId) => {
+    setSavingCount((value) => value + 1)
+    try {
+      if (settings.backgrounds?.workspaceSpecific) {
+        const result = await api.updateWorkspace(activeWorkspace.id, { backgroundAssetId: assetId, version: activeWorkspace.version })
+        applyBootstrap(result.bootstrap)
+      } else {
+        await patchSettings({ backgrounds: { globalAssetId: assetId } })
       }
     } finally {
       setSavingCount((value) => Math.max(0, value - 1))
@@ -515,6 +562,19 @@ export function App() {
           <InlineResults {...inlineResults} onClose={() => setInlineResults(null)} />
         ) : widgetView ? (
           <ServiceRailView kind={widgetView} onClose={() => setWidgetView(null)} />
+        ) : agentMode ? (
+          <AgentMode
+            ref={agentRef}
+            workspace={activeWorkspace}
+            settings={settings}
+            targetSessionId={agentTarget}
+            sessionLinks={(bootstrap.agentSessions || []).filter((session) => session.workspaceId === activeWorkspace.id)}
+            preferences={(bootstrap.agentPreferences || []).find((preference) => preference.workspaceId === activeWorkspace.id)}
+            onNavigate={navigateAgent}
+            onSessionLinked={linkAgentSession}
+            onPreferencesChange={saveAgentPreferences}
+            onStateChange={setAgentUi}
+          />
         ) : (
           <DialCanvas
             workspace={activeWorkspace}
@@ -546,9 +606,15 @@ export function App() {
           onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
+          agentMode={agentMode}
+          agentReady={agentUi.ready}
+          agentRunning={agentUi.running}
+          onAgentToggle={toggleAgentMode}
+          onAgentSubmit={(value) => agentRef.current?.submit(value)}
+          onAgentStop={() => agentRef.current?.stop()}
         />
         <div className="page-controls">
-          <button type="button" className={editMode ? 'active' : ''} onClick={() => setEditMode((value) => !value)} aria-label={editMode ? 'Finish editing' : 'Edit page'}>{editMode ? <Check /> : <Pencil />}</button>
+          {!agentMode && <button type="button" className={editMode ? 'active' : ''} onClick={() => setEditMode((value) => !value)} aria-label={editMode ? 'Finish editing' : 'Edit page'}>{editMode ? <Check /> : <Pencil />}</button>}
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><Settings /></button>
         </div>
       </section>
@@ -593,7 +659,7 @@ export function App() {
         onDelete={deleteWorkspaceFromMenu}
       />}
       {workspaceDialog && <WorkspaceDialog workspace={workspaceDialog.workspace} busy={busy} onClose={() => setWorkspaceDialog(null)} onSubmit={saveWorkspaceDialog} />}
-      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={deleteWorkspace} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} />}
+      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} activeBackgroundId={backgroundId || null} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={deleteWorkspace} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} onSelectBackground={selectBackground} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}
     </main>

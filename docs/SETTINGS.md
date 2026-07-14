@@ -17,10 +17,11 @@ The initial settings navigation contains:
 2. Workspaces
 3. Speed Dial
 4. Search
-5. Appearance
-6. Backgrounds
-7. Widgets
-8. Data & System
+5. Agent
+6. Appearance
+7. Backgrounds
+8. Widgets
+9. Data & System
 
 Settings opens as a large modal/sheet over the page. It does not become another layout
 mode. On narrow viewports, navigation becomes a list/detail stack.
@@ -48,7 +49,7 @@ Configurable actions:
 - Focus search.
 - Toggle inline mode.
 - Activate voice recording.
-- Activate AI placeholder mode.
+- Toggle Agent Mode.
 - Next workspace.
 - Previous workspace.
 - Open settings.
@@ -124,8 +125,9 @@ There are no Modern, Classic, Edge, Stage, or layout-override settings.
 - Image search enabled.
 - Voice/STT enabled.
 
-No AI provider, model, API key, routing, web-search-provider, prompt setting, or integration
-message is shown. The exact V Start 1 AI glyph only toggles its local inert placeholder.
+No AI provider, model, API key, routing, web-search-provider, or prompt setting is shown in
+Search. The exact V Start 1 AI glyph is inert through the core release phases, then opens
+the loopback Hermes Agent Mode defined in `AGENT_MODE.md`.
 
 ### Search dock placement
 
@@ -151,7 +153,28 @@ Carry only:
 Do not import V Start 1's full suggestion/AI/inline-theme appearance matrix. Inline results
 use the shared app theme plus one readable result density option if testing proves necessary.
 
-## 7. Appearance
+## 7. Agent
+
+This page is present only after the Agent Mode extension is installed.
+
+- Enable Agent Mode.
+- Loopback bridge status and Start/Stop guidance.
+- Loopback bridge URL, restricted to approved loopback hosts.
+- Default reasoning effort.
+- Show tool activity.
+- Show usage metadata.
+- Enable workspace-specific agent defaults.
+- Per-workspace working directory and model/provider preference when workspace defaults are
+  enabled.
+
+Reasoning effort and fast mode are labeled as Hermes-profile defaults because the current
+Hermes gateway persists them at profile scope. They are not presented as workspace-specific
+until Hermes exposes a truly session-scoped contract.
+
+Provider authentication stays in Hermes. This page contains no key, OAuth, executable,
+CLI-registry, arbitrary command, secret, or sudo controls.
+
+## 8. Appearance
 
 ### Global typography and color
 
@@ -174,7 +197,7 @@ use the shared app theme plus one readable result density option if testing prov
 The page explicitly describes the Edge Effect as decorative. Enabling it must not reveal
 layout controls or change the dial rail's geometry.
 
-## 8. Backgrounds
+## 9. Backgrounds
 
 ### Global
 
@@ -198,7 +221,7 @@ Disabling the feature preserves assignments but renders the global background.
 
 No uploaded background is stored in IndexedDB or a browser blob database.
 
-## 9. Widgets
+## 10. Widgets
 
 ### Visibility
 
@@ -222,7 +245,7 @@ V Start 2 surfaces are always transparent. Music is the sole exception.
 All enabled widgets remain visible in Compact Mode. Compact Mode may use tighter widget
 geometry, but it does not replace the rail with launchers or remove widget content.
 
-## 10. Data & System
+## 11. Data & System
 
 - Database connection health.
 - Service health: storage, Gmail, image search, notes, SearXNG, STT.
@@ -236,7 +259,7 @@ geometry, but it does not replace the rail with launchers or remove widget conte
 There is no "clear browser storage" action because V Start 2 owns no browser-persistent
 application state.
 
-## 11. Settings removed from V Start 1
+## 12. Settings removed from V Start 1
 
 The following categories do not migrate:
 
@@ -251,7 +274,7 @@ The following categories do not migrate:
 - Per-component duplicated blur/link controls that violate the new surface rules.
 - Settings used solely to preserve legacy behavior.
 
-## 12. Settings acceptance criteria
+## 13. Settings acceptance criteria
 
 - Every visible setting has an observable effect or is clearly labeled future-only.
 - Reloading after any setting change returns the same value from PostgreSQL.

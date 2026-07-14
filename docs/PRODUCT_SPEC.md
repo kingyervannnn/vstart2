@@ -20,7 +20,8 @@ couple the two projects and break an isolated Docker build context.
 - Reversing scrolling header.
 - Workspace buttons immediately above the search dock.
 - Continuous free-placement speed-dial canvas, folders, and workspace scroll switching.
-- Draggable search dock with normal, inline, voice, image, and future-AI controls.
+- Draggable search dock with normal, inline, voice, image, and optional Agent Mode
+  controls.
 - Full-column inline search results.
 - V Start 1 left-rail widgets, with a simplified surface treatment.
 - Global and optional workspace-specific fonts, colors, and backgrounds.
@@ -284,12 +285,12 @@ The dock contains:
 - Inline-mode toggle.
 - Voice/STT toggle.
 - Image-search affordance.
-- AI toggle placeholder.
+- Agent Mode toggle using the exact V Start 1 AI glyph.
 
-The AI toggle uses the exact V Start 1 glyph and interaction affordance. It is clickable
-and toggles a local inert placeholder presentation only. It contains no "coming later"
-or integration-status message, performs no network request, exposes no provider settings,
-and is not eligible as the startup/default search mode in the first release.
+During the core release sequence the control is a local inert placeholder and is not
+eligible as the startup/default search mode. Phase 15 activates it only through the
+loopback Hermes bridge specified in `AGENT_MODE.md`. It never exposes provider keys or
+makes a direct provider API request.
 
 ### 7.3 Core search behavior
 
@@ -424,6 +425,8 @@ V Start 2 is not ready for default use until all of the following pass:
    profile's widget access, embed no page/iframe, and return cleanly.
 10. A stopped database shows a reconnect/error shell and does not silently fall back to
     defaults that can overwrite user data.
-11. The Docker stack contains no AI backend and the frontend makes no AI API request.
+11. The Docker stack contains no provider-specific AI backend, the frontend makes no direct
+    provider API request, and optional Agent Mode can communicate only with the approved
+    loopback Hermes bridge defined in `AGENT_MODE.md`.
 12. V Start 1 can continue running with its original database and ports while V Start 2
     is under development.

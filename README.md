@@ -25,8 +25,9 @@ state.
 - Wide Mode uses the widget and dial columns. Compact Mode automatically removes the
   widget column, hides clock/weather, and retains a small widget-access dock.
 - "Edge effect" is visual styling only. It never changes layout behavior.
-- The exact V Start 1 AI glyph remains as a clickable local placeholder, but V Start 2
-  ships without an AI backend, provider settings, API keys, or AI API calls.
+- The exact V Start 1 AI glyph is the entry point for the optional Hermes-backed Agent
+  Mode. V Start ships no provider-specific backend, provider settings, API keys, or direct
+  provider API calls; local agent execution stays behind an explicit loopback host bridge.
 - V Start 1 remains untouched and independently runnable during development.
 
 ## Specification index
@@ -35,6 +36,7 @@ state.
 - [Data and service architecture](docs/DATA_AND_SERVICES.md)
 - [Settings organization](docs/SETTINGS.md)
 - [Implementation sequence](docs/IMPLEMENTATION_SEQUENCE.md)
+- [Hermes Agent Mode](docs/AGENT_MODE.md)
 
 ## Run it
 
@@ -55,6 +57,13 @@ Useful stack commands:
 ./scripts/stack.sh reset  # destroys only the isolated V Start 2 Docker volumes
 ```
 
+Agent Mode uses a separate native loopback bridge because Hermes and its local tools run
+on macOS, not inside Docker. Run it in the foreground with `npm run agent:bridge`, or see
+[the Agent Bridge operator guide](agent-bridge/README.md) for the optional explicit
+`launchd` installation. Docker startup never installs the host service. When the active
+Hermes profile has approvals disabled, the bridge starts in a safety-locked state and V
+Start refuses agent execution.
+
 Parallel host ports:
 
 | Service | Port |
@@ -66,6 +75,7 @@ Parallel host ports:
 | Notes | `3410` |
 | Gmail | `3510` |
 | Speech to text | `8091` |
+| Agent bridge (optional native host service) | `3120` loopback only |
 
 Configure `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `IMGBB_API_KEY`, and optionally
 `VSTART2_NOTES_ROOT` in the shell or an untracked `.env` file before stack startup.
@@ -78,6 +88,16 @@ when V2 already contains shortcuts.
 
 Run `npm run backfill:icons` after importing legacy data to copy retrievable shortcut
 images into PostgreSQL. Normal shortcut creation performs the same retrieval automatically.
+
+To import V Start 1's bundled and uploaded background library into PostgreSQL, run:
+
+```sh
+npm run import:vstart1:backgrounds -- --source /Users/vbitzx/SS/VSTART --select theme_2.gif
+```
+
+The import is transactional and content-deduplicated. `--select` optionally makes the
+matching imported image the global background; imported assets remain selectable from
+Settings → Backgrounds.
 
 ## Verify it
 
@@ -98,4 +118,6 @@ The first standalone implementation is runnable. It includes the database-first 
 two-column Wide/Compact shell, workspace URLs, continuous shortcut placement, folders,
 icon override/upload retrieval, movable search dock, inline results, widget service
 adapters, background assets, and reorganized settings. V Start 1 is not a runtime
-dependency and remains untouched.
+dependency and remains untouched. The initial Hermes Agent Mode is also implemented with
+first-class session URLs, streaming UI, tool/approval/clarification surfaces, model and
+reasoning controls, workspace preferences in PostgreSQL, and a secured native bridge.

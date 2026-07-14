@@ -48,6 +48,23 @@ function openPlacements(bootstrap, workspaceId, preferredItemId = null, containe
 
 const initial = (await call('/bootstrap')).body
 assert.ok(initial.workspaces[0], 'default workspace exists')
+const backgroundName = `Integration ${runId}.png`
+const background = await mutation('/assets', 'POST', {
+  kind: 'background',
+  mimeType: 'image/png',
+  data: tinyPng,
+  originalName: backgroundName,
+}, `${runId}:background-create`)
+assert.equal(background.response.status, 201)
+let backgroundBootstrap = (await call('/bootstrap')).body
+const backgroundMetadata = backgroundBootstrap.backgroundAssets.find((asset) => asset.id === background.body.assetId)
+assert.equal(backgroundMetadata.originalName, backgroundName, 'background metadata is available without loading binary content')
+const backgroundContent = await fetch(`${base}/assets/${background.body.assetId}`)
+assert.equal(backgroundContent.status, 200)
+assert.equal(backgroundContent.headers.get('content-type'), 'image/png')
+const backgroundDeleted = await mutation(`/assets/${background.body.assetId}`, 'DELETE', {}, `${runId}:background-delete`)
+assert.equal(backgroundDeleted.response.status, 200)
+assert.ok(!backgroundDeleted.body.bootstrap.backgroundAssets.some((asset) => asset.id === background.body.assetId), 'unused backgrounds can be removed cleanly')
 const createdWorkspace = await mutation('/workspaces', 'POST', { name: `Smoke ${runId}`, icon: 'Briefcase' }, `${runId}:workspace-a`)
 assert.equal(createdWorkspace.response.status, 201)
 const workspace = createdWorkspace.body.bootstrap.workspaces.find((value) => value.id === createdWorkspace.body.workspaceId)
@@ -183,9 +200,57 @@ const labelsRestored = await mutation('/settings', 'PATCH', {
 }, `${runId}:labels-restore`)
 assert.equal(labelsRestored.body.bootstrap.settings.document.speedDial.alwaysShowNames, originalLabels)
 
+const agentPreferences = await mutation(`/workspaces/${workspace.id}/agent-preferences`, 'PUT', {
+  cwd: '/tmp/vstart2-agent-smoke',
+  provider: 'fixture-provider',
+  model: 'fixture-model',
+  version: 0,
+}, `${runId}:agent-preferences`)
+assert.equal(agentPreferences.response.status, 200)
+assert.deepEqual(
+  agentPreferences.body.bootstrap.agentPreferences.find((value) => value.workspaceId === workspace.id),
+  expectAgentPreferences(workspace.id),
+  'agent workspace preferences persist in PostgreSQL',
+)
+
+const linkedAgentSession = await mutation('/agent/sessions', 'POST', {
+  workspaceId: workspace.id,
+  hermesSessionId: `hermes-${runId}`,
+}, `${runId}:agent-session-link`)
+assert.equal(linkedAgentSession.response.status, 200)
+let agentSession = linkedAgentSession.body.bootstrap.agentSessions.find((value) => value.id === linkedAgentSession.body.agentSessionLinkId)
+assert.ok(agentSession, 'Hermes session link is returned in bootstrap')
+
+const updatedAgentSession = await mutation(`/agent/sessions/${agentSession.id}`, 'PATCH', {
+  pinned: true,
+  titleOverride: 'Smoke Hermes session',
+  version: agentSession.version,
+}, `${runId}:agent-session-update`)
+assert.equal(updatedAgentSession.response.status, 200)
+agentSession = updatedAgentSession.body.bootstrap.agentSessions.find((value) => value.id === agentSession.id)
+assert.equal(agentSession.pinned, true)
+assert.equal(agentSession.titleOverride, 'Smoke Hermes session')
+
+const unlinkedAgentSession = await mutation(`/agent/sessions/${agentSession.id}`, 'DELETE', {
+  version: agentSession.version,
+}, `${runId}:agent-session-unlink`)
+assert.equal(unlinkedAgentSession.response.status, 200)
+assert.ok(!unlinkedAgentSession.body.bootstrap.agentSessions.some((value) => value.id === agentSession.id), 'unlink keeps Hermes history out of PostgreSQL while removing the V Start link')
+
 for (const workspaceId of [destinationWorkspaceId, workspace.id]) {
   const deleted = await mutation(`/workspaces/${workspaceId}`, 'DELETE', {}, `${runId}:delete-workspace:${workspaceId}`)
   assert.equal(deleted.response.status, 200)
 }
 
-console.log('V Start 2 integration smoke passed: persistence, idempotency, collision, free placement, direct folder creation, workspace glyphs/moves, synchronized pinning, deletion, and settings.')
+console.log('V Start 2 integration smoke passed: persistence, background assets, idempotency, collision, free placement, folders, workspace moves, synchronized pinning, Agent Mode links/preferences, deletion, and settings.')
+
+function expectAgentPreferences(workspaceId) {
+  return {
+    workspaceId,
+    cwd: '/tmp/vstart2-agent-smoke',
+    provider: 'fixture-provider',
+    model: 'fixture-model',
+    version: 1,
+    updatedAt: agentPreferences.body.bootstrap.agentPreferences.find((value) => value.workspaceId === workspaceId).updatedAt,
+  }
+}

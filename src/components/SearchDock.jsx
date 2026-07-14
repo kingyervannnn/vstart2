@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Globe2, Image, LoaderCircle, Mic, Sparkles, Square } from 'lucide-react'
+import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { clampDockGeometry, shouldDropSuggestionsUp } from '../lib/searchDock.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
@@ -22,6 +22,12 @@ export function SearchDock({
   onGeometryCommit,
   onWorkspaceOffsetCommit,
   onInlineResults,
+  agentMode = false,
+  agentReady = false,
+  agentRunning = false,
+  onAgentToggle,
+  onAgentSubmit,
+  onAgentStop,
 }) {
   const dockRef = useRef(null)
   const inputRef = useRef(null)
@@ -40,7 +46,6 @@ export function SearchDock({
   const [query, setQuery] = useState('')
   const [inline, setInline] = useState(false)
   const [imageMode, setImageMode] = useState(false)
-  const [aiActive, setAiActive] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [suggestions, setSuggestions] = useState([])
@@ -67,12 +72,12 @@ export function SearchDock({
         event.preventDefault()
         inputRef.current?.focus()
       }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
+      if (!agentMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
         event.preventDefault()
         setImageMode((value) => !value)
         inputRef.current?.focus()
       }
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      if (!agentMode && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault()
         setInline(true)
         inputRef.current?.focus()
@@ -80,9 +85,14 @@ export function SearchDock({
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [])
+  }, [agentMode])
 
   useEffect(() => {
+    if (agentMode) {
+      setSuggestions([])
+      setSuggestionsOpen(false)
+      return undefined
+    }
     const value = query.trim()
     if (value.length < 2) {
       setSuggestions([])
@@ -92,7 +102,7 @@ export function SearchDock({
       api.suggestions(value).then((result) => setSuggestions(result.suggestions || [])).catch(() => setSuggestions([]))
     }, 140)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [agentMode, query])
 
   useEffect(() => {
     const updateDirection = () => {
@@ -199,11 +209,17 @@ export function SearchDock({
     }
   }, [endWorkspaceMove, moveWorkspace, workspaceMoving])
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const value = query.trim()
     if (!value) return
     setSuggestionsOpen(false)
+    if (agentMode) {
+      if (!agentReady) return
+      const accepted = await onAgentSubmit?.(value)
+      if (accepted) setQuery('')
+      return
+    }
     if (inline) return onInlineResults(value)
     const searchQuery = imageMode ? `${value} images` : value
     const target = (ENGINES[settings.search?.engine] || ENGINES.google)(searchQuery)
@@ -253,17 +269,25 @@ export function SearchDock({
     >
       <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />
       <form
-        className={`search-dock ${inline ? 'inline-mode' : ''} ${aiActive ? 'ai-placeholder-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} ${searchAppearance.outerGlow ? 'search-outer-glow' : ''} ${searchAppearance.glowOnFocus !== false ? 'glow-on-focus' : ''}`}
+        className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} ${searchAppearance.outerGlow ? 'search-outer-glow' : ''} ${searchAppearance.glowOnFocus !== false ? 'glow-on-focus' : ''}`}
         style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
         onSubmit={submit}
       >
-        <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
-        <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
-        <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
-        <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
-        <button type="button" className={aiActive ? 'active' : ''} onClick={() => setAiActive((value) => !value)} aria-label="AI mode placeholder" aria-pressed={aiActive}><Sparkles size={18} /></button>
+        {agentMode ? <>
+          <button type="button" className="active" onClick={onAgentToggle} aria-label="Close Agent Mode" aria-pressed={true}><Sparkles size={18} /></button>
+          <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Agent Mode is not ready'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} autoComplete="off" disabled={!agentReady} />
+          {agentRunning
+            ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
+            : <button type="submit" disabled={!agentReady || !query.trim()} aria-label="Send to Hermes"><Send size={18} /></button>}
+        </> : <>
+          <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
+          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
+          <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
+          <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
+          <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
+        </>}
       </form>
-      {suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
+      {!agentMode && suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
         {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
       </ul>}
       {editMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
