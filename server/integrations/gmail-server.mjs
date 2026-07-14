@@ -1,0 +1,972 @@
+import http from 'node:http'
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
+
+// Selectively ported from V Start 1. This copy is independently owned by V Start 2.
+const PORT = process.env.GMAIL_PORT ? Number(process.env.GMAIL_PORT) : 3510
+const DATA_DIR = process.env.GMAIL_DATA_DIR || path.resolve('/app/uploads/gmail')
+const TOKENS_FILE = path.join(DATA_DIR, 'tokens.json')
+const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json')
+
+// Credentials can be updated at runtime
+let CLIENT_ID = process.env.GMAIL_CLIENT_ID || ''
+let CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || ''
+
+// Load credentials from file if it exists (takes precedence over env vars)
+async function loadCredentialsFromFile() {
+  try {
+    const data = await fs.readFile(CREDENTIALS_FILE, 'utf8')
+    const json = JSON.parse(data)
+    if (json.client_id) CLIENT_ID = json.client_id
+    if (json.client_secret) CLIENT_SECRET = json.client_secret
+    console.log('[gmail-server] Loaded credentials from file')
+  } catch {
+    // File doesn't exist or invalid, use env vars
+  }
+}
+
+// Save credentials to file
+async function saveCredentialsToFile(clientId, clientSecret) {
+  await ensureDir(DATA_DIR)
+  await fs.writeFile(CREDENTIALS_FILE, JSON.stringify({
+    client_id: clientId,
+    client_secret: clientSecret,
+    updated_at: new Date().toISOString()
+  }, null, 2), 'utf8')
+  CLIENT_ID = clientId
+  CLIENT_SECRET = clientSecret
+  console.log('[gmail-server] Credentials updated and saved to file')
+}
+
+// Load credentials on startup
+loadCredentialsFromFile().catch(() => {})
+
+function send(res, status, body, headers = {}) {
+  const payload = typeof body === 'string' ? body : JSON.stringify(body)
+  res.writeHead(status, {
+    'Content-Type':
+      typeof body === 'string'
+        ? 'text/plain; charset=utf-8'
+        : 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    ...headers
+  })
+  res.end(payload)
+}
+
+function sendBinary(res, status, body, headers = {}) {
+  res.writeHead(status, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    ...headers
+  })
+  res.end(body)
+}
+
+function decodeBase64UrlToBuffer(data) {
+  const raw = String(data || '').trim()
+  if (!raw) return Buffer.from([])
+  const normalized = raw.replace(/-/g, '+').replace(/_/g, '/')
+  const padLen = normalized.length % 4 ? (4 - (normalized.length % 4)) : 0
+  const padded = normalized + (padLen ? '='.repeat(padLen) : '')
+  return Buffer.from(padded, 'base64')
+}
+
+function sanitizeFilename(name) {
+  const raw = String(name || '').trim()
+  if (!raw) return 'attachment'
+  const cleaned = raw.replace(/[^\w.\- ()]/g, '').slice(0, 180).trim()
+  return cleaned || 'attachment'
+}
+
+function extractPartHeader(part, headerName) {
+  try {
+    const headers = Array.isArray(part?.headers) ? part.headers : []
+    const target = String(headerName || '').toLowerCase()
+    const found = headers.find((h) => String(h?.name || '').toLowerCase() === target)
+    return String(found?.value || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function parseBody(req) {
+  return new Promise((resolve) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+      if (body.length > 1_000_000) {
+        // 1MB safety limit
+        body = ''
+        resolve({})
+        req.destroy()
+      }
+    })
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'))
+      } catch {
+        resolve({})
+      }
+    })
+  })
+}
+
+async function ensureDir(dir) {
+  await fs.mkdir(dir, { recursive: true })
+}
+
+async function readTokens() {
+  try {
+    const txt = await fs.readFile(TOKENS_FILE, 'utf8')
+    const data = JSON.parse(txt || '{}')
+    if (!data || typeof data !== 'object') return { accounts: {} }
+    if (!data.accounts || typeof data.accounts !== 'object') {
+      data.accounts = {}
+    }
+    return data
+  } catch {
+    return { accounts: {} }
+  }
+}
+
+async function writeTokens(data) {
+  await ensureDir(DATA_DIR)
+  const safe = {
+    accounts:
+      data && typeof data === 'object' && data.accounts && typeof data.accounts === 'object'
+        ? data.accounts
+        : {}
+  }
+  await fs.writeFile(TOKENS_FILE, JSON.stringify(safe, null, 2), 'utf8')
+}
+
+async function exchangeCodeForTokens(code, redirectUri) {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error(
+      'Gmail client credentials not configured (set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET)'
+    )
+  }
+
+  const params = new URLSearchParams()
+  params.set('code', code)
+  params.set('client_id', CLIENT_ID)
+  params.set('client_secret', CLIENT_SECRET)
+  params.set('redirect_uri', redirectUri)
+  params.set('grant_type', 'authorization_code')
+
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  })
+
+  const json = await resp.json().catch(() => ({}))
+  if (!resp.ok || !json.access_token) {
+    const errMsg =
+      json.error_description || json.error || `Upstream token error ${resp.status}`
+    throw new Error(errMsg)
+  }
+
+  return json
+}
+
+async function refreshAccessToken(refreshToken) {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error(
+      'Gmail client credentials not configured (set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET)'
+    )
+  }
+  if (!refreshToken) {
+    throw new Error('Missing refresh token for account')
+  }
+
+  const params = new URLSearchParams()
+  params.set('refresh_token', refreshToken)
+  params.set('client_id', CLIENT_ID)
+  params.set('client_secret', CLIENT_SECRET)
+  params.set('grant_type', 'refresh_token')
+
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  })
+
+  const json = await resp.json().catch(() => ({}))
+  if (!resp.ok || !json.access_token) {
+    const errMsg =
+      json.error_description || json.error || `Refresh token error ${resp.status}`
+    throw new Error(errMsg)
+  }
+
+  return json
+}
+
+async function fetchUserInfo(accessToken) {
+  const resp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  })
+  if (!resp.ok) {
+    return {}
+  }
+  const json = await resp.json().catch(() => ({}))
+  return json || {}
+}
+
+async function getAccountTokens(email) {
+  const store = await readTokens()
+  const key = String(email || '').toLowerCase()
+  const entry = store.accounts[key]
+  if (!entry || !entry.refresh_token) {
+    throw new Error('No stored tokens for this email')
+  }
+
+  const now = Date.now()
+  const needsRefresh =
+    !entry.access_token ||
+    !entry.expiry_date ||
+    Number(entry.expiry_date) <= now + 60_000
+
+  if (!needsRefresh) {
+    return { store, entry }
+  }
+
+  const refreshed = await refreshAccessToken(entry.refresh_token)
+  const expiresInSec = Number(refreshed.expires_in || 3600)
+  const updated = {
+    ...entry,
+    access_token: refreshed.access_token,
+    scope: refreshed.scope || entry.scope || '',
+    token_type: refreshed.token_type || entry.token_type || 'Bearer',
+    expiry_date: now + expiresInSec * 1000,
+    updated_at: new Date().toISOString()
+  }
+  store.accounts[key] = updated
+  await writeTokens(store)
+  return { store, entry: updated }
+}
+
+function formatTimestamp(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n)) return Date.now()
+  return n
+}
+
+function extractHeader(headers, name) {
+  if (!Array.isArray(headers)) return ''
+  const lower = String(name || '').toLowerCase()
+  for (const h of headers) {
+    if (!h || typeof h.name !== 'string') continue
+    if (h.name.toLowerCase() === lower) {
+      return String(h.value || '')
+    }
+  }
+  return ''
+}
+
+async function mapWithConcurrency(items, concurrency, fn) {
+  const list = Array.isArray(items) ? items : []
+  const limit = Math.max(1, Number(concurrency) || 1)
+  const results = new Array(list.length)
+  let idx = 0
+  const workers = Array.from({ length: Math.min(limit, list.length) }, () =>
+    (async () => {
+      while (idx < list.length) {
+        const current = idx++
+        try {
+          results[current] = await fn(list[current], current)
+        } catch {
+          results[current] = null
+        }
+      }
+    })()
+  )
+  await Promise.all(workers)
+  return results
+}
+
+async function listMessagesForAccount(email, maxResults = 20, labelId = 'INBOX', pageToken = '') {
+  let entry, token
+  try {
+    const result = await getAccountTokens(email)
+    entry = result.entry
+    token = entry.access_token
+    if (!token) {
+      throw new Error('No access token available for this account')
+    }
+  } catch (e) {
+    console.error(`[gmail-server] Token error for ${email}:`, e.message)
+    throw e
+  }
+
+  const max = Math.max(1, Math.min(50, Number(maxResults) || 20))
+
+  const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+  listUrl.searchParams.set('maxResults', String(max))
+  const normalizedLabel = String(labelId || '').trim().toUpperCase()
+  if (normalizedLabel && normalizedLabel !== 'ALL') {
+    listUrl.searchParams.set('labelIds', normalizedLabel)
+  }
+  const cleanPageToken = String(pageToken || '').trim()
+  if (cleanPageToken) {
+    listUrl.searchParams.set('pageToken', cleanPageToken)
+  }
+  if (normalizedLabel === 'SPAM' || normalizedLabel === 'TRASH' || normalizedLabel === 'ALL') {
+    listUrl.searchParams.set('includeSpamTrash', 'true')
+  }
+
+  const listResp = await fetch(listUrl.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+  const listJson = await listResp.json().catch(() => ({}))
+  if (!listResp.ok) {
+    const errMsg =
+      listJson.error?.message ||
+      listJson.error_description ||
+      listJson.error ||
+      `Gmail messages error ${listResp.status}`
+    throw new Error(errMsg)
+  }
+
+  const baseMessages = Array.isArray(listJson.messages)
+    ? listJson.messages.slice(0, max)
+    : []
+  if (!baseMessages.length) {
+    return { messages: [], nextPageToken: listJson.nextPageToken || null }
+  }
+
+  const headerParams = [
+    'From',
+    'To',
+    'Cc',
+    'Subject',
+    'Date'
+  ].map((h) => `metadataHeaders=${encodeURIComponent(h)}`).join('&')
+  const detailBaseUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/`
+  const detailUrls = baseMessages
+    .filter((m) => m && m.id)
+    .map((m) => `${detailBaseUrl}${encodeURIComponent(m.id)}?format=metadata&${headerParams}`)
+
+  const detailedResults = await mapWithConcurrency(detailUrls, 8, async (detailUrl) => {
+    const dResp = await fetch(detailUrl, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const dJson = await dResp.json().catch(() => ({}))
+    if (!dResp.ok) return null
+    const headers = dJson.payload?.headers || []
+    const from = extractHeader(headers, 'From') || email
+    const subject = extractHeader(headers, 'Subject') || '(no subject)'
+    const dateHeader = extractHeader(headers, 'Date')
+    let ts = null
+    if (dJson.internalDate) {
+      ts = formatTimestamp(dJson.internalDate)
+    } else if (dateHeader) {
+      const parsed = Date.parse(dateHeader)
+      ts = Number.isNaN(parsed) ? Date.now() : parsed
+    } else {
+      ts = Date.now()
+    }
+    const labels = Array.isArray(dJson.labelIds) ? dJson.labelIds : []
+    const unread = labels.includes('UNREAD')
+    const starred = labels.includes('STARRED')
+    const snippet = dJson.snippet || ''
+    return {
+      id: dJson.id,
+      email,
+      sender: from,
+      subject,
+      snippet,
+      timestamp: ts,
+      unread,
+      starred
+    }
+  })
+
+  const detailed = detailedResults.filter(Boolean)
+
+  // Sort newest first
+  detailed.sort((a, b) => {
+    const ta = Number(a.timestamp || 0)
+    const tb = Number(b.timestamp || 0)
+    return tb - ta
+  })
+
+  return { messages: detailed, nextPageToken: listJson.nextPageToken || null }
+}
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const host = req.headers.host || `localhost:${PORT}`
+    const url = new URL(req.url, `http://${host}`)
+    const p = url.pathname
+    // Debug: Log all incoming requests to /gmail/*
+    if (p && p.startsWith('/gmail/')) {
+      console.log(`[gmail-server] Request - Method: ${req.method}, Pathname: ${p}, Full URL: ${req.url}`)
+    }
+
+    if (req.method === 'OPTIONS') {
+      send(res, 204, '')
+      return
+    }
+
+    if (
+      req.method === 'GET' &&
+      (p === '/gmail/health' || p === '/gmail/api/v1/health')
+    ) {
+      send(res, 200, {
+        ok: true,
+        service: 'gmail',
+        hasClientId: !!CLIENT_ID,
+        hasClientSecret: !!CLIENT_SECRET
+      })
+      return
+    }
+
+    // Update credentials endpoint
+    if (req.method === 'POST' && p === '/gmail/credentials') {
+      const body = await parseBody(req)
+      const clientId = String(body.client_id || body.clientId || '').trim()
+      const clientSecret = String(body.client_secret || body.clientSecret || '').trim()
+
+      if (!clientId || !clientSecret) {
+        send(res, 400, { error: 'Missing client_id or client_secret' })
+        return
+      }
+
+      try {
+        await saveCredentialsToFile(clientId, clientSecret)
+        send(res, 200, {
+          success: true,
+          message: 'Credentials updated successfully',
+          hasClientId: !!CLIENT_ID,
+          hasClientSecret: !!CLIENT_SECRET
+        })
+      } catch (e) {
+        send(res, 500, { error: e?.message || 'Failed to save credentials' })
+      }
+      return
+    }
+
+    // Remove stored tokens for an email account (useful when scopes change)
+    if (req.method === 'POST' && p === '/gmail/account/remove') {
+      const body = await parseBody(req)
+      const email = String(body.email || '').trim().toLowerCase()
+      if (!email) {
+        send(res, 400, { error: 'Missing email' })
+        return
+      }
+      try {
+        const store = await readTokens()
+        if (store.accounts && store.accounts[email]) {
+          delete store.accounts[email]
+          await writeTokens(store)
+        }
+        send(res, 200, { success: true, email })
+      } catch (e) {
+        send(res, 500, { error: e?.message || 'Failed to remove account tokens' })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && p === '/gmail/oauth/token') {
+      const body = await parseBody(req)
+      const code = String(body.code || '').trim()
+      const redirectUri = String(body.redirectUri || '').trim()
+      if (!code || !redirectUri) {
+        send(res, 400, { error: 'Missing code or redirectUri' })
+        return
+      }
+      try {
+        const tokenJson = await exchangeCodeForTokens(code, redirectUri)
+        const accessToken = tokenJson.access_token
+        const refreshToken = tokenJson.refresh_token || ''
+        const expiresIn = Number(tokenJson.expires_in || 3600)
+
+        const user = await fetchUserInfo(accessToken)
+        const email =
+          String(user.email || tokenJson.email || '').trim().toLowerCase()
+        if (!email) {
+          throw new Error(
+            'Unable to resolve user email from Google profile; ensure userinfo scopes are granted'
+          )
+        }
+
+        const store = await readTokens()
+        const key = email
+        const prev = store.accounts[key] || {}
+        const effectiveRefresh =
+          refreshToken || prev.refresh_token || tokenJson.refresh_token || ''
+        if (!effectiveRefresh) {
+          // Still store short-lived access token, but warn about missing refresh
+          console.warn(
+            '[gmail-server] No refresh_token received; account may not persist across restarts'
+          )
+        }
+        store.accounts[key] = {
+          email,
+          access_token: accessToken,
+          refresh_token: effectiveRefresh,
+          scope: tokenJson.scope || prev.scope || '',
+          token_type: tokenJson.token_type || prev.token_type || 'Bearer',
+          expiry_date: Date.now() + expiresIn * 1000,
+          created_at: prev.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        await writeTokens(store)
+
+        send(res, 200, {
+          access_token: accessToken,
+          refresh_token: effectiveRefresh,
+          email,
+          expires_in: expiresIn
+        })
+      } catch (e) {
+        send(res, 500, { error: e?.message || 'Token exchange failed' })
+      }
+      return
+    }
+
+    if (req.method === 'GET' && p === '/gmail/messages') {
+      const email = url.searchParams.get('email') || ''
+      const maxStr = url.searchParams.get('max') || ''
+      const label = url.searchParams.get('label') || 'INBOX'
+      const pageToken = url.searchParams.get('pageToken') || ''
+      const cleanEmail = String(email || '').trim().toLowerCase()
+      if (!cleanEmail) {
+        send(res, 400, { error: 'Missing email query parameter' })
+        return
+      }
+      try {
+        const result = await listMessagesForAccount(cleanEmail, maxStr, label, pageToken)
+        send(res, 200, { email: cleanEmail, messages: result.messages, nextPageToken: result.nextPageToken })
+      } catch (e) {
+        console.error(`[gmail-server] Error fetching messages for ${cleanEmail}:`, e)
+        send(res, 500, {
+          error: e?.message || 'Failed to list messages',
+          details: String(e || '')
+        })
+      }
+      return
+    }
+
+    // Get single email full content
+    if (req.method === 'GET' && p.startsWith('/gmail/message/')) {
+      // Attachment fetch: /gmail/message/:messageId/attachment/:attachmentId
+      if (p.includes('/attachment/')) {
+        const parts = p.split('/').filter(Boolean)
+        const messageId = parts[2] || ''
+        const attachmentId = parts[4] || ''
+        const email = url.searchParams.get('email') || ''
+        const cleanEmail = String(email || '').trim().toLowerCase()
+        if (!cleanEmail || !messageId || !attachmentId) {
+          send(res, 400, { error: 'Missing email, messageId, or attachmentId parameter' })
+          return
+        }
+        try {
+          const result = await getAccountTokens(cleanEmail)
+          const token = result.entry.access_token
+          if (!token) {
+            send(res, 401, { error: 'No access token available' })
+            return
+          }
+          const attachUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`
+          const aResp = await fetch(attachUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          if (!aResp.ok) {
+            const errorData = await aResp.json().catch(() => ({}))
+            send(res, aResp.status, { error: errorData.error?.message || 'Failed to fetch attachment' })
+            return
+          }
+          const aJson = await aResp.json()
+          const buf = decodeBase64UrlToBuffer(aJson?.data || '')
+          const mime = String(url.searchParams.get('mime') || '').trim() || 'application/octet-stream'
+          const filename = sanitizeFilename(url.searchParams.get('name') || '')
+          const download = url.searchParams.get('download') === '1'
+          const disposition = download ? 'attachment' : 'inline'
+          sendBinary(res, 200, buf, {
+            'Content-Type': mime,
+            'Content-Length': String(buf.length),
+            'Content-Disposition': `${disposition}; filename="${filename}"`
+          })
+        } catch (e) {
+          console.error(`[gmail-server] Error fetching attachment ${attachmentId} for ${cleanEmail}/${messageId}:`, e)
+          send(res, 500, { error: e?.message || 'Failed to fetch attachment' })
+        }
+        return
+      }
+
+      console.log(`[gmail-server] GET /gmail/message/ - Pathname: ${p}, Full URL: ${req.url}`)
+      const messageId = p.replace('/gmail/message/', '').split('?')[0]
+      const email = url.searchParams.get('email') || ''
+      const cleanEmail = String(email || '').trim().toLowerCase()
+      console.log(`[gmail-server] Extracted - messageId: ${messageId}, email: ${cleanEmail}`)
+      if (!cleanEmail || !messageId) {
+        console.log(`[gmail-server] Missing params - messageId: ${!!messageId}, email: ${!!cleanEmail}`)
+        send(res, 400, { error: 'Missing email or messageId parameter' })
+        return
+      }
+      try {
+        const result = await getAccountTokens(cleanEmail)
+        const token = result.entry.access_token
+        if (!token) {
+          send(res, 401, { error: 'No access token available' })
+          return
+        }
+        const detailUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`
+        const dResp = await fetch(detailUrl, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!dResp.ok) {
+          const errorData = await dResp.json().catch(() => ({}))
+          send(res, dResp.status, { error: errorData.error?.message || 'Failed to fetch message' })
+          return
+        }
+        const dJson = await dResp.json()
+        const headers = dJson.payload?.headers || []
+
+	        // Extract body content
+	        function extractBody(payload) {
+	          if (!payload) return { text: '', html: '' }
+	          let text = ''
+	          let html = ''
+
+	          function walkParts(parts) {
+	            if (!Array.isArray(parts)) return
+	            for (const part of parts) {
+	              const mimeType = part.mimeType || ''
+	              const bodyData = part.body?.data || ''
+	              if (bodyData) {
+	                try {
+	                  const content = decodeBase64UrlToBuffer(bodyData).toString('utf-8')
+	                  if (mimeType === 'text/plain') {
+	                    text = content
+	                  } else if (mimeType === 'text/html') {
+	                    html = content
+	                  }
+		                } catch { /* Ignore malformed message parts. */ }
+	              }
+	              if (part.parts) {
+	                walkParts(part.parts)
+	              }
+	            }
+	          }
+
+	          if (payload.parts) {
+	            walkParts(payload.parts)
+	          } else if (payload.body?.data) {
+	            const mimeType = payload.mimeType || ''
+	            try {
+	              const content = decodeBase64UrlToBuffer(payload.body.data).toString('utf-8')
+	              if (mimeType === 'text/plain') {
+	                text = content
+	              } else if (mimeType === 'text/html') {
+	                html = content
+              }
+            } catch { /* Ignore malformed message bodies. */ }
+          }
+
+          return { text, html }
+        }
+
+        const body = extractBody(dJson.payload)
+        const labels = Array.isArray(dJson.labelIds) ? dJson.labelIds : []
+
+	        const attachments = (() => {
+	          const INLINE_DATA_LIMIT_BYTES = 2_000_000
+	          const out = []
+	          const seen = new Set()
+	          const extForMime = (mimeType) => {
+	            const mt = String(mimeType || '').toLowerCase()
+	            if (mt === 'application/pdf') return '.pdf'
+	            if (mt === 'image/png') return '.png'
+	            if (mt === 'image/jpeg') return '.jpg'
+	            if (mt === 'image/gif') return '.gif'
+	            if (mt === 'text/plain') return '.txt'
+	            return ''
+	          }
+	          const isProbablyBinaryAttachment = (mimeType) => {
+	            const mt = String(mimeType || '').toLowerCase()
+	            if (!mt) return false
+	            if (mt.startsWith('multipart/')) return false
+	            if (mt.startsWith('text/plain') || mt.startsWith('text/html')) return false
+	            return true
+	          }
+	          const walk = (node) => {
+	            if (!node) return
+	            try {
+	              const attachmentId = node?.body?.attachmentId || ''
+	              const mimeType = String(node?.mimeType || '').trim()
+	              const size = Number(node?.body?.size || 0)
+	              const bodyData = String(node?.body?.data || '').trim()
+	              const contentDisposition = extractPartHeader(node, 'Content-Disposition')
+	              const rawFilename = String(node?.filename || '').trim()
+	              const filenameHint = extractPartHeader(node, 'Content-Type')
+	              const looksLikeAttachment = (
+	                !!rawFilename ||
+	                /attachment/i.test(contentDisposition) ||
+	                /filename\s*=/i.test(contentDisposition) ||
+	                (attachmentId && isProbablyBinaryAttachment(mimeType))
+	              )
+	              const hasDownloadableBody = !!attachmentId || !!bodyData
+	              const inlineDataOk = !!bodyData && (!Number.isFinite(size) || size <= INLINE_DATA_LIMIT_BYTES)
+
+	              if (looksLikeAttachment && hasDownloadableBody) {
+	                const ext = extForMime(mimeType)
+	                const filename = rawFilename || (ext ? `attachment${ext}` : 'attachment')
+	                const key = `${attachmentId || 'inline'}:${filename}:${mimeType}:${size}`
+	                if (!seen.has(key)) {
+	                  seen.add(key)
+	                  out.push({
+	                    attachmentId: attachmentId || null,
+	                    filename,
+	                    mimeType: mimeType || 'application/octet-stream',
+	                    size: Number.isFinite(size) ? size : 0,
+	                    inlineDataBase64Url: (!attachmentId && inlineDataOk) ? bodyData : null,
+	                    hint: filenameHint || null,
+	                  })
+	                }
+	              }
+		            } catch { /* Ignore malformed attachment metadata. */ }
+
+	            const parts = Array.isArray(node.parts) ? node.parts : []
+	            for (const p of parts) walk(p)
+	          }
+	          walk(dJson.payload)
+	          return out
+	        })()
+
+        send(res, 200, {
+          id: dJson.id,
+          email: cleanEmail,
+          sender: extractHeader(headers, 'From') || cleanEmail,
+          subject: extractHeader(headers, 'Subject') || '(no subject)',
+          to: extractHeader(headers, 'To') || '',
+          cc: extractHeader(headers, 'Cc') || '',
+          date: extractHeader(headers, 'Date') || '',
+          timestamp: formatTimestamp(dJson.internalDate),
+          body: body.text || body.html || '',
+          htmlBody: body.html || '',
+          textBody: body.text || '',
+          snippet: dJson.snippet || '',
+          unread: labels.includes('UNREAD'),
+          starred: labels.includes('STARRED'),
+          labels: labels,
+          attachments,
+        })
+      } catch (e) {
+        console.error(`[gmail-server] Error fetching message ${messageId} for ${cleanEmail}:`, e)
+        send(res, 500, { error: e?.message || 'Failed to fetch message' })
+      }
+      return
+    }
+
+    // Email actions (trash/delete/modify labels)
+    if (req.method === 'POST' && p.startsWith('/gmail/message/')) {
+      const parts = p.split('/').filter(Boolean)
+      const messageId = parts[2] || ''
+      const action = parts[3] || ''
+      const email = url.searchParams.get('email') || ''
+      const cleanEmail = String(email || '').trim().toLowerCase()
+      if (!cleanEmail || !messageId || !action) {
+        send(res, 400, { error: 'Missing email, messageId, or action parameter' })
+        return
+      }
+
+      const supported = new Set(['trash', 'delete', 'modify'])
+      if (!supported.has(action)) {
+        send(res, 404, { error: 'Not found' })
+        return
+      }
+
+      try {
+        const result = await getAccountTokens(cleanEmail)
+        const token = result.entry.access_token
+        if (!token) {
+          send(res, 401, { error: 'No access token available' })
+          return
+        }
+
+        if (action === 'trash') {
+          const trashUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/trash`
+          const tResp = await fetch(trashUrl, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          const tJson = await tResp.json().catch(() => ({}))
+          if (!tResp.ok) {
+            send(res, tResp.status, { error: tJson.error?.message || 'Failed to trash message' })
+            return
+          }
+          send(res, 200, { success: true, messageId, action: 'trash' })
+          return
+        }
+
+        if (action === 'delete') {
+          const delUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`
+          const dResp = await fetch(delUrl, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          if (!dResp.ok) {
+            const dJson = await dResp.json().catch(() => ({}))
+            send(res, dResp.status, { error: dJson.error?.message || 'Failed to delete message' })
+            return
+          }
+          send(res, 200, { success: true, messageId, action: 'delete' })
+          return
+        }
+
+        if (action === 'modify') {
+          const body = await parseBody(req)
+          const addLabelIds = Array.isArray(body.addLabelIds)
+            ? body.addLabelIds.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim())
+            : []
+          const removeLabelIds = Array.isArray(body.removeLabelIds)
+            ? body.removeLabelIds.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim())
+            : []
+
+          const modUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`
+          const mResp = await fetch(modUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              addLabelIds,
+              removeLabelIds
+            })
+          })
+          const mJson = await mResp.json().catch(() => ({}))
+          if (!mResp.ok) {
+            send(res, mResp.status, { error: mJson.error?.message || 'Failed to modify message labels' })
+            return
+          }
+          const labels = Array.isArray(mJson.labelIds) ? mJson.labelIds : []
+          send(res, 200, { success: true, messageId, action: 'modify', labels })
+          return
+        }
+      } catch (e) {
+        console.error(`[gmail-server] Error running action ${action} for ${cleanEmail}/${messageId}:`, e)
+        send(res, 500, { error: e?.message || 'Failed to perform message action' })
+      }
+      return
+    }
+
+    // Send email endpoint
+    if (req.method === 'POST' && p === '/gmail/send') {
+      console.log(`[gmail-server] POST /gmail/send - Pathname: ${p}`)
+      const body = await parseBody(req)
+      console.log(`[gmail-server] Send request body:`, { email: body.email, to: body.to, subject: body.subject })
+      const email = String(body.email || '').trim().toLowerCase()
+      const to = String(body.to || '').trim()
+      const cc = String(body.cc || '').trim()
+      const bcc = String(body.bcc || '').trim()
+      const subject = String(body.subject || '').trim()
+      const textBody = String(body.textBody || body.body || '').trim()
+      const htmlBody = String(body.htmlBody || '').trim()
+
+      if (!email || !to || !subject) {
+        send(res, 400, { error: 'Missing required fields: email, to, subject' })
+        return
+      }
+
+      try {
+        const result = await getAccountTokens(email)
+        const token = result.entry.access_token
+        if (!token) {
+          send(res, 401, { error: 'No access token available' })
+          return
+        }
+
+        // Build email message in RFC 2822 format
+        let message = []
+        message.push(`To: ${to}`)
+        if (cc) message.push(`Cc: ${cc}`)
+        if (bcc) message.push(`Bcc: ${bcc}`)
+        message.push(`Subject: ${subject}`)
+        message.push('MIME-Version: 1.0')
+
+        if (htmlBody) {
+          // Multipart message with HTML
+          const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36)}`
+          message.push(`Content-Type: multipart/alternative; boundary="${boundary}"`)
+          message.push('')
+          message.push(`--${boundary}`)
+          message.push('Content-Type: text/plain; charset=UTF-8')
+          message.push('Content-Transfer-Encoding: 7bit')
+          message.push('')
+          message.push(textBody || htmlBody.replace(/<[^>]*>/g, ''))
+          message.push(`--${boundary}`)
+          message.push('Content-Type: text/html; charset=UTF-8')
+          message.push('Content-Transfer-Encoding: 7bit')
+          message.push('')
+          message.push(htmlBody)
+          message.push(`--${boundary}--`)
+        } else {
+          // Plain text message
+          message.push('Content-Type: text/plain; charset=UTF-8')
+          message.push('Content-Transfer-Encoding: 7bit')
+          message.push('')
+          message.push(textBody)
+        }
+
+        const rawMessage = message.join('\r\n')
+        const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+        // Send via Gmail API
+        const sendUrl = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+        const sendResp = await fetch(sendUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            raw: encodedMessage
+          })
+        })
+
+        if (!sendResp.ok) {
+          const errorData = await sendResp.json().catch(() => ({}))
+          throw new Error(errorData.error?.message || `Failed to send email: ${sendResp.status}`)
+        }
+
+        const sendData = await sendResp.json()
+        send(res, 200, {
+          success: true,
+          messageId: sendData.id,
+          threadId: sendData.threadId
+        })
+      } catch (e) {
+        console.error(`[gmail-server] Error sending email for ${email}:`, e)
+        send(res, 500, { error: e?.message || 'Failed to send email' })
+      }
+      return
+    }
+
+    // Log unmatched routes for debugging
+    console.log(`[gmail-server] 404 - Method: ${req.method}, Pathname: ${p}, Full URL: ${req.url}`)
+    send(res, 404, { error: 'Not found' })
+  } catch (e) {
+    console.error(`[gmail-server] Server error:`, e)
+    send(res, 500, { error: e?.message || 'Server error' })
+  }
+})
+
+server.listen(PORT, () => {
+  console.log(`gmail-server listening on :${PORT}`)
+})

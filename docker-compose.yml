@@ -1,0 +1,139 @@
+name: vstart2
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      storage-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  storage-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      PORT: 3110
+      DATABASE_URL: postgres://vstart2:${VSTART2_DB_PASSWORD:-vstart2-local-password}@db:5432/vstart2
+      SEARXNG_URL: http://searxng:8080
+    ports:
+      - "3110:3110"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3110/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vstart2
+      POSTGRES_USER: vstart2
+      POSTGRES_PASSWORD: ${VSTART2_DB_PASSWORD:-vstart2-local-password}
+    ports:
+      - "55432:5432"
+    volumes:
+      - vstart2-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vstart2 -d vstart2 >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  searxng:
+    image: searxng/searxng:latest
+    environment:
+      SEARXNG_BASE_URL: http://localhost:3001/searxng/
+      SEARXNG_BIND_ADDRESS: 0.0.0.0
+      SEARXNG_PORT: 8080
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-vstart2-local-searxng}
+      SEARXNG_LIMITER: "false"
+      SEARXNG_PUBLIC_INSTANCE: "false"
+    volumes:
+      - ./searxng:/etc/searxng:ro
+    restart: unless-stopped
+
+  stt-api:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    environment:
+      ASR_MODEL: small
+      ASR_ENGINE: faster_whisper
+      NUM_WORKERS: 1
+    ports:
+      - "8091:9000"
+    restart: unless-stopped
+
+  image-search-api:
+    image: node:22-alpine
+    working_dir: /app
+    command: node server/integrations/image-search-server.mjs
+    environment:
+      IMAGE_SEARCH_PORT: 3310
+      IMGBB_API_KEY: ${IMGBB_API_KEY:-}
+    ports:
+      - "3310:3310"
+    volumes:
+      - ./server:/app/server:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3310/image-search/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  gmail-api:
+    image: node:22-alpine
+    working_dir: /app
+    command: node server/integrations/gmail-server.mjs
+    environment:
+      GMAIL_PORT: 3510
+      GMAIL_DATA_DIR: /app/data
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+    ports:
+      - "3510:3510"
+    volumes:
+      - ./server:/app/server:ro
+      - vstart2-gmail-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3510/gmail/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  notes-api:
+    image: node:22-alpine
+    working_dir: /app
+    command: node server/integrations/notes-server.mjs
+    environment:
+      NOTES_PORT: 3410
+      NOTES_ROOT: /vault
+    ports:
+      - "3410:3410"
+    volumes:
+      - ./server:/app/server:ro
+      - ${VSTART2_NOTES_ROOT:-/Users/vbitzx/Desktop/SYNC/Vaults}:/vault
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3410/notes/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  default:
+    name: vstart2-network
+
+volumes:
+  vstart2-db-data:
+  vstart2-gmail-data:

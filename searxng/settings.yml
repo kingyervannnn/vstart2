@@ -1,0 +1,19 @@
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - bing
+      - google
+      - wikipedia
+server:
+  secret_key: "vstart2-local-searxng"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+search:
+  safe_search: 0
+  autocomplete: "duckduckgo"
+  formats:
+    - html
+    - json
