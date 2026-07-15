@@ -68,6 +68,14 @@ export class MailBridgeHttpServer {
         this.#send(response, 200, { messages })
         return
       }
+      if (request.method === 'GET' && url.pathname === '/v1/contacts') {
+        this.#send(response, 200, { contacts: await this.service.contacts({
+          account: url.searchParams.get('account') || '',
+          query: url.searchParams.get('q') || '',
+          max: url.searchParams.get('max') || 12,
+        }) })
+        return
+      }
       if (request.method === 'GET' && url.pathname === '/v1/drafts') {
         this.#send(response, 200, { drafts: await this.service.drafts({ account: url.searchParams.get('account') || '', max: url.searchParams.get('max') || 20 }) })
         return

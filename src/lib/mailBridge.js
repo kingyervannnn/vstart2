@@ -5,6 +5,8 @@ const cache = {
   accounts: null,
   accountsUpdatedAt: 0,
   inboxes: new Map(),
+  contacts: new Map(),
+  contactPromises: new Map(),
   preloadPromise: null,
 }
 
@@ -83,10 +85,37 @@ async function preload({ force = false, query = DEFAULT_QUERY, maxPerAccount = 3
   return cache.preloadPromise
 }
 
+async function loadContacts({ account, max = 80, force = false, maxAgeMs = 5 * 60_000, signal } = {}) {
+  const cached = cache.contacts.get(account)
+  if (!force && cached && Date.now() - cached.updatedAt <= maxAgeMs) {
+    return { contacts: cached.contacts.slice(0, max), updatedAt: cached.updatedAt, fromCache: true }
+  }
+  if (!force && cache.contactPromises.has(account)) {
+    const pending = await cache.contactPromises.get(account)
+    return { ...pending, contacts: pending.contacts.slice(0, max), fromCache: true }
+  }
+  const request = (async () => {
+    const params = new URLSearchParams({ account, max: String(Math.max(80, Math.min(100, max))) })
+    const payload = await mailRequest(`/contacts?${params}`, { signal })
+    const snapshot = { contacts: payload.contacts || [], updatedAt: Date.now() }
+    cache.contacts.set(account, snapshot)
+    return snapshot
+  })()
+  cache.contactPromises.set(account, request)
+  try {
+    const snapshot = await request
+    return { ...snapshot, contacts: snapshot.contacts.slice(0, max), fromCache: false }
+  } finally {
+    if (cache.contactPromises.get(account) === request) cache.contactPromises.delete(account)
+  }
+}
+
 function clearCache() {
   cache.accounts = null
   cache.accountsUpdatedAt = 0
   cache.inboxes.clear()
+  cache.contacts.clear()
+  cache.contactPromises.clear()
   cache.preloadPromise = null
 }
 
@@ -103,6 +132,7 @@ export const mailBridge = {
   peekInbox,
   loadInbox,
   preload,
+  contacts: loadContacts,
   clearCache,
   removeCachedMessage,
   messages: ({ account = 'all', query = 'in:inbox', max = 30, signal } = {}) => {

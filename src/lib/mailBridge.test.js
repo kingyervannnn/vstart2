@@ -40,4 +40,17 @@ describe('mailBridge cache', () => {
     expect(result.fromCache).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
+
+  it('caches contact suggestions per account', async () => {
+    const fetchMock = vi.fn(() => response({ contacts: [{ name: 'Ada', email: 'ada@example.com' }] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = await mailBridge.contacts({ account: 'work' })
+    const second = await mailBridge.contacts({ account: 'work' })
+
+    expect(first.fromCache).toBe(false)
+    expect(second.fromCache).toBe(true)
+    expect(second.contacts).toEqual([{ name: 'Ada', email: 'ada@example.com' }])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

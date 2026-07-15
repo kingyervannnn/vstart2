@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, Mail, Music2, NotebookPen, Paperclip, PenLine, RefreshCw, Reply, Search, Send, Trash2, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
@@ -60,6 +60,83 @@ function fileAsAttachment(file) {
   })
 }
 
+function activeRecipientToken(value) {
+  return String(value || '').split(/[;,]/).at(-1).trim().toLowerCase()
+}
+
+function RecipientField({ label, value, contacts, required = false, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const token = activeRecipientToken(value)
+  const suggestions = useMemo(() => {
+    if (!token) return []
+    const starts = []
+    const contains = []
+    for (const contact of contacts) {
+      const email = contact.email.toLowerCase()
+      const name = contact.name.toLowerCase()
+      if (!email.includes(token) && !name.includes(token)) continue
+      const target = email.startsWith(token) || name.startsWith(token) ? starts : contains
+      target.push(contact)
+    }
+    return [...starts, ...contains].slice(0, 7)
+  }, [contacts, token])
+
+  useEffect(() => setActiveIndex(0), [token])
+
+  const choose = (contact) => {
+    const prefix = String(value || '').match(/^(.*[;,]\s*)[^;,]*$/)?.[1] || ''
+    const formatted = contact.name ? `${contact.name} <${contact.email}>` : contact.email
+    onChange(`${prefix}${formatted}`)
+    setOpen(false)
+  }
+
+  const onKeyDown = (event) => {
+    if (!open || !suggestions.length) return
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveIndex((index) => (index + 1) % suggestions.length)
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveIndex((index) => (index - 1 + suggestions.length) % suggestions.length)
+    } else if (['Enter', 'Tab'].includes(event.key)) {
+      event.preventDefault()
+      choose(suggestions[activeIndex])
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <label className="mail-recipient-field">
+      <span>{label}</span>
+      <span className="mail-recipient-control">
+        <input
+          required={required}
+          value={value}
+          aria-label={label}
+          aria-autocomplete="list"
+          aria-expanded={open && suggestions.length > 0}
+          onChange={(event) => { onChange(event.target.value); setOpen(Boolean(activeRecipientToken(event.target.value))) }}
+          onFocus={() => setOpen(Boolean(token))}
+          onBlur={() => window.setTimeout(() => setOpen(false), 100)}
+          onKeyDown={onKeyDown}
+        />
+        {open && suggestions.length > 0 && <span className="mail-recipient-suggestions" role="listbox" aria-label={`${label} suggestions`}>
+          {suggestions.map((contact, index) => <button
+            type="button"
+            role="option"
+            aria-selected={index === activeIndex}
+            className={index === activeIndex ? 'active' : ''}
+            key={contact.email}
+            onMouseDown={(event) => { event.preventDefault(); choose(contact) }}
+          ><strong>{contact.name || contact.email}</strong>{contact.name && <small>{contact.email}</small>}</button>)}
+        </span>}
+      </span>
+    </label>
+  )
+}
+
 function MailComposer({ accounts, initial, onCancel, onCreated }) {
   const [draft, setDraft] = useState(() => ({
     account: initial?.account || accounts[0]?.alias || '',
@@ -72,7 +149,19 @@ function MailComposer({ accounts, initial, onCancel, onCreated }) {
     attachments: [],
   }))
   const [files, setFiles] = useState([])
+  const [contacts, setContacts] = useState([])
   const [state, setState] = useState({ working: false, error: '' })
+
+  useEffect(() => {
+    if (!draft.account) return undefined
+    let live = true
+    void mailBridge.contacts({ account: draft.account, max: 80 }).then((result) => {
+      if (live) setContacts(result.contacts || [])
+    }).catch(() => {
+      if (live) setContacts([])
+    })
+    return () => { live = false }
+  }, [draft.account])
 
   const submit = async (event, sendAfter) => {
     event.preventDefault()
@@ -90,9 +179,9 @@ function MailComposer({ accounts, initial, onCancel, onCreated }) {
     <form className="mail-composer" onSubmit={(event) => submit(event, false)}>
       <header><button type="button" className="mail-back" onClick={onCancel}><ArrowLeft /> Inbox</button><span>{draft.replyTo ? 'Reply' : initial?.forwarded ? 'Forward' : 'New message'}</span></header>
       <label><span>From</span><select value={draft.account} onChange={(event) => setDraft((value) => ({ ...value, account: event.target.value }))}>{accounts.map((item) => <option key={item.alias} value={item.alias}>{item.alias} · {item.email}</option>)}</select></label>
-      {!draft.replyTo && <label><span>To</span><input required value={draft.to} onChange={(event) => setDraft((value) => ({ ...value, to: event.target.value }))} /></label>}
-      {!draft.replyTo && <label><span>Cc</span><input value={draft.cc} onChange={(event) => setDraft((value) => ({ ...value, cc: event.target.value }))} /></label>}
-      {!draft.replyTo && <label><span>Bcc</span><input value={draft.bcc} onChange={(event) => setDraft((value) => ({ ...value, bcc: event.target.value }))} /></label>}
+      {!draft.replyTo && <RecipientField label="To" required value={draft.to} contacts={contacts} onChange={(to) => setDraft((value) => ({ ...value, to }))} />}
+      {!draft.replyTo && <RecipientField label="Cc" value={draft.cc} contacts={contacts} onChange={(cc) => setDraft((value) => ({ ...value, cc }))} />}
+      {!draft.replyTo && <RecipientField label="Bcc" value={draft.bcc} contacts={contacts} onChange={(bcc) => setDraft((value) => ({ ...value, bcc }))} />}
       {!draft.replyTo && <label><span>Subject</span><input required value={draft.subject} onChange={(event) => setDraft((value) => ({ ...value, subject: event.target.value }))} /></label>}
       {draft.replyTo && <div className="mail-reply-context"><strong>{initial.subject}</strong><small>Replying to {initial.from}</small></div>}
       {initial?.forwarded && <div className="mail-reply-context"><strong>{initial.subject}</strong><small>Forwarded message included below</small></div>}

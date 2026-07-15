@@ -507,7 +507,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-composer > header, .mail-drafts-view > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
 .mail-composer > header > span, .mail-drafts-view > header > span { opacity: .56; font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
 .mail-composer > label { min-height: 39px; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; border-bottom: 1px solid rgba(255,255,255,.09); }
-.mail-composer > label > span { opacity: .46; font-size: 9px; }
+.mail-composer > label > span:first-child { opacity: .46; font-size: 9px; }
+.mail-recipient-control { position: relative; min-width: 0; align-self: stretch; display: flex; align-items: center; }
+.mail-recipient-control > input { width: 100%; }
+.mail-recipient-suggestions { position: absolute; z-index: 45; top: calc(100% - 2px); left: -8px; right: 0; max-height: 214px; display: grid; overflow: auto; padding: 5px; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(11,16,24,.94); box-shadow: 0 18px 44px rgba(0,0,0,.3); backdrop-filter: blur(18px) saturate(1.08); scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--app-text) 18%, transparent) transparent; }
+.mail-recipient-suggestions button { min-width: 0; display: grid; gap: 2px; border: 0; border-radius: 8px; padding: 8px 9px; color: inherit; background: transparent; cursor: pointer; text-align: left; }
+.mail-recipient-suggestions button:hover, .mail-recipient-suggestions button.active { background: color-mix(in srgb, var(--app-accent) 14%, transparent); }
+.mail-recipient-suggestions strong, .mail-recipient-suggestions small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail-recipient-suggestions strong { font-size: 9px; }
+.mail-recipient-suggestions small { opacity: .52; font-size: 8px; }
 .mail-composer input, .mail-composer select, .mail-composer textarea { min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
 .mail-composer input, .mail-composer select { height: 38px; font-size: 10px; }
 .mail-composer select option { color: #111; }

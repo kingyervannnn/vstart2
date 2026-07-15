@@ -6,6 +6,39 @@ import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCallback)
 const DEFAULT_MAILCTL_PATH = '/Users/vbitzx/SS/TOOLS/bin/mailctl'
+const CONTACT_CACHE_MS = 5 * 60 * 1000
+
+function mailboxParts(value) {
+  const parts = []
+  let start = 0
+  let quoted = false
+  let angleDepth = 0
+  const input = String(value || '')
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index]
+    if (character === '"' && input[index - 1] !== '\\') quoted = !quoted
+    else if (!quoted && character === '<') angleDepth += 1
+    else if (!quoted && character === '>') angleDepth = Math.max(0, angleDepth - 1)
+    else if (!quoted && angleDepth === 0 && [',', ';'].includes(character)) {
+      parts.push(input.slice(start, index))
+      start = index + 1
+    }
+  }
+  parts.push(input.slice(start))
+  return parts
+}
+
+function parseMailbox(value) {
+  const bracketed = String(value || '').trim().match(/^(.*?)\s*<([^<>\s]+@[^<>\s]+)>$/)
+  const email = bracketed?.[2] || String(value || '').match(/[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0]
+  if (!email) return null
+  const rawName = bracketed?.[1]?.trim().replace(/^"|"$/g, '') || ''
+  return { email: email.toLowerCase(), name: rawName && !rawName.includes('@') ? rawName : '' }
+}
+
+function mailboxes(value) {
+  return mailboxParts(value).map(parseMailbox).filter(Boolean)
+}
 
 export class MailBridgeError extends Error {
   constructor(status, code, message) {
@@ -23,12 +56,13 @@ export class MailctlService {
     this.mailctlPath = mailctlPath
     this.run = run
     this.accountCache = null
+    this.contactCache = new Map()
   }
 
   async health() {
     try {
       const accounts = await this.accounts({ refresh: true })
-      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'draft', 'reply', 'forward', 'attach', 'send', 'trash'], accountCount: accounts.length }
+      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'contacts', 'draft', 'reply', 'forward', 'attach', 'send', 'trash'], accountCount: accounts.length }
     } catch {
       return { status: 'unavailable', service: 'mailctl', capabilities: [], accountCount: 0 }
     }
@@ -66,6 +100,44 @@ export class MailctlService {
     if (!/^[a-zA-Z0-9_-]{1,200}$/.test(safeId)) throw new MailBridgeError(400, 'message_id_invalid', 'Message id is invalid')
     const result = await this.#json(['read', '--account', alias, '--id', safeId, '--json'])
     return this.#normalizeMessage(alias, result, { includeBody: true })
+  }
+
+  async contacts({ account, query = '', max = 12, refresh = false } = {}) {
+    const [{ alias }] = await this.#resolveAccounts(account)
+    const accounts = await this.accounts()
+    const ownAddresses = new Set(accounts.map((candidate) => candidate.email.toLowerCase()).filter(Boolean))
+    let cached = this.contactCache.get(alias)
+    if (refresh || !cached || Date.now() - cached.updatedAt > CONTACT_CACHE_MS) {
+      const [inbox, sent] = await Promise.all([
+        this.messages({ account: alias, query: 'in:inbox', max: 50 }),
+        this.messages({ account: alias, query: 'in:sent', max: 50 }),
+      ])
+      const candidates = new Map()
+      const remember = (mailbox, source, date) => {
+        if (!mailbox || ownAddresses.has(mailbox.email)) return
+        const current = candidates.get(mailbox.email) || { email: mailbox.email, name: '', inboxCount: 0, sentCount: 0, lastSeen: '' }
+        if (mailbox.name && mailbox.name.length > current.name.length) current.name = mailbox.name
+        current[`${source}Count`] += 1
+        if (this.#timestamp(date) > this.#timestamp(current.lastSeen)) current.lastSeen = date
+        candidates.set(mailbox.email, current)
+      }
+      for (const message of inbox) for (const mailbox of mailboxes(message.from)) remember(mailbox, 'inbox', message.date)
+      for (const message of sent) for (const mailbox of mailboxes(message.to)) remember(mailbox, 'sent', message.date)
+      cached = {
+        updatedAt: Date.now(),
+        contacts: [...candidates.values()].sort((left, right) =>
+          right.sentCount - left.sentCount
+          || (right.sentCount + right.inboxCount) - (left.sentCount + left.inboxCount)
+          || this.#timestamp(right.lastSeen) - this.#timestamp(left.lastSeen)),
+      }
+      this.contactCache.set(alias, cached)
+    }
+    const safeQuery = String(query || '').trim().toLowerCase().slice(0, 200)
+    const safeMax = Math.max(1, Math.min(Number(max) || 12, 100))
+    const matches = safeQuery
+      ? cached.contacts.filter((contact) => contact.email.includes(safeQuery) || contact.name.toLowerCase().includes(safeQuery))
+      : cached.contacts
+    return matches.slice(0, safeMax).map(({ email, name }) => ({ email, name }))
   }
 
   async drafts({ account, max = 20 }) {

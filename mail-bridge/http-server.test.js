@@ -20,6 +20,7 @@ describe('MailBridgeHttpServer', () => {
       createDraft: vi.fn(async () => ({ draftId: 'draft-1' })),
       sendDraft: vi.fn(async () => ({ id: 'sent-1' })),
       trashMessage: vi.fn(async () => ({ id: 'message-1' })),
+      contacts: vi.fn(async () => []),
       message: vi.fn(async () => ({ id: 'message-1' })),
     }
     server = new MailBridgeHttpServer({ service, port: 0 })
@@ -60,5 +61,17 @@ describe('MailBridgeHttpServer', () => {
     })
     expect(response.status).toBe(200)
     expect(service.trashMessage).toHaveBeenCalledWith({ account: 'work', messageId: 'message-1', confirmTrash: true })
+  })
+
+  it('returns contact suggestions for the requested local account', async () => {
+    const service = {
+      contacts: vi.fn(async () => [{ name: 'Ada', email: 'ada@example.com' }]),
+    }
+    server = new MailBridgeHttpServer({ service, port: 0 })
+    await server.start()
+    const response = await fetch(`http://127.0.0.1:${server.address.port}/v1/contacts?account=work&q=ada&max=8`, { headers: { Origin: origin } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ contacts: [{ name: 'Ada', email: 'ada@example.com' }] })
+    expect(service.contacts).toHaveBeenCalledWith({ account: 'work', query: 'ada', max: '8' })
   })
 })

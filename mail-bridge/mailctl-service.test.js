@@ -56,4 +56,29 @@ describe('MailctlService', () => {
     await service.trashMessage({ account: 'work', messageId: 'message-1', confirmTrash: true })
     expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['trash', '--account', 'work', '--id', 'message-1', '--yes'], expect.any(Object))
   })
+
+  it('builds ranked contact suggestions from Sent recipients and Inbox senders', async () => {
+    const run = vi.fn(async (_path, args) => {
+      if (args[0] === 'accounts') return { stdout: accounts }
+      const query = args[args.indexOf('--query') + 1]
+      if (query === 'in:sent') return { stdout: JSON.stringify({ messages: [
+        { id: 'sent-1', date: '2026-03-03', from: 'work@example.com', to: 'Ada Lovelace <ada@example.com>' },
+        { id: 'sent-2', date: '2026-03-02', from: 'work@example.com', to: 'Ada Lovelace <ada@example.com>, Grace <grace@example.com>' },
+      ] }) }
+      return { stdout: JSON.stringify({ messages: [
+        { id: 'inbox-1', date: '2026-03-04', from: 'Grace Hopper <grace@example.com>', to: 'work@example.com' },
+        { id: 'inbox-2', date: '2026-03-01', from: 'Me <me@example.com>', to: 'work@example.com' },
+      ] }) }
+    })
+    const service = new MailctlService({ mailctlPath: '/fake/mailctl', run })
+
+    expect(await service.contacts({ account: 'work', max: 10 })).toEqual([
+      { name: 'Ada Lovelace', email: 'ada@example.com' },
+      { name: 'Grace Hopper', email: 'grace@example.com' },
+    ])
+    expect(await service.contacts({ account: 'work', query: 'grace', max: 10 })).toEqual([
+      { name: 'Grace Hopper', email: 'grace@example.com' },
+    ])
+    expect(run).toHaveBeenCalledTimes(3)
+  })
 })
