@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { AlertTriangle, Bot, Check, CircleStop, Copy, FolderOpen, LoaderCircle, Pencil, Pin, Plus, RefreshCw, ShieldAlert, Wrench, X } from 'lucide-react'
 
 import { getSharedAgentBridgeClient } from '../lib/agentBridge.js'
+import { LinkifiedText } from './LinkifiedText.jsx'
 
 const modelId = (model) => typeof model === 'string' ? model : model?.id || model?.slug || model?.name || ''
 
@@ -49,6 +50,7 @@ export const AgentMode = forwardRef(function AgentMode({
   onPreferencesChange,
   onStateChange,
   onEditMessage,
+  onOpenInline,
 }, ref) {
   const clientRef = useRef(null)
   const transcriptRef = useRef(null)
@@ -439,7 +441,7 @@ export const AgentMode = forwardRef(function AgentMode({
       <div ref={transcriptRef} className="agent-transcript" aria-live="polite">
         <div className="agent-transcript-stack">
           {!messages.length && connection.state === 'ready' && <div className="agent-empty"><Bot /><h2>What should Hermes work on?</h2><p>This session uses local tools through the loopback Agent Bridge. Tool actions remain approval-gated.</p></div>}
-          {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}><div className="agent-message-heading"><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><div className="agent-message-actions"><button type="button" onClick={() => void copyMessage(message)} aria-label={`Copy ${message.role} message`} title="Copy message">{copiedMessageId === message.id ? <Check /> : <Copy />}</button>{message.role === 'user' && <button type="button" onClick={() => onEditMessage?.(message.text)} aria-label="Edit and resend message" title="Edit and resend"><Pencil /></button>}</div></div><p>{message.text || (message.streaming ? '…' : '')}</p></article>)}
+          {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}><div className="agent-message-heading"><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><div className="agent-message-actions"><button type="button" onClick={() => void copyMessage(message)} aria-label={`Copy ${message.role} message`} title="Copy message">{copiedMessageId === message.id ? <Check /> : <Copy />}</button>{message.role === 'user' && <button type="button" onClick={() => onEditMessage?.(message.text)} aria-label="Edit and resend message" title="Edit and resend"><Pencil /></button>}</div></div><p><LinkifiedText text={message.text || (message.streaming ? '…' : '')} openInNewTab={settings.general?.openLinksInNewTab} onOpenInline={onOpenInline} /></p></article>)}
 
           {settings.agent?.showToolActivity !== false && activities.length > 0 && <section className="agent-activity" aria-label="Tool activity">
             <h3><Wrench /> Tool activity</h3>

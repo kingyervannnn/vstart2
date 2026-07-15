@@ -220,6 +220,10 @@ export function App() {
     navigate({ pathname: location.pathname, search: buildViewSearch(view) }, options)
   }, [location.pathname, navigate])
 
+  const openTextLinkInline = useCallback(({ url, title }) => {
+    navigateView({ type: 'frame', query: '', result: { title: title || new URL(url).hostname, url }, fullScreen: false })
+  }, [navigateView])
+
   const openShortcutInline = useCallback((item) => {
     if (!item?.url) return
     setFolderId(null)
@@ -713,6 +717,8 @@ export function App() {
             key={`${routedView.kind}:${activeWorkspace.id}`}
             kind={routedView.kind}
             initialMailAccount={workspaceMailAccount}
+            openLinksInNewTab={settings.general?.openLinksInNewTab}
+            onOpenInline={openTextLinkInline}
             onClose={() => navigateView({ type: 'dial' })}
           />
         ) : agentMode ? (
@@ -728,6 +734,7 @@ export function App() {
             onPreferencesChange={saveAgentPreferences}
             onStateChange={setAgentUi}
             onEditMessage={(text) => setAgentDraft({ id: crypto.randomUUID(), text })}
+            onOpenInline={openTextLinkInline}
           />
         ) : (
           <DialCanvas

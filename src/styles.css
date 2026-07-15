@@ -421,7 +421,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .agent-state-card button svg { width: 14px; }
 .agent-state-card code { margin-top: 14px; padding: 7px 9px; border-radius: 8px; background: rgba(0,0,0,.2); opacity: .62; font-size: 9px; }
 
-.service-rail-view { position: absolute; z-index: 8; inset: 52px 0 0; padding: 25px clamp(22px, 4vw, 70px) 145px; overflow: auto; }
+.service-rail-view { position: absolute; z-index: 8; inset: 52px 0 0; padding: 25px clamp(22px, 4vw, 70px) 145px; overflow: auto; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.service-rail-view:hover { scrollbar-color: color-mix(in srgb, var(--app-text) 22%, transparent) transparent; }
+.service-rail-view::-webkit-scrollbar { width: 5px; height: 5px; background: transparent; }
+.service-rail-view::-webkit-scrollbar-track, .service-rail-view::-webkit-scrollbar-corner { background: transparent; }
+.service-rail-view::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
+.service-rail-view:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--app-text) 22%, transparent); }
 .service-rail-view > header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 17px; border-bottom: 1px solid rgba(255,255,255,.18); }
 .service-rail-view > header > div { display: flex; align-items: center; gap: 12px; }
 .service-rail-view > header span { display: flex; flex-direction: column; }
@@ -446,6 +451,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-toolbar-actions > button.primary { border-color: color-mix(in srgb, var(--app-accent) 40%, transparent); background: color-mix(in srgb, var(--app-accent) 14%, transparent); }
 .mail-toolbar-actions > button svg, .mail-reader-actions button svg { width: 12px; }
 .mail-reader-action-group > button.danger { color: #ffb9c0; }
+.mail-reader-action-group > button.mail-inline-confirm.confirming { border-color: rgba(255,98,112,.34); background: rgba(255,76,94,.1); }
 .mail-account-tabs { min-width: 0; display: flex; flex: none; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .mail-account-tabs::-webkit-scrollbar { display: none; }
 .mail-account-tabs button, .mail-refresh, .mail-back { border: 1px solid rgba(255,255,255,.1); color: inherit; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); cursor: pointer; }
@@ -474,13 +480,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-message-quick-actions button { width: 29px; height: 29px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; color: inherit; background: rgba(10,14,22,.7); backdrop-filter: blur(12px); cursor: pointer; }
 .mail-message-quick-actions button:hover { background: rgba(255,255,255,.12); }
 .mail-message-quick-actions button.danger { color: #ffb9c0; }
+.mail-message-quick-actions button.mail-inline-confirm.confirming { width: auto; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; gap: 4px; border-color: rgba(255,98,112,.34); background: rgba(79,19,27,.72); }
+.mail-message-quick-actions .mail-inline-confirm span { font-size: 8px; }
 .mail-message-quick-actions button:disabled { opacity: .45; cursor: wait; }
 .mail-message-quick-actions svg { width: 13px; }
 .mail-message-list strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .mail-message-list small { overflow: hidden; opacity: .62; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .mail-message-list p { margin: 2px 0 0; overflow: hidden; opacity: .45; font-size: 9px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .mail-message-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mail-message-meta time, .mail-reader time { opacity: .45; font-size: 8px; }
+.mail-message-meta time, .mail-reader time { margin-left: auto; opacity: .45; font-size: 8px; }
 .mail-account-badge { width: fit-content; padding: 2px 6px; border-radius: 999px; color: color-mix(in srgb, var(--app-text) 70%, transparent); background: color-mix(in srgb, var(--app-accent) 15%, transparent); text-transform: uppercase; letter-spacing: .08em; font-size: 7px; }
 .mail-reader { padding-top: 17px; }
 .mail-reader-actions { display: flex; justify-content: space-between; align-items: center; }
@@ -525,17 +533,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-send-confirm > div:last-child { display: flex; gap: 7px; }
 .mail-send-confirm button { min-height: 34px; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; padding: 0 12px; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; font-size: 9px; }
 .mail-send-confirm button.primary { border-color: transparent; color: #16120d; background: var(--app-accent); font-weight: 700; }
-.mail-trash-backdrop { position: fixed; z-index: 260; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(4,7,12,.38); backdrop-filter: blur(8px); }
-.mail-trash-confirm { width: min(410px, 100%); display: flex; flex-direction: column; align-items: center; padding: 27px; border: 1px solid rgba(255,255,255,.17); border-radius: 20px; color: #f6f8ff; background: rgba(15,20,30,.94); box-shadow: 0 24px 70px rgba(0,0,0,.42); text-align: center; }
-.mail-trash-confirm > svg { width: 25px; color: #ff9aa5; }
-.mail-trash-confirm > small { margin-top: 9px; opacity: .48; font-size: 8px; letter-spacing: .15em; }
-.mail-trash-confirm h3 { max-width: 100%; margin: 7px 0 0; overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
-.mail-trash-confirm p { margin: 9px 0 18px; opacity: .62; font-size: 10px; line-height: 1.5; }
-.mail-trash-confirm .service-state { width: 100%; padding: 0 0 13px; }
-.mail-trash-confirm > div:last-child { display: flex; gap: 7px; }
-.mail-trash-confirm button { min-height: 34px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 0 12px; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; font-size: 9px; }
-.mail-trash-confirm button.danger { border-color: rgba(255,98,112,.34); color: #ffbec4; background: rgba(255,76,94,.1); }
-.mail-trash-confirm button:disabled { opacity: .48; cursor: wait; }
+.embedded-link { position: relative; display: inline; }
+.embedded-link > a { color: color-mix(in srgb, var(--app-accent) 86%, var(--app-text)); text-decoration-color: color-mix(in srgb, var(--app-accent) 48%, transparent); text-underline-offset: 2px; overflow-wrap: anywhere; }
+.embedded-link > a:hover { text-decoration-color: currentColor; }
+.embedded-link-inline { position: absolute; z-index: 5; left: calc(100% + 4px); top: 50%; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; padding: 0; color: var(--app-text); background: rgba(10,14,22,.88); box-shadow: 0 5px 16px rgba(0,0,0,.22); opacity: 0; pointer-events: none; transform: translateY(-50%) translateX(-3px); transition: opacity 130ms ease, transform 130ms ease; cursor: pointer; }
+.embedded-link:hover .embedded-link-inline, .embedded-link:focus-within .embedded-link-inline { opacity: 1; pointer-events: auto; transform: translateY(-50%); }
+.embedded-link-inline:hover { border-color: color-mix(in srgb, var(--app-accent) 48%, transparent); background: color-mix(in srgb, var(--app-accent) 18%, rgba(10,14,22,.88)); }
+.embedded-link-inline svg { width: 12px; height: 12px; }
 
 @media (max-width: 680px) {
   .mail-brand h2 { display: none; }
@@ -545,6 +549,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .mail-message-open { padding-right: 100px; }
   .mail-message-quick-actions { right: 4px; }
   .mail-reader-action-group > button { width: 32px; justify-content: center; padding: 0; font-size: 0; }
+  .mail-reader-action-group > button.mail-inline-confirm.confirming { width: auto; padding: 0 8px; font-size: 8px; }
   .mail-composer footer { align-items: stretch; flex-wrap: wrap; }
   .mail-composer footer > span { display: none; }
 }

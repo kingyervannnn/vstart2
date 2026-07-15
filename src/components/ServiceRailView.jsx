@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, Mail, Music2, NotebookPen, Paperclip, PenLine, RefreshCw, Reply, Search, Send, Trash2, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
+import { LinkifiedText } from './LinkifiedText.jsx'
 
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7'
 
@@ -108,7 +109,7 @@ function MailComposer({ accounts, initial, onCancel, onCreated }) {
   )
 }
 
-function MailServiceView({ initialAccount = 'all', onClose }) {
+function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInline, onClose }) {
   const initialSnapshot = mailBridge.peekInbox({ account: initialAccount, query: 'in:inbox', max: 30 })
   const [accounts, setAccounts] = useState(initialSnapshot?.accounts || mailBridge.peekAccounts())
   const [account, setAccount] = useState(initialAccount)
@@ -126,6 +127,12 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
   const [headerHidden, setHeaderHidden] = useState(false)
   const headerRef = useRef(null)
   const lastScrollRef = useRef(0)
+
+  useEffect(() => {
+    if (!trashTarget || trashTarget.working) return undefined
+    const timer = window.setTimeout(() => setTrashTarget(null), 4200)
+    return () => window.clearTimeout(timer)
+  }, [trashTarget])
 
   useEffect(() => {
     const scroller = headerRef.current?.closest('.service-rail-view')
@@ -224,33 +231,25 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
     }
   }
 
-  const confirmTrash = async () => {
-    if (!trashTarget) return
+  const confirmTrash = async (message) => {
+    const sameTarget = trashTarget?.account === message.account && trashTarget?.id === message.id
+    if (!sameTarget) {
+      setTrashTarget({ ...message, working: false })
+      return
+    }
     setTrashTarget((current) => ({ ...current, working: true, error: '' }))
     try {
-      await mailBridge.trashMessage(trashTarget.account, trashTarget.id)
-      mailBridge.removeCachedMessage(trashTarget.account, trashTarget.id)
-      setMessages((current) => current.filter((message) => !(message.account === trashTarget.account && message.id === trashTarget.id)))
-      if (selected?.account === trashTarget.account && selected?.id === trashTarget.id) setSelected(null)
+      await mailBridge.trashMessage(message.account, message.id)
+      mailBridge.removeCachedMessage(message.account, message.id)
+      setMessages((current) => current.filter((item) => !(item.account === message.account && item.id === message.id)))
+      if (selected?.account === message.account && selected?.id === message.id) setSelected(null)
       setTrashTarget(null)
       setNotice('Message moved to Gmail Trash.')
     } catch (error) {
-      setTrashTarget((current) => ({ ...current, working: false, error: error.message }))
+      setTrashTarget(null)
+      setNotice(`Could not move message to Trash: ${error.message}`)
     }
   }
-
-  const trashConfirmation = trashTarget && (
-    <div className="mail-trash-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !trashTarget.working && setTrashTarget(null)}>
-      <section className="mail-trash-confirm" role="dialog" aria-modal="true" aria-label="Move message to Trash">
-        <Trash2 />
-        <small>MOVE TO GMAIL TRASH</small>
-        <h3>{trashTarget.subject}</h3>
-        <p>This removes the message from the inbox. It is not permanent deletion.</p>
-        {trashTarget.error && <div className="service-state error">{trashTarget.error}</div>}
-        <div><button type="button" disabled={trashTarget.working} onClick={() => setTrashTarget(null)}>Cancel</button><button type="button" className="danger" disabled={trashTarget.working} onClick={confirmTrash}>{trashTarget.working ? 'Moving…' : 'Move to Trash'}</button></div>
-      </section>
-    </div>
-  )
 
   const submitSearch = (event) => {
     event.preventDefault()
@@ -320,18 +319,18 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
   }
 
   if (selected) {
+    const selectedTrashPending = trashTarget?.account === selected.account && trashTarget?.id === selected.id
     return (
       <div className="mail-reader">
-        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> Inbox</button><div className="mail-reader-action-group"><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button><button type="button" className="danger" onClick={() => setTrashTarget(selected)}><Trash2 /> Trash</button></div></div>
+        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> Inbox</button><div className="mail-reader-action-group"><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button><button type="button" className={`danger mail-inline-confirm${selectedTrashPending ? ' confirming' : ''}`} disabled={trashTarget?.working} onClick={() => void confirmTrash(selected)}><Trash2 /><span>{selectedTrashPending ? trashTarget.working ? 'Deleting…' : 'Confirm' : 'Trash'}</span></button></div></div>
         <article>
-          <header><span className="mail-account-badge">{selected.account}</span><time>{formatMailDate(selected.date)}</time></header>
+          <header>{account === 'all' && <span className="mail-account-badge">{selected.account}</span>}<time>{formatMailDate(selected.date)}</time></header>
           <h3>{selected.subject}</h3>
           <dl><div><dt>From</dt><dd>{selected.from}</dd></div><div><dt>To</dt><dd>{selected.to}</dd></div></dl>
           {selected.loading && <div className="service-state">Opening message…</div>}
           {selected.error && <div className="service-state error">{selected.error}</div>}
-          {!selected.loading && !selected.error && <div className="mail-body">{selected.body || selected.snippet || 'This message has no text body.'}</div>}
+          {!selected.loading && !selected.error && <div className="mail-body"><LinkifiedText text={selected.body || selected.snippet || 'This message has no text body.'} openInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} /></div>}
         </article>
-        {trashConfirmation}
       </div>
     )
   }
@@ -359,9 +358,11 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
       {state.loading && <div className="service-state">Reading local mail…</div>}
       {state.error && <div className="service-state error"><strong>Mail bridge unavailable.</strong><br />{state.error}</div>}
       {!state.loading && !state.error && <div className="mail-message-list">
-        {messages.map((message) => <article className="mail-message-row" key={`${message.account}:${message.id}`}>
+        {messages.map((message) => {
+          const trashPending = trashTarget?.account === message.account && trashTarget?.id === message.id
+          return <article className="mail-message-row" key={`${message.account}:${message.id}`}>
           <button type="button" className="mail-message-open" onClick={() => openMessage(message)}>
-            <span className="mail-message-meta"><span className="mail-account-badge">{message.account}</span><time>{formatMailDate(message.date)}</time></span>
+            <span className="mail-message-meta">{account === 'all' && <span className="mail-account-badge">{message.account}</span>}<time>{formatMailDate(message.date)}</time></span>
             <strong>{message.subject}</strong>
             <small>{message.from}</small>
             <p>{message.snippet}</p>
@@ -369,17 +370,16 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
           <div className="mail-message-quick-actions" aria-label={`Actions for ${message.subject}`}>
             <button type="button" title="Reply" aria-label={`Reply to ${message.subject}`} onClick={() => replyToMessage(message)}><Reply /></button>
             <button type="button" title="Forward" aria-label={`Forward ${message.subject}`} disabled={actionMessageId === message.id} onClick={() => forwardMessage(message)}><Forward /></button>
-            <button type="button" className="danger" title="Move to Trash" aria-label={`Move ${message.subject} to Trash`} onClick={() => setTrashTarget(message)}><Trash2 /></button>
+            <button type="button" className={`danger mail-inline-confirm${trashPending ? ' confirming' : ''}`} title={trashPending ? 'Click again to confirm' : 'Move to Trash'} aria-label={trashPending ? `Confirm moving ${message.subject} to Trash` : `Move ${message.subject} to Trash`} disabled={trashTarget?.working} onClick={() => void confirmTrash(message)}><Trash2 />{trashPending && <span>{trashTarget.working ? 'Deleting…' : 'Confirm'}</span>}</button>
           </div>
-        </article>)}
+        </article>})}
         {!messages.length && <div className="service-state">No messages match this search.</div>}
       </div>}
-      {trashConfirmation}
     </div>
   )
 }
 
-export function ServiceRailView({ kind, initialMailAccount, onClose }) {
+export function ServiceRailView({ kind, initialMailAccount, openLinksInNewTab, onOpenInline, onClose }) {
   const [state, setState] = useState({ loading: !['music', 'mail'].includes(kind), error: '', data: null })
 
   useEffect(() => {
@@ -405,7 +405,7 @@ export function ServiceRailView({ kind, initialMailAccount, onClose }) {
   if (kind === 'mail') {
     return (
       <section className="service-rail-view mail-service" aria-label="Mail">
-        <MailServiceView initialAccount={initialMailAccount} onClose={onClose} />
+        <MailServiceView initialAccount={initialMailAccount} openLinksInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} onClose={onClose} />
       </section>
     )
   }
@@ -415,7 +415,7 @@ export function ServiceRailView({ kind, initialMailAccount, onClose }) {
       {state.loading && <div className="service-state">Connecting to the V Start 2 service…</div>}
       {state.error && <div className="service-state error">{state.error}</div>}
       {!state.loading && !state.error && kind === 'notes' && <div className="notes-service-list">
-        {(state.data.notes || []).map((note) => <article key={note.id}><NotebookPen /><div><strong>{note.title || note.id}</strong><p>{String(note.content || '').slice(0, 220) || 'Empty note'}</p></div></article>)}
+        {(state.data.notes || []).map((note) => <article key={note.id}><NotebookPen /><div><strong>{note.title || note.id}</strong><p><LinkifiedText text={String(note.content || '').slice(0, 220) || 'Empty note'} openInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} /></p></div></article>)}
         {!(state.data.notes || []).length && <div className="service-state">No notes found in the mounted vault.</div>}
       </div>}
       {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} />}
