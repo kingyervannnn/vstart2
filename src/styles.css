@@ -436,31 +436,31 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .notes-service-list strong { font-size: 12px; }
 .notes-service-list p { margin: 5px 0 0; opacity: .58; font-size: 10px; line-height: 1.5; }
 .mail-service-view { padding-top: 0; }
-.mail-unified-header { position: sticky; z-index: 12; top: 0; display: grid; gap: 10px; margin-top: -25px; padding: 25px 0 14px; border-bottom: 1px solid rgba(255,255,255,.14); background: linear-gradient(180deg, rgba(10,14,22,.72) 0%, rgba(10,14,22,.48) 76%, rgba(10,14,22,.1) 100%); backdrop-filter: blur(18px) saturate(1.15); transition: transform 180ms ease, opacity 180ms ease; will-change: transform; }
-.mail-unified-header.is-hidden { transform: translateY(calc(-100% - 12px)); opacity: .2; pointer-events: none; }
-.mail-header-primary { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
+.mail-unified-header { position: sticky; z-index: 12; top: 0; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 1px 0 12px; transition: transform 180ms ease, opacity 180ms ease; will-change: transform; }
+.mail-unified-header.is-hidden { transform: translateY(calc(-100% - 8px)); opacity: 0; pointer-events: none; }
 .mail-brand { display: flex; align-items: center; gap: 9px; }
-.mail-brand > svg { width: 18px; opacity: .74; }
-.mail-brand h2 { margin: 0; font-size: 22px; }
+.mail-brand > svg { width: 16px; opacity: .66; }
+.mail-brand h2 { margin: 0; font-size: 19px; }
 .mail-toolbar-actions { display: flex; align-items: center; gap: 5px; }
-.mail-toolbar-actions > button, .mail-reader-action-group > button { height: 32px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 0 10px; color: inherit; background: rgba(255,255,255,.035); cursor: pointer; font-size: 8px; }
+.mail-toolbar-actions > button, .mail-reader-action-group > button { height: 30px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 0 9px; color: inherit; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); cursor: pointer; font-size: 8px; }
 .mail-toolbar-actions > button.primary { border-color: color-mix(in srgb, var(--app-accent) 40%, transparent); background: color-mix(in srgb, var(--app-accent) 14%, transparent); }
 .mail-toolbar-actions > button svg, .mail-reader-actions button svg { width: 12px; }
 .mail-reader-action-group > button.danger { color: #ffb9c0; }
-.mail-account-tabs { min-width: 0; display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
+.mail-account-tabs { min-width: 0; display: flex; flex: none; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .mail-account-tabs::-webkit-scrollbar { display: none; }
-.mail-account-tabs button, .mail-refresh, .mail-back { border: 1px solid rgba(255,255,255,.12); color: inherit; background: rgba(255,255,255,.035); cursor: pointer; }
-.mail-account-tabs button { min-height: 30px; padding: 0 12px; border-radius: 999px; text-transform: capitalize; font-size: 9px; }
+.mail-account-tabs button, .mail-refresh, .mail-back { border: 1px solid rgba(255,255,255,.1); color: inherit; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); cursor: pointer; }
+.mail-account-tabs button { min-height: 28px; padding: 0 10px; border-radius: 999px; text-transform: capitalize; font-size: 8px; }
 .mail-account-tabs button.active { border-color: color-mix(in srgb, var(--app-accent) 55%, transparent); background: color-mix(in srgb, var(--app-accent) 16%, transparent); }
-.mail-refresh { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; }
+.mail-refresh { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 10px; }
 .mail-refresh svg { width: 13px; }
 .mail-refresh.refreshing svg { animation: spin 800ms linear infinite; }
-.mail-close { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; }
-.mail-close svg { width: 16px; }
-.mail-search { height: 40px; display: flex; align-items: center; gap: 9px; padding-left: 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: rgba(255,255,255,.035); }
-.mail-search > svg { width: 15px; opacity: .48; }
+.mail-close { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; color: inherit; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); cursor: pointer; }
+.mail-close svg { width: 14px; }
+.mail-search { min-width: 120px; height: 30px; display: flex; flex: 1 1 190px; align-items: center; padding-left: 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); }
 .mail-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 11px; }
-.mail-search button { align-self: stretch; border: 0; border-left: 1px solid rgba(255,255,255,.1); padding: 0 15px; border-radius: 0 13px 13px 0; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; font-size: 9px; }
+.mail-search button { width: 30px; align-self: stretch; display: grid; place-items: center; border: 0; border-radius: 0 9px 9px 0; color: inherit; background: transparent; cursor: pointer; opacity: .5; }
+.mail-search button:hover, .mail-search:focus-within button { opacity: .9; }
+.mail-search button svg { width: 13px; }
 .mail-notice { margin-top: 10px; border: 1px solid color-mix(in srgb, var(--app-accent) 28%, transparent); border-radius: 10px; padding: 8px 10px; color: inherit; background: color-mix(in srgb, var(--app-accent) 10%, transparent); cursor: pointer; font-size: 9px; }
 .mail-message-list { display: grid; gap: 2px; margin-top: 12px; }
 .mail-message-list > button, .mail-message-open { width: 100%; display: grid; gap: 3px; padding: 12px 4px; border: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
@@ -538,7 +538,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-trash-confirm button:disabled { opacity: .48; cursor: wait; }
 
 @media (max-width: 680px) {
-  .mail-header-primary { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 7px; }
   .mail-brand h2 { display: none; }
   .mail-brand > svg { width: 17px; }
   .mail-toolbar-actions > button span { display: none; }

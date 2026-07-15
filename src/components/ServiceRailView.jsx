@@ -339,24 +339,21 @@ function MailServiceView({ initialAccount = 'all', onClose }) {
   return (
     <div className="mail-service-view">
       <header ref={headerRef} className={`mail-unified-header ${headerHidden ? 'is-hidden' : ''}`}>
-        <div className="mail-header-primary">
-          <div className="mail-brand"><Mail /><h2>Mail</h2></div>
-          <div className="mail-account-tabs" aria-label="Mail account">
-            <button type="button" className={account === 'all' ? 'active' : ''} onClick={() => setAccount('all')}>All</button>
-            {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => setAccount(item.alias)}>{item.alias}</button>)}
-          </div>
-          <div className="mail-toolbar-actions">
-            <button type="button" onClick={openDrafts}><FileText /><span>Drafts</span></button>
-            <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>
-            <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail"><RefreshCw /></button>
-          </div>
-          <button type="button" className="mail-close" onClick={onClose} aria-label="Close mail"><X /></button>
+        <div className="mail-brand"><Mail /><h2>Mail</h2></div>
+        <div className="mail-account-tabs" aria-label="Mail account">
+          <button type="button" className={account === 'all' ? 'active' : ''} onClick={() => setAccount('all')}>All</button>
+          {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => setAccount(item.alias)}>{item.alias}</button>)}
         </div>
         <form className="mail-search" onSubmit={submitSearch}>
-          <Search />
-          <input value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Search mail (Gmail query syntax)" />
-          <button type="submit">Search</button>
+          <input aria-label="Search mail (Gmail query syntax)" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Search mail…" />
+          <button type="submit" aria-label="Search mail"><Search /></button>
         </form>
+        <div className="mail-toolbar-actions">
+          <button type="button" onClick={openDrafts}><FileText /><span>Drafts</span></button>
+          <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>
+          <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail"><RefreshCw /></button>
+        </div>
+        <button type="button" className="mail-close" onClick={onClose} aria-label="Close mail"><X /></button>
       </header>
       {notice && <button type="button" className="mail-notice" onClick={() => setNotice('')}>{notice}</button>}
       {state.loading && <div className="service-state">Reading local mail…</div>}
