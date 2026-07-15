@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildViewSearch, parseViewSearch } from '../src/lib/viewRoute.js'
+import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from '../src/lib/viewRoute.js'
 
 describe('URL-backed active views', () => {
   it('round-trips inline search and full-screen iframe state', () => {
@@ -11,5 +11,15 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch('?view=mail')).toEqual({ type: 'service', kind: 'mail' })
     expect(parseViewSearch('?view=weather')).toEqual({ type: 'service', kind: 'weather' })
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
+  })
+
+  it('lets the new route replace stale iframe presentation state immediately', () => {
+    const searchView = parseViewSearch('?view=search&q=health')
+    const staleFrameState = { query: 'health', results: [{ title: 'Health' }], loading: false, error: '', initialFrame: { title: 'Health', url: 'https://example.com/' } }
+    expect(resolveInlinePresentation(searchView, staleFrameState)).toMatchObject({
+      query: 'health',
+      initialFrame: null,
+      initialFullScreen: false,
+    })
   })
 })

@@ -49,3 +49,16 @@ export function buildViewSearch(view) {
   }
   return `?${params.toString()}`
 }
+
+export function resolveInlinePresentation(view, fetched) {
+  if (view?.type !== 'search' && view?.type !== 'frame') return null
+  const matches = fetched?.query === view.query
+  return {
+    query: view.query,
+    results: matches ? fetched.results || [] : [],
+    loading: matches ? Boolean(fetched.loading) : Boolean(view.query),
+    error: matches ? fetched.error || '' : '',
+    initialFrame: view.type === 'frame' ? view.result : null,
+    initialFullScreen: Boolean(view.fullScreen),
+  }
+}

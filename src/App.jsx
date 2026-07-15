@@ -4,7 +4,7 @@ import { Check, Pencil, RotateCcw, Settings } from 'lucide-react'
 import { api } from './lib/api.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
-import { buildViewSearch, parseViewSearch } from './lib/viewRoute.js'
+import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -53,7 +53,6 @@ export function App() {
   const [toast, setToast] = useState(null)
   const [headerDirection, setHeaderDirection] = useState('left')
   const [inlineResults, setInlineResults] = useState(null)
-  const [widgetView, setWidgetView] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const activeRef = useRef(null)
   const agentRef = useRef(null)
@@ -86,17 +85,16 @@ export function App() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  const routedView = useMemo(() => parseViewSearch(location.search), [location.search])
+
   useEffect(() => {
-    const routedView = parseViewSearch(location.search)
     let live = true
     if (routedView.type === 'service') {
       setInlineResults(null)
-      setWidgetView(routedView.kind)
       return () => { live = false }
     }
     if (routedView.type === 'search' || routedView.type === 'frame') {
       const initialFrame = routedView.type === 'frame' ? routedView.result : null
-      setWidgetView(null)
       setInlineResults({ query: routedView.query, results: [], loading: Boolean(routedView.query), error: '', initialFrame, initialFullScreen: routedView.fullScreen })
       if (routedView.query) {
         void api.search(routedView.query).then((result) => {
@@ -108,9 +106,8 @@ export function App() {
       return () => { live = false }
     }
     setInlineResults(null)
-    setWidgetView(null)
     return () => { live = false }
-  }, [location.search])
+  }, [routedView])
 
   const workspaces = useMemo(() => bootstrap?.workspaces || [], [bootstrap?.workspaces])
   const workspaceRoute = location.pathname.match(/^\/w\/([^/]+)(?:\/agent(?:\/([^/]+))?)?$/)
@@ -122,6 +119,7 @@ export function App() {
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
+  const routedInline = resolveInlinePresentation(routedView, inlineResults)
 
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
@@ -147,7 +145,7 @@ export function App() {
   }, [activeWorkspace, selectWorkspace, workspaces])
 
   const onDialWheel = (event) => {
-    if (inlineResults || widgetView || folderId || settingsOpen) return
+    if (routedView.type !== 'dial' || folderId || settingsOpen) return
     const wheel = wheelRef.current
     if (wheel.cooldown) return
     wheel.total += Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX
@@ -196,7 +194,6 @@ export function App() {
   const toggleAgentMode = useCallback(() => {
     if (!activeWorkspace) return
     setInlineResults(null)
-    setWidgetView(null)
     setFolderId(null)
     navigate(agentMode ? `/w/${activeWorkspace.slug}` : `/w/${activeWorkspace.slug}/agent/new`)
   }, [activeWorkspace, agentMode, navigate])
@@ -650,10 +647,19 @@ export function App() {
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
       <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
       <section className="dial-rail" onWheel={onDialWheel}>
-        {inlineResults ? (
-          <InlineResults key={location.search} {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} linkBehavior={settings.search?.inlineLinkBehavior || 'inline'} onNavigate={navigateView} onCreateShortcut={quickShortcutFromResult} onClose={() => navigateView({ type: 'dial' })} />
-        ) : widgetView ? (
-          <ServiceRailView kind={widgetView} onClose={() => navigateView({ type: 'dial' })} />
+        {routedInline ? (
+          <InlineResults
+            key={location.search}
+            {...routedInline}
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspace.id}
+            linkBehavior={settings.search?.inlineLinkBehavior || 'inline'}
+            onNavigate={navigateView}
+            onCreateShortcut={quickShortcutFromResult}
+            onClose={() => navigateView({ type: 'dial' })}
+          />
+        ) : routedView.type === 'service' ? (
+          <ServiceRailView kind={routedView.kind} onClose={() => navigateView({ type: 'dial' })} />
         ) : agentMode ? (
           <AgentMode
             ref={agentRef}
@@ -698,7 +704,7 @@ export function App() {
           onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
-          restoredQuery={inlineResults?.query || ''}
+          restoredQuery={routedInline?.query || ''}
           agentMode={agentMode}
           agentReady={agentUi.ready}
           agentRunning={agentUi.running}
