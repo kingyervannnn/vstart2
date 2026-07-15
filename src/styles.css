@@ -277,7 +277,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .inline-action svg { width: 13px; height: 13px; }
 .result-shortcut-target { min-width: 0; display: flex; align-items: center; gap: 5px; }
 .result-shortcut-target select { min-width: 86px; max-width: 132px; height: 31px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0 24px 0 8px; color: var(--app-text); background: rgba(12,17,25,.44); outline: 0; font-size: 9px; }
-.result-shortcut-target button { min-height: 31px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0 9px; color: color-mix(in srgb, var(--app-text) 76%, transparent); background: rgba(255,255,255,.04); cursor: pointer; font-size: 9px; }
+.result-shortcut-target button { width: 31px; min-width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0; color: color-mix(in srgb, var(--app-text) 76%, transparent); background: rgba(255,255,255,.04); cursor: pointer; }
 .result-shortcut-target button svg { width: 13px; height: 13px; }
 .result-shortcut-target.saved button, .result-shortcut-target.exists button { color: #b8ffd8; border-color: rgba(94,232,153,.3); }
 .result-shortcut-target.error button { color: #ffc4c9; border-color: rgba(255,96,112,.35); }

@@ -31,7 +31,6 @@ function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcu
       </select>
       <button type="button" onClick={() => void create()} disabled={state === 'saving' || !selectedWorkspace} aria-label={`${label} in ${selectedWorkspace?.name || 'workspace'}`} title={`${label} in ${selectedWorkspace?.name || 'workspace'}`}>
         {state === 'saving' ? <LoaderCircle className="spin" /> : state === 'saved' || state === 'exists' ? <Check /> : <Plus />}
-        <span>{label}</span>
       </button>
     </div>
   )
