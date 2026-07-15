@@ -503,6 +503,34 @@ async function handleRequest(request, response) {
     })
   }
 
+  if (request.method === 'POST' && pathname === '/api/folders') {
+    const body = await readJson(request)
+    const data = parse(z.object({
+      workspaceId: uuid,
+      title: z.string().trim().min(1).max(120),
+      placements,
+      mutationId: z.string().max(200).optional(),
+    }), body)
+    for (const profileName of Object.keys(CANVASES)) assertPlacementBounds(profileName, data.placements[profileName])
+    return mutate(request, response, 'folder.create', data, async (client) => {
+      const workspace = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [data.workspaceId])
+      if (!workspace.rowCount) throw new HttpError(404, 'Workspace not found')
+      const folderId = crypto.randomUUID()
+      await client.query(`
+        INSERT INTO shortcut_items(id, workspace_id, kind, title)
+        VALUES ($1, $2, 'folder', $3)
+      `, [folderId, data.workspaceId, data.title])
+      for (const profileName of Object.keys(CANVASES)) {
+        const value = data.placements[profileName]
+        await client.query(`
+          INSERT INTO item_placements(item_id, workspace_id, container_key, profile, x, y, width, height)
+          VALUES ($1, $2, 'root', $3, $4, $5, $6, $7)
+        `, [folderId, data.workspaceId, profileName, value.x, value.y, value.width, value.height])
+      }
+      return { status: 201, body: await bootstrapResponse(client, { folderId }) }
+    })
+  }
+
   match = routeMatch(pathname, /^\/api\/items\/([0-9a-f-]+)$/)
   if (request.method === 'PATCH' && match) {
     const body = await readJson(request, 2 * 1024 * 1024)

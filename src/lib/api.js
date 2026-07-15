@@ -43,6 +43,7 @@ export const api = {
   updateAgentSession: (id, values) => mutation(`/api/agent/sessions/${id}`, 'PATCH', values, 'agent-session-update'),
   unlinkAgentSession: (id, version) => mutation(`/api/agent/sessions/${id}`, 'DELETE', { version }, 'agent-session-unlink'),
   createShortcut: (values) => mutation('/api/shortcuts', 'POST', values, 'shortcut-create'),
+  createFolder: (values) => mutation('/api/folders', 'POST', values, 'folder-create'),
   updateItem: (id, values) => mutation(`/api/items/${id}`, 'PATCH', values, 'item-update'),
   deleteItem: (id, action = 'deleteChildren') => mutation(`/api/items/${id}`, 'DELETE', { action }, 'item-delete'),
   movePlacement: (id, values) => mutation(`/api/items/${id}/placement`, 'PUT', values, 'placement'),

@@ -201,6 +201,30 @@ export function App() {
         const result = await api.updateItem(item.id, changes)
         applyBootstrap(result.bootstrap)
         if (result.iconWarning) setToast({ type: 'warning', message: result.iconWarning })
+      } else if (dialog.kind === 'folder') {
+        const activeCanvas = CANVASES[profile]
+        const activeOccupied = placementsFor(activeWorkspace.id, profile)
+        const preferred = values.point ? {
+          x: values.point.x - activeCanvas.tileWidth / 2,
+          y: values.point.y - activeCanvas.tileHeight / 2,
+        } : { x: activeCanvas.width * 0.45, y: activeCanvas.height * 0.38 }
+        const activePlacement = findOpenPlacement(activeOccupied, profile, preferred)
+        if (!activePlacement) throw new Error(`No free space remains in the ${profile} layout`)
+        const otherProfile = profile === 'wide' ? 'compact' : 'wide'
+        const projection = projectPlacement(activePlacement, profile, otherProfile)
+        const otherOccupied = placementsFor(activeWorkspace.id, otherProfile)
+        const otherPlacement = collides(projection, otherOccupied)
+          ? findOpenPlacement(otherOccupied, otherProfile, projection)
+          : projection
+        if (!otherPlacement) throw new Error(`No free space remains in the ${otherProfile} layout`)
+        const result = await api.createFolder({
+          workspaceId: activeWorkspace.id,
+          title: values.title,
+          placements: profile === 'wide'
+            ? { wide: activePlacement, compact: otherPlacement }
+            : { compact: activePlacement, wide: otherPlacement },
+        })
+        applyBootstrap(result.bootstrap)
       } else {
         const parentFolderId = dialog.parentFolderId || null
         const containerKey = parentFolderId || 'root'
@@ -619,13 +643,14 @@ export function App() {
         </div>
       </section>
 
-      {dialog && <ShortcutDialog item={dialog.item} point={dialog.point} onClose={() => setDialog(null)} onSubmit={saveDialog} onDelete={deleteItem} onDuplicate={duplicateItem} busy={busy} />}
+      {dialog && <ShortcutDialog item={dialog.item} kind={dialog.kind} point={dialog.point} onClose={() => setDialog(null)} onSubmit={saveDialog} onDelete={deleteItem} onDuplicate={duplicateItem} busy={busy} />}
       {contextMenu && <AppContextMenu
         menu={contextMenu}
         workspaces={workspaces}
         editMode={editMode}
         onClose={closeContextMenu}
         onCreate={(point, parentFolderId = null) => { if (parentFolderId) setFolderId(null); setDialog({ item: null, point, parentFolderId }) }}
+        onCreateFolder={(point) => setDialog({ item: null, kind: 'folder', point })}
         onToggleEdit={() => setEditMode((value) => !value)}
         onEditItem={(item) => { setFolderId(null); setDialog({ item, point: null }) }}
         onMoveItem={moveItemToWorkspace}

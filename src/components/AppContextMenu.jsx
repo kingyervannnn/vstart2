@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUpRight, FolderInput, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowUpRight, FolderInput, FolderPlus, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 
 function MenuButton({ children, icon: Icon, danger = false, disabled = false, onClick }) {
   return (
@@ -10,7 +10,7 @@ function MenuButton({ children, icon: Icon, danger = false, disabled = false, on
   )
 }
 
-export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onToggleEdit, onEditItem, onMoveItem, onMoveOut, onPinItem, onUnpinItem, onDeleteItem }) {
+export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onCreateFolder, onToggleEdit, onEditItem, onMoveItem, onMoveOut, onPinItem, onUnpinItem, onDeleteItem }) {
   const ref = useRef(null)
   const [position, setPosition] = useState({ left: menu.x, top: menu.y })
 
@@ -50,6 +50,7 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
       {!item ? <>
         {menu.folder && <div className="context-menu-heading"><strong>{menu.folder.title}</strong><span>Folder space</span></div>}
         <MenuButton icon={Plus} onClick={run(() => onCreate(menu.point, menu.folder?.id || null))}>Create shortcut{menu.folder ? ' here' : ''}</MenuButton>
+        {!menu.folder && <MenuButton icon={FolderPlus} onClick={run(() => onCreateFolder(menu.point))}>Create folder</MenuButton>}
         <MenuButton icon={Pencil} onClick={run(onToggleEdit)}>{editMode ? 'Finish editing' : 'Enter edit mode'}</MenuButton>
       </> : <>
         <div className="context-menu-heading"><strong>{item.title}</strong><span>{item.kind === 'folder' ? 'Folder' : item.pinGroupId ? 'Pinned shortcut' : 'Shortcut'}</span></div>

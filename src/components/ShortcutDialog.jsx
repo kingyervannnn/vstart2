@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 
-export function ShortcutDialog({ item, point, onClose, onSubmit, onDelete, onDuplicate, busy }) {
+export function ShortcutDialog({ item, kind = 'shortcut', point, onClose, onSubmit, onDelete, onDuplicate, busy }) {
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('https://')
   const [imageUrl, setImageUrl] = useState('')
   const [iconData, setIconData] = useState(null)
   const [iconMimeType, setIconMimeType] = useState(null)
   const [error, setError] = useState('')
+  const isFolder = item?.kind === 'folder' || kind === 'folder'
 
   useEffect(() => {
     setTitle(item?.title || '')
@@ -49,9 +50,9 @@ export function ShortcutDialog({ item, point, onClose, onSubmit, onDelete, onDup
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <form className="shortcut-dialog" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="shortcut-dialog-title">
-        <header><h2 id="shortcut-dialog-title">{item ? 'Edit shortcut' : 'New shortcut'}</h2><button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
-        <label>Shortcut name<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={120} /></label>
-        {item?.kind !== 'folder' && (
+        <header><h2 id="shortcut-dialog-title">{item ? (isFolder ? 'Edit folder' : 'Edit shortcut') : (isFolder ? 'New folder' : 'New shortcut')}</h2><button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
+        <label>{isFolder ? 'Folder name' : 'Shortcut name'}<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={120} /></label>
+        {!isFolder && (
           <>
             <label>Destination URL<input value={url} onChange={(event) => setUrl(event.target.value)} required type="url" /></label>
             <label>Shortcut image URL <span>(optional)</span><input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} type="url" placeholder="https://example.com/icon.png" /></label>
@@ -66,7 +67,7 @@ export function ShortcutDialog({ item, point, onClose, onSubmit, onDelete, onDup
           {item.kind === 'folder' && <button type="button" onClick={() => onDelete(item, 'returnChildren')} disabled={busy}>Delete folder, keep shortcuts</button>}
           <button className="danger" type="button" onClick={() => onDelete(item, 'deleteChildren')} disabled={busy}>{item.kind === 'folder' ? 'Delete folder and shortcuts' : 'Delete shortcut'}</button>
         </div>}
-        <footer><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={busy}>{busy ? 'Saving…' : item?.kind === 'folder' ? 'Save folder' : 'Save shortcut'}</button></footer>
+        <footer><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={busy}>{busy ? 'Saving…' : isFolder ? 'Save folder' : 'Save shortcut'}</button></footer>
       </form>
     </div>
   )

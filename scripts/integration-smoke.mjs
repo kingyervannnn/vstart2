@@ -71,6 +71,19 @@ const workspace = createdWorkspace.body.bootstrap.workspaces.find((value) => val
 assert.ok(workspace, 'isolated smoke workspace exists')
 assert.equal(workspace.icon, 'Briefcase', 'workspace glyph is persisted')
 
+const emptyFolder = await mutation('/folders', 'POST', {
+  workspaceId: workspace.id,
+  title: 'Smoke empty folder',
+  placements: openPlacements(createdWorkspace.body.bootstrap, workspace.id),
+}, `${runId}:empty-folder`)
+assert.equal(emptyFolder.response.status, 201)
+const emptyFolderItem = emptyFolder.body.bootstrap.items.find((item) => item.id === emptyFolder.body.folderId)
+assert.equal(emptyFolderItem.kind, 'folder', 'an empty folder can be created directly')
+assert.equal(emptyFolder.body.bootstrap.items.filter((item) => item.parentFolderId === emptyFolder.body.folderId).length, 0)
+assert.equal(emptyFolder.body.bootstrap.placements.filter((value) => value.itemId === emptyFolder.body.folderId && value.containerKey === 'root').length, 2)
+const emptyFolderDeleted = await mutation(`/items/${emptyFolder.body.folderId}`, 'DELETE', { action: 'deleteChildren' }, `${runId}:delete-empty-folder`)
+assert.equal(emptyFolderDeleted.response.status, 200)
+
 const makeShortcut = (title, x, compactX) => ({
   workspaceId: workspace.id,
   title,
