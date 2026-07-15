@@ -22,6 +22,7 @@ export function SearchDock({
   onGeometryCommit,
   onWorkspaceOffsetCommit,
   onInlineResults,
+  restoredQuery = '',
   agentMode = false,
   agentReady = false,
   agentRunning = false,
@@ -54,6 +55,12 @@ export function SearchDock({
   const [interactionKind, setInteractionKind] = useState(null)
   const [workspaceOffset, setWorkspaceOffset] = useState(configuredWorkspaceOffset)
   const [workspaceMoving, setWorkspaceMoving] = useState(false)
+
+  useEffect(() => {
+    if (!restoredQuery) return
+    setQuery(restoredQuery)
+    setInline(true)
+  }, [restoredQuery])
 
   useEffect(() => {
     const next = { x: configuredX, y: configuredY, width: configuredWidth }

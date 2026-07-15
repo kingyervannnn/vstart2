@@ -4,6 +4,7 @@ import { Check, Pencil, RotateCcw, Settings } from 'lucide-react'
 import { api } from './lib/api.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
+import { buildViewSearch, parseViewSearch } from './lib/viewRoute.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -85,6 +86,32 @@ export function App() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    const routedView = parseViewSearch(location.search)
+    let live = true
+    if (routedView.type === 'service') {
+      setInlineResults(null)
+      setWidgetView(routedView.kind)
+      return () => { live = false }
+    }
+    if (routedView.type === 'search' || routedView.type === 'frame') {
+      const initialFrame = routedView.type === 'frame' ? routedView.result : null
+      setWidgetView(null)
+      setInlineResults({ query: routedView.query, results: [], loading: Boolean(routedView.query), error: '', initialFrame, initialFullScreen: routedView.fullScreen })
+      if (routedView.query) {
+        void api.search(routedView.query).then((result) => {
+          if (live) setInlineResults((current) => current ? { ...current, results: result.results, loading: false, error: '' } : current)
+        }).catch((error) => {
+          if (live) setInlineResults((current) => current ? { ...current, results: [], loading: false, error: error.message } : current)
+        })
+      }
+      return () => { live = false }
+    }
+    setInlineResults(null)
+    setWidgetView(null)
+    return () => { live = false }
+  }, [location.search])
+
   const workspaces = useMemo(() => bootstrap?.workspaces || [], [bootstrap?.workspaces])
   const workspaceRoute = location.pathname.match(/^\/w\/([^/]+)(?:\/agent(?:\/([^/]+))?)?$/)
   const slug = decodeURIComponent(workspaceRoute?.[1] || '')
@@ -99,8 +126,8 @@ export function App() {
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
     if (routedWorkspace) return
-    navigate(`/w/${fallbackWorkspace.slug}`, { replace: true })
-  }, [bootstrap, fallbackWorkspace, navigate, routedWorkspace, workspaces.length])
+    navigate({ pathname: `/w/${fallbackWorkspace.slug}`, search: location.search }, { replace: true })
+  }, [bootstrap, fallbackWorkspace, location.search, navigate, routedWorkspace, workspaces.length])
 
   useEffect(() => {
     if (!activeWorkspace || activeRef.current === activeWorkspace.id) return
@@ -110,8 +137,8 @@ export function App() {
   }, [activeWorkspace])
 
   const selectWorkspace = useCallback((workspace) => {
-    if (workspace) navigate(agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`)
-  }, [agentMode, navigate])
+    if (workspace) navigate({ pathname: agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`, search: agentMode ? '' : location.search })
+  }, [agentMode, location.search, navigate])
 
   const cycleWorkspace = useCallback((delta) => {
     if (!activeWorkspace || workspaces.length < 2) return
@@ -173,6 +200,10 @@ export function App() {
     setFolderId(null)
     navigate(agentMode ? `/w/${activeWorkspace.slug}` : `/w/${activeWorkspace.slug}/agent/new`)
   }, [activeWorkspace, agentMode, navigate])
+
+  const navigateView = useCallback((view, options = {}) => {
+    navigate({ pathname: location.pathname, search: buildViewSearch(view) }, options)
+  }, [location.pathname, navigate])
 
   const placementsFor = useCallback((workspaceId, profileName, containerKey = 'root') =>
     (bootstrapRef.current?.placements || []).filter((value) => value.workspaceId === workspaceId && value.profile === profileName && value.containerKey === containerKey), [])
@@ -484,16 +515,7 @@ export function App() {
     }
   }
 
-  const runInlineSearch = async (query) => {
-    setWidgetView(null)
-    setInlineResults({ query, results: [], loading: true, error: '' })
-    try {
-      const result = await api.search(query)
-      setInlineResults({ query, results: result.results, loading: false, error: '' })
-    } catch (error) {
-      setInlineResults({ query, results: [], loading: false, error: error.message })
-    }
-  }
+  const runInlineSearch = (query) => navigateView({ type: 'search', query })
 
   const createWorkspace = async (nameOrValues) => {
     const values = typeof nameOrValues === 'string' ? { name: nameOrValues } : nameOrValues
@@ -626,12 +648,12 @@ export function App() {
       style={appStyle}
     >
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => { setInlineResults(null); setWidgetView(kind) }} />
+      <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {inlineResults ? (
-          <InlineResults {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} linkBehavior={settings.search?.inlineLinkBehavior || 'inline'} onCreateShortcut={quickShortcutFromResult} onClose={() => setInlineResults(null)} />
+          <InlineResults key={location.search} {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} linkBehavior={settings.search?.inlineLinkBehavior || 'inline'} onNavigate={navigateView} onCreateShortcut={quickShortcutFromResult} onClose={() => navigateView({ type: 'dial' })} />
         ) : widgetView ? (
-          <ServiceRailView kind={widgetView} onClose={() => setWidgetView(null)} />
+          <ServiceRailView kind={widgetView} onClose={() => navigateView({ type: 'dial' })} />
         ) : agentMode ? (
           <AgentMode
             ref={agentRef}
@@ -676,6 +698,7 @@ export function App() {
           onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
+          restoredQuery={inlineResults?.query || ''}
           agentMode={agentMode}
           agentReady={agentUi.ready}
           agentRunning={agentUi.running}

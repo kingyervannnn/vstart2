@@ -36,9 +36,9 @@ function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcu
   )
 }
 
-export function InlineResults({ query, results, loading, error, workspaces, activeWorkspaceId, linkBehavior = 'inline', onCreateShortcut, onClose }) {
-  const [frame, setFrame] = useState(null)
-  const [fullScreen, setFullScreen] = useState(false)
+export function InlineResults({ query, results, loading, error, initialFrame = null, initialFullScreen = false, workspaces, activeWorkspaceId, linkBehavior = 'inline', onNavigate, onCreateShortcut, onClose }) {
+  const [frame, setFrame] = useState(() => initialFrame ? { result: initialFrame, src: null, loading: true, assist: 'preparing' } : null)
+  const [fullScreen, setFullScreen] = useState(initialFullScreen)
   const [extension, setExtension] = useState({ installed: false, iframeAssist: false, version: null })
   const activeRuleRef = useRef(null)
 
@@ -53,13 +53,30 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
   }, [])
 
   useEffect(() => {
+    if (!initialFrame) return undefined
+    let live = true
+    void activateFrameAssist(initialFrame.url).then((activation) => {
+      if (!live) {
+        if (activation.ruleId) void deactivateFrameAssist(activation.ruleId)
+        return
+      }
+      if (activation.ruleId) activeRuleRef.current = activation.ruleId
+      if (activation.installed) setExtension((value) => ({ ...value, installed: true, iframeAssist: activation.ok }))
+      setFrame({ result: initialFrame, src: initialFrame.url, loading: true, assist: activation.ok ? 'active' : activation.installed ? 'failed' : 'native' })
+    })
+    return () => { live = false }
+  }, [initialFrame])
+
+  useEffect(() => {
     if (!fullScreen) return undefined
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setFullScreen(false)
+      if (event.key !== 'Escape') return
+      if (onNavigate) onNavigate(frame ? { type: 'frame', query, result: frame.result, fullScreen: false } : { type: 'search', query, fullScreen: false })
+      else setFullScreen(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [fullScreen])
+  }, [frame, fullScreen, onNavigate, query])
 
   const releaseRule = () => {
     const ruleId = activeRuleRef.current
@@ -68,6 +85,10 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
   }
 
   const openInside = async (result, forceFullScreen = false) => {
+    if (onNavigate) {
+      onNavigate({ type: 'frame', query, result, fullScreen: forceFullScreen })
+      return
+    }
     releaseRule()
     if (forceFullScreen) setFullScreen(true)
     setFrame({ result, src: null, loading: true, assist: 'preparing' })
@@ -79,12 +100,25 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
 
   const backToResults = () => {
     releaseRule()
+    if (onNavigate) {
+      onNavigate(query ? { type: 'search', query, fullScreen } : { type: 'dial' })
+      return
+    }
     setFrame(null)
   }
 
   const close = () => {
     releaseRule()
     onClose()
+  }
+
+  const toggleFullScreen = () => {
+    const next = !fullScreen
+    if (onNavigate) {
+      onNavigate(frame ? { type: 'frame', query, result: frame.result, fullScreen: next } : { type: 'search', query, fullScreen: next })
+      return
+    }
+    setFullScreen(next)
   }
 
   const followPrimaryResult = (event, result) => {
@@ -106,7 +140,7 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
             </span>
             <ShortcutTarget result={frame.result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
             <a className="inline-action external" href={frame.result.url} target="_blank" rel="noreferrer"><ExternalLink /> <span>New tab</span></a>
-            <button className="iframe-fullscreen" type="button" onClick={() => setFullScreen((value) => !value)} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
+            <button className="iframe-fullscreen" type="button" onClick={toggleFullScreen} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
             <button className="iframe-close" type="button" onClick={close} aria-label="Close inline results"><X /></button>
           </div>
         </header>
@@ -123,7 +157,7 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
       <header>
         <div><small>INLINE RESULTS</small><h2>{query}</h2></div>
         <div className="inline-results-header-actions">
-          <button type="button" onClick={() => setFullScreen((value) => !value)} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
+          <button type="button" onClick={toggleFullScreen} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
           <button type="button" onClick={close} aria-label="Close inline results"><X /></button>
         </div>
       </header>
