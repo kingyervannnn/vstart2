@@ -206,6 +206,12 @@ export function App() {
     navigate({ pathname: location.pathname, search: buildViewSearch(view) }, options)
   }, [location.pathname, navigate])
 
+  const openShortcutInline = useCallback((item) => {
+    if (!item?.url) return
+    setFolderId(null)
+    navigateView({ type: 'frame', query: '', result: { title: item.title, url: item.url }, fullScreen: false })
+  }, [navigateView])
+
   const placementsFor = useCallback((workspaceId, profileName, containerKey = 'root') =>
     (bootstrapRef.current?.placements || []).filter((value) => value.workspaceId === workspaceId && value.profile === profileName && value.containerKey === containerKey), [])
 
@@ -713,11 +719,13 @@ export function App() {
             editMode={editMode}
             alwaysShowNames={settings.speedDial?.alwaysShowNames !== false}
             showFolderLabels={settings.speedDial?.showFolderLabels !== false}
+            labelOpensInline={settings.speedDial?.labelOpensInline === true}
             openInNewTab={settings.general?.openLinksInNewTab !== false}
             onCreateAt={(point) => setDialog({ item: null, point })}
             onMove={moveItem}
             onDropOnItem={dropOnItem}
             onOpenFolder={(item) => setFolderId(item.id)}
+            onOpenInline={openShortcutInline}
             onEdit={(item) => setDialog({ item, point: null })}
             onBlankContextMenu={({ x, y, point }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null }) }}
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
@@ -774,6 +782,7 @@ export function App() {
         profile={profile}
         editMode={editMode}
         openInNewTab={settings.general?.openLinksInNewTab !== false}
+        labelOpensInline={settings.speedDial?.labelOpensInline === true}
         onClose={() => setFolderId(null)}
         onCreate={(point) => { setFolderId(null); setDialog({ item: null, point, parentFolderId: currentFolder.id }) }}
         onBlankContextMenu={({ x, y, point, folder }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null, folder }) }}
@@ -781,6 +790,7 @@ export function App() {
         onEdit={(item) => { setFolderId(null); setDialog({ item, point: null }) }}
         onMove={moveItem}
         onMoveOut={moveOutOfFolder}
+        onOpenInline={openShortcutInline}
       />
       {workspaceMenu && <WorkspaceContextMenu
         menu={workspaceMenu}

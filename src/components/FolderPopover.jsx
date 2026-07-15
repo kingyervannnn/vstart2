@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
 
-export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, onClose, onEdit, onMove, onMoveOut, onCreate, onBlankContextMenu, onItemContextMenu }) {
+export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, labelOpensInline, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
   const canvasRef = useRef(null)
   const dragRef = useRef(null)
   const [preview, setPreview] = useState(null)
@@ -79,11 +79,27 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
                 onPointerCancel={endDrag}
                 onClick={() => !editMode && window.open(child.url, openInNewTab ? '_blank' : '_self')}
                 onKeyDown={(event) => {
+                  if (event.target.closest('.shortcut-inline-label')) return
                   if (event.key === 'Enter') editMode ? onEdit(child) : window.open(child.url, openInNewTab ? '_blank' : '_self')
                 }}
               >
                 <ShortcutIcon item={child} />
-                <span className="folder-child-name">{child.title}</span>
+                {labelOpensInline
+                  ? <button
+                      type="button"
+                      className="folder-child-name shortcut-inline-label"
+                      title={`Open ${child.title} inline`}
+                      aria-label={`Open ${child.title} inline`}
+                      onPointerDown={(event) => { if (!editMode) event.stopPropagation() }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        if (editMode) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onOpenInline(child)
+                      }}
+                    >{child.title}</button>
+                  : <span className="folder-child-name">{child.title}</span>}
                 {editMode && <div className="folder-child-actions"><button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onEdit(child)} aria-label={`Edit ${child.title}`}><Pencil /></button><button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onMoveOut(child)} aria-label={`Move ${child.title} out of folder`}><ArrowUpRight /></button></div>}
               </div>
             )

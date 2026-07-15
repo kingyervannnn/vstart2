@@ -1,11 +1,12 @@
 use_default_settings:
   engines:
     keep_only:
-      - duckduckgo
-      - brave
       - bing
       - google
       - wikipedia
+engines:
+  - name: bing
+    disabled: false
 server:
   secret_key: "vstart2-local-searxng"
   bind_address: "0.0.0.0"

@@ -11,11 +11,13 @@ export function DialCanvas({
   editMode,
   alwaysShowNames,
   showFolderLabels,
+  labelOpensInline,
   openInNewTab,
   onCreateAt,
   onMove,
   onDropOnItem,
   onOpenFolder,
+  onOpenInline,
   onEdit,
   onBlankContextMenu,
   onItemContextMenu,
@@ -146,7 +148,22 @@ export function DialCanvas({
                 ? <FolderPreview children={childrenByFolder.get(item.id) || []} />
                 : <ShortcutIcon item={item} />}
             </div>
-            {(item.kind !== 'folder' || showFolderLabels) && <span className="shortcut-name">{item.title}</span>}
+            {(item.kind !== 'folder' || showFolderLabels) && (item.kind === 'shortcut' && labelOpensInline
+              ? <button
+                  type="button"
+                  className="shortcut-name shortcut-inline-label"
+                  title={`Open ${item.title} inline`}
+                  aria-label={`Open ${item.title} inline`}
+                  onPointerDown={(event) => { if (!editMode) event.stopPropagation() }}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    if (editMode) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onOpenInline(item)
+                  }}
+                >{item.title}</button>
+              : <span className="shortcut-name">{item.title}</span>)}
             {editMode && <button className="tile-edit" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onEdit(item) }} aria-label={`Edit ${item.title}`}><Pencil size={12} /></button>}
           </div>
         )

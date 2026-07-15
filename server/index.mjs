@@ -826,7 +826,14 @@ async function handleRequest(request, response) {
     endpoint.searchParams.set('q', query)
     endpoint.searchParams.set('format', 'json')
     try {
-      const upstream = await fetch(endpoint, { signal: AbortSignal.timeout(8000) })
+      const upstream = await fetch(endpoint, {
+        signal: AbortSignal.timeout(8000),
+        headers: {
+          'user-agent': 'VStart2/0.1 inline search',
+          'x-forwarded-for': '127.0.0.1',
+          'x-real-ip': '127.0.0.1',
+        },
+      })
       if (!upstream.ok) throw new Error(`SearXNG returned ${upstream.status}`)
       const payload = await upstream.json()
       const results = (payload.results || []).slice(0, 18).map((item) => ({
@@ -835,6 +842,13 @@ async function handleRequest(request, response) {
         content: item.content || '',
         engine: item.engine || item.engines?.[0] || '',
       }))
+      const failedEngines = (payload.unresponsive_engines || []).map((value) => String(value?.[0] || '')).filter(Boolean)
+      if (!results.length && failedEngines.length) {
+        return sendJson(response, 503, {
+          error: 'Inline search providers did not respond',
+          details: `SearXNG providers unavailable: ${failedEngines.join(', ')}`,
+        })
+      }
       return sendJson(response, 200, { query, results })
     } catch (error) {
       return sendJson(response, 503, { error: 'Inline search is temporarily unavailable', details: error.message })

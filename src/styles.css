@@ -246,6 +246,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .folder-preview-cell img, .folder-preview-cell .generated-icon { width: 100%; height: 100%; border-radius: 6px; }
 .folder-preview-cell .generated-icon { font-size: clamp(8px, 1.05vw, 15px); }
 .shortcut-name { max-width: 100%; padding: 2px 0; color: var(--app-text); background: transparent; font-size: clamp(8px, .75vw, 12px); line-height: 1.1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; text-shadow: 0 1px 3px #000; transition: opacity 150ms ease, transform 150ms ease; }
+.shortcut-inline-label { border: 0; padding: 2px 0; color: inherit; background: transparent; font-family: inherit; cursor: pointer; }
+.shortcut-inline-label:hover, .shortcut-inline-label:focus-visible { color: color-mix(in srgb, var(--app-text) 82%, var(--app-accent)); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--app-accent) 62%, transparent); text-underline-offset: 3px; outline: 0; }
 .labels-hover .shortcut-name { opacity: 0; transform: translateY(-3px); }
 .labels-hover .shortcut-tile:hover .shortcut-name, .labels-hover .shortcut-tile:focus-visible .shortcut-name { opacity: 1; transform: none; }
 .tile-edit { position: absolute; top: 1px; right: 1px; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.24); border-radius: 50%; background: rgba(8,12,18,.62); cursor: pointer; }
