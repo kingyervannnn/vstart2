@@ -87,6 +87,16 @@ export class MailBridgeHttpServer {
         this.#send(response, 200, { message: await this.service.message(decodeURIComponent(match[1]), decodeURIComponent(match[2])) })
         return
       }
+      const trashMatch = url.pathname.match(/^\/v1\/messages\/([^/]+)\/([^/]+)\/trash$/)
+      if (request.method === 'POST' && trashMatch) {
+        const body = await this.#readJson(request)
+        this.#send(response, 200, { trashed: await this.service.trashMessage({
+          account: decodeURIComponent(trashMatch[1]),
+          messageId: decodeURIComponent(trashMatch[2]),
+          confirmTrash: body.confirmTrash,
+        }) })
+        return
+      }
       throw new MailBridgeError(404, 'route_not_found', 'Route not found')
     } catch (error) {
       const status = error instanceof MailBridgeError ? error.status : 500

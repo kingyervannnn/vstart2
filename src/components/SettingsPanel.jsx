@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Mail, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
+import { mailBridge } from '../lib/mailBridge.js'
 
 const PAGES = [
   ['general', 'General', SlidersHorizontal],
@@ -11,6 +12,7 @@ const PAGES = [
   ['appearance', 'Appearance', Palette],
   ['backgrounds', 'Backgrounds', Image],
   ['widgets', 'Widgets', PanelsTopLeft],
+  ['mail', 'Mail', Mail],
   ['system', 'Data & System', Database],
 ]
 
@@ -27,11 +29,25 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
+  const [mailAccounts, setMailAccounts] = useState(() => mailBridge.peekAccounts())
+  const [mailConnection, setMailConnection] = useState('checking')
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
   const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
   const searchAppearance = settings.search?.appearance || {}
   const searchBlur = Math.max(0, Math.min(40, Number(searchAppearance.blur) || 0))
+
+  useEffect(() => {
+    let live = true
+    void Promise.all([mailBridge.health(), mailBridge.accounts()]).then(([, accountData]) => {
+      if (!live) return
+      setMailAccounts(accountData.accounts || [])
+      setMailConnection('connected')
+    }).catch(() => {
+      if (live) setMailConnection('unavailable')
+    })
+    return () => { live = false }
+  }, [])
 
   const addWorkspace = async (event) => {
     event.preventDefault()
@@ -160,6 +176,38 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
               <h3>Widgets</h3>
               {['clock', 'weather', 'notes', 'email', 'music'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
               <label className="setting-field"><span>Music player blur</span><input type="range" min="0" max="40" value={settings.widgets?.musicBlur ?? 18} onChange={(event) => onPatch({ widgets: { musicBlur: Number(event.target.value) } })} /></label>
+            </>}
+            {page === 'mail' && <>
+              <h3>Mail</h3>
+              <p className="settings-intro">Choose which local inbox opens with each workspace. Assignments and refresh preferences are stored in PostgreSQL.</p>
+              <div className={`mail-settings-status ${mailConnection}`}>
+                <Mail />
+                <span><strong>{mailConnection === 'connected' ? 'Local mail ready' : mailConnection === 'unavailable' ? 'Local mail unavailable' : 'Checking local mail…'}</strong><small>{mailConnection === 'connected' ? `${mailAccounts.length} configured ${mailAccounts.length === 1 ? 'inbox' : 'inboxes'} · warmed in memory while V Start is open` : 'V Start will keep retrying its background warmup.'}</small></span>
+              </div>
+              <label className="setting-field"><span>Default inbox</span><select value={settings.mail?.defaultAccount || 'all'} onChange={(event) => onPatch({ mail: { defaultAccount: event.target.value } })}>
+                <option value="all">All inboxes</option>
+                {mailAccounts.map((item) => <option key={item.alias} value={item.alias}>{item.alias} · {item.email}</option>)}
+              </select></label>
+              <label className="setting-field"><span>Background refresh</span><select value={String(settings.mail?.refreshSeconds ?? 60)} onChange={(event) => onPatch({ mail: { refreshSeconds: Number(event.target.value) } })}>
+                <option value="30">Every 30 seconds</option>
+                <option value="60">Every minute</option>
+                <option value="300">Every 5 minutes</option>
+                <option value="0">Only when V Start loads</option>
+              </select></label>
+              <div className="mail-workspace-settings">
+                <h4>Workspace inboxes</h4>
+                {workspaces.map((workspace) => {
+                  const assigned = settings.mail?.workspaceAccounts?.[workspace.id] || ''
+                  const isUnknown = assigned && assigned !== 'all' && !mailAccounts.some((item) => item.alias === assigned)
+                  return <label key={workspace.id}><span><strong>{workspace.name}</strong><small>/w/{workspace.slug}</small></span><select value={assigned} onChange={(event) => onPatch({ mail: { workspaceAccounts: { [workspace.id]: event.target.value } } })}>
+                    <option value="">Use Mail default</option>
+                    <option value="all">All inboxes</option>
+                    {isUnknown && <option value={assigned}>{assigned} (not currently available)</option>}
+                    {mailAccounts.map((item) => <option key={item.alias} value={item.alias}>{item.alias}</option>)}
+                  </select></label>
+                })}
+              </div>
+              <div className="setting-note"><strong>No browser mailbox storage.</strong><span>Only a short-lived memory cache is used for instant opening. Messages are never copied into PostgreSQL or browser storage.</span></div>
             </>}
             {page === 'system' && <>
               <h3>Data & System</h3>

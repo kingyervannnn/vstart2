@@ -48,4 +48,12 @@ describe('MailctlService', () => {
     await service.sendDraft({ account: 'work', draftId: 'draft-1', confirmSend: true })
     expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['send-draft', '--account', 'work', '--draft-id', 'draft-1', '--yes'], expect.any(Object))
   })
+
+  it('requires explicit confirmation before moving a message to trash', async () => {
+    const run = vi.fn(async (_path, args) => args[0] === 'accounts' ? { stdout: accounts } : { stdout: JSON.stringify({ trashed: [{ id: 'message-1' }] }) })
+    const service = new MailctlService({ mailctlPath: '/fake/mailctl', run })
+    await expect(service.trashMessage({ account: 'work', messageId: 'message-1', confirmTrash: false })).rejects.toBeInstanceOf(MailBridgeError)
+    await service.trashMessage({ account: 'work', messageId: 'message-1', confirmTrash: true })
+    expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['trash', '--account', 'work', '--id', 'message-1', '--yes'], expect.any(Object))
+  })
 })

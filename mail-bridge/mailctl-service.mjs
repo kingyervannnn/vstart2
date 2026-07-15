@@ -28,7 +28,7 @@ export class MailctlService {
   async health() {
     try {
       const accounts = await this.accounts({ refresh: true })
-      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'draft', 'reply', 'attach', 'send'], accountCount: accounts.length }
+      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'draft', 'reply', 'forward', 'attach', 'send', 'trash'], accountCount: accounts.length }
     } catch {
       return { status: 'unavailable', service: 'mailctl', capabilities: [], accountCount: 0 }
     }
@@ -115,6 +115,12 @@ export class MailctlService {
     if (confirmSend !== true) throw new MailBridgeError(400, 'send_confirmation_required', 'Explicit send confirmation is required')
     const [{ alias }] = await this.#resolveAccounts(account)
     return this.#json(['send-draft', '--account', alias, '--draft-id', this.#safeId(draftId, 'Draft id'), '--yes'])
+  }
+
+  async trashMessage({ account, messageId, confirmTrash }) {
+    if (confirmTrash !== true) throw new MailBridgeError(400, 'trash_confirmation_required', 'Explicit trash confirmation is required')
+    const [{ alias }] = await this.#resolveAccounts(account)
+    return this.#json(['trash', '--account', alias, '--id', this.#safeId(messageId, 'Message id'), '--yes'])
   }
 
   async #resolveAccounts(requested) {

@@ -2,7 +2,7 @@
 
 This loopback-only helper connects the V Start mail widget to the canonical local `mailctl` capability. It runs as the signed-in macOS user so `mailctl` can use its existing account registry and Keychain-backed credentials.
 
-The browser API supports search, reading, draft creation, replies, attachments, draft listing, and sending. Sending is draft-first and requires a separate explicit confirmation before the bridge invokes `mailctl send-draft --yes`. Token management, trashing, and arbitrary CLI execution are not exposed.
+The browser API supports search, reading, draft creation, replies, forwarding as a new draft, attachments, draft listing, sending, and moving a message to Gmail Trash. Sending and trashing each require a separate explicit confirmation before the bridge invokes the corresponding guarded `mailctl` command. Token management, permanent deletion, and arbitrary CLI execution are not exposed.
 
 ```sh
 npm run mail:bridge:manage -- install

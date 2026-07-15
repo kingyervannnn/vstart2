@@ -19,6 +19,7 @@ describe('MailBridgeHttpServer', () => {
       drafts: vi.fn(async () => []),
       createDraft: vi.fn(async () => ({ draftId: 'draft-1' })),
       sendDraft: vi.fn(async () => ({ id: 'sent-1' })),
+      trashMessage: vi.fn(async () => ({ id: 'message-1' })),
       message: vi.fn(async () => ({ id: 'message-1' })),
     }
     server = new MailBridgeHttpServer({ service, port: 0 })
@@ -44,5 +45,20 @@ describe('MailBridgeHttpServer', () => {
     })
     expect(response.status).toBe(200)
     expect(service.sendDraft).toHaveBeenCalledWith({ account: 'work', draftId: 'draft-1', confirmSend: true })
+  })
+
+  it('passes an explicit confirmation to the trash service', async () => {
+    const service = {
+      trashMessage: vi.fn(async () => ({ id: 'message-1' })),
+    }
+    server = new MailBridgeHttpServer({ service, port: 0 })
+    await server.start()
+    const response = await fetch(`http://127.0.0.1:${server.address.port}/v1/messages/work/message-1/trash`, {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmTrash: true }),
+    })
+    expect(response.status).toBe(200)
+    expect(service.trashMessage).toHaveBeenCalledWith({ account: 'work', messageId: 'message-1', confirmTrash: true })
   })
 })

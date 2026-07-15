@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, Pencil, RotateCcw, Settings } from 'lucide-react'
 import { api } from './lib/api.js'
+import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
@@ -122,8 +123,21 @@ export function App() {
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
+  const workspaceMailAccount = settings.mail?.workspaceAccounts?.[activeWorkspace?.id]
+    || settings.mail?.defaultAccount
+    || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+
+  useEffect(() => {
+    void mailBridge.preload().catch(() => {})
+    const refreshSeconds = Number(settings.mail?.refreshSeconds ?? 60)
+    if (refreshSeconds <= 0) return undefined
+    const timer = window.setInterval(() => {
+      void mailBridge.preload({ force: true }).catch(() => {})
+    }, Math.max(30, refreshSeconds) * 1000)
+    return () => window.clearInterval(timer)
+  }, [settings.mail?.refreshSeconds])
 
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
@@ -695,7 +709,12 @@ export function App() {
             onClose={() => navigateView({ type: 'dial' })}
           />
         ) : routedView.type === 'service' ? (
-          <ServiceRailView kind={routedView.kind} onClose={() => navigateView({ type: 'dial' })} />
+          <ServiceRailView
+            key={`${routedView.kind}:${activeWorkspace.id}`}
+            kind={routedView.kind}
+            initialMailAccount={workspaceMailAccount}
+            onClose={() => navigateView({ type: 'dial' })}
+          />
         ) : agentMode ? (
           <AgentMode
             ref={agentRef}
@@ -731,7 +750,7 @@ export function App() {
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
-        <SearchDock
+        {!(routedView.type === 'service' && routedView.kind === 'mail') && <SearchDock
           settings={settings}
           profile={profile}
           compact={compact}
@@ -752,7 +771,7 @@ export function App() {
           onAgentToggle={toggleAgentMode}
           onAgentSubmit={(value) => agentRef.current?.submit(value)}
           onAgentStop={() => agentRef.current?.stop()}
-        />
+        />}
         <div className="page-controls">
           {!agentMode && <button type="button" className={editMode ? 'active' : ''} onClick={() => setEditMode((value) => !value)} aria-label={editMode ? 'Finish editing' : 'Edit page'}>{editMode ? <Check /> : <Pencil />}</button>}
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><Settings /></button>
