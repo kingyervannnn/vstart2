@@ -18,6 +18,8 @@ import { AgentMode } from './components/AgentMode.jsx'
 import { WorkspaceContextMenu } from './components/WorkspaceContextMenu.jsx'
 import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 
+const LOADING_SHELL_DELAY_MS = 350
+
 function LoadingShell({ error, onRetry }) {
   return (
     <main className="loading-shell">
@@ -37,6 +39,7 @@ export function App() {
   const [bootstrap, setBootstrap] = useState(null)
   const bootstrapRef = useRef(null)
   const [loadError, setLoadError] = useState('')
+  const [showLoadingShell, setShowLoadingShell] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dialog, setDialog] = useState(null)
@@ -72,6 +75,11 @@ export function App() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
+    if (bootstrap || loadError) return undefined
+    const timer = window.setTimeout(() => setShowLoadingShell(true), LOADING_SHELL_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [bootstrap, loadError])
+  useEffect(() => {
     if (!toast) return undefined
     const timer = setTimeout(() => setToast(null), 4200)
     return () => clearTimeout(timer)
@@ -80,18 +88,19 @@ export function App() {
   const workspaces = useMemo(() => bootstrap?.workspaces || [], [bootstrap?.workspaces])
   const workspaceRoute = location.pathname.match(/^\/w\/([^/]+)(?:\/agent(?:\/([^/]+))?)?$/)
   const slug = decodeURIComponent(workspaceRoute?.[1] || '')
-  const agentMode = Boolean(workspaceRoute && location.pathname.includes('/agent'))
+  const routedWorkspace = workspaces.find((workspace) => workspace.slug === slug) || null
+  const lastWorkspaceId = bootstrap?.state?.last_active_workspace_id?.value
+  const fallbackWorkspace = workspaces.find((workspace) => workspace.id === lastWorkspaceId) || workspaces[0] || null
+  const activeWorkspace = routedWorkspace || fallbackWorkspace
+  const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
-  const activeWorkspace = workspaces.find((workspace) => workspace.slug === slug) || null
   const settings = bootstrap?.settings?.document || {}
 
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
-    if (activeWorkspace) return
-    const lastId = bootstrap.state?.last_active_workspace_id?.value
-    const fallback = workspaces.find((workspace) => workspace.id === lastId) || workspaces[0]
-    navigate(`/w/${fallback.slug}`, { replace: true })
-  }, [activeWorkspace, bootstrap, navigate, workspaces])
+    if (routedWorkspace) return
+    navigate(`/w/${fallbackWorkspace.slug}`, { replace: true })
+  }, [bootstrap, fallbackWorkspace, navigate, routedWorkspace, workspaces.length])
 
   useEffect(() => {
     if (!activeWorkspace || activeRef.current === activeWorkspace.id) return
@@ -558,8 +567,10 @@ export function App() {
     }
   }
 
-  if (!bootstrap) return <LoadingShell error={loadError} onRetry={load} />
-  if (!activeWorkspace) return <LoadingShell error="Resolving workspace…" onRetry={load} />
+  if (!bootstrap) {
+    if (loadError || showLoadingShell) return <LoadingShell error={loadError} onRetry={load} />
+    return <main className="startup-shell" aria-label="Starting V Start 2" aria-busy="true" />
+  }
 
   const currentFolder = bootstrap.items.find((item) => item.id === folderId && item.kind === 'folder')
   const folderChildren = currentFolder ? bootstrap.items.filter((item) => item.parentFolderId === currentFolder.id) : []

@@ -537,11 +537,13 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.loading-shell { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #eef2ff; background: radial-gradient(circle at 50% 35%, #283751, #0a0d14 58%); text-align: center; }
+.startup-shell { position: fixed; inset: 0; background: #080a0f; }
+.loading-shell { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #eef2ff; background: radial-gradient(circle at 50% 35%, #283751, #0a0d14 58%); text-align: center; animation: loading-shell-enter 160ms ease-out both; }
 .loading-mark { width: 58px; height: 58px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 18px; background: rgba(255,255,255,.06); font-weight: 800; }
 .loading-shell h1 { margin: 9px 0 0; font-size: 24px; }
 .loading-shell p { max-width: 430px; margin: 0; color: rgba(238,242,255,.57); font-size: 11px; }
 .loading-shell button { display: flex; gap: 7px; margin-top: 10px; padding: 9px 14px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; background: rgba(255,255,255,.08); cursor: pointer; }
+@keyframes loading-shell-enter { from { opacity: 0; } }
 
 @media (max-width: 1099px) {
   .clock-widget strong { font-size: clamp(30px, 6vw, 48px); }
