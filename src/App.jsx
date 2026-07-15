@@ -191,6 +191,41 @@ export function App() {
     return result
   }, [placementsFor])
 
+  const quickShortcutFromResult = async (link, workspaceId) => {
+    const workspace = workspaces.find((value) => value.id === workspaceId)
+    if (!workspace) throw new Error('That workspace no longer exists.')
+    const url = new URL(link.url).href
+    const existing = bootstrapRef.current.items.find((item) => {
+      if (item.kind !== 'shortcut' || item.workspaceId !== workspaceId || !item.url) return false
+      try { return new URL(item.url).href === url } catch { return item.url === url }
+    })
+    if (existing) {
+      setToast({ type: 'warning', message: `${existing.title} is already in ${workspace.name}.` })
+      return { alreadyExists: true, itemId: existing.id }
+    }
+    const title = String(link.title || new URL(url).hostname).trim().slice(0, 120)
+    const resultPlacements = {}
+    for (const [profileName, canvas] of Object.entries(CANVASES)) {
+      const occupied = placementsFor(workspaceId, profileName)
+      const position = findOpenPlacement(occupied, profileName, { x: canvas.width * 0.46, y: canvas.height * 0.34 })
+      if (!position) throw new Error(`No free space remains in ${workspace.name}'s ${profileName} view.`)
+      resultPlacements[profileName] = position
+    }
+    setBusy(true)
+    try {
+      const result = await api.createShortcut({ workspaceId, title, url, placements: resultPlacements })
+      applyBootstrap(result.bootstrap)
+      setToast({ type: 'success', message: `${title} added to ${workspace.name}.` })
+      return { alreadyExists: false, itemId: result.itemId }
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+      await load()
+      throw error
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const saveDialog = async (values) => {
     if (!activeWorkspace) return
     setBusy(true)
@@ -594,7 +629,7 @@ export function App() {
       <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => { setInlineResults(null); setWidgetView(kind) }} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {inlineResults ? (
-          <InlineResults {...inlineResults} onClose={() => setInlineResults(null)} />
+          <InlineResults {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} onCreateShortcut={quickShortcutFromResult} onClose={() => setInlineResults(null)} />
         ) : widgetView ? (
           <ServiceRailView kind={widgetView} onClose={() => setWidgetView(null)} />
         ) : agentMode ? (

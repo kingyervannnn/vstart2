@@ -226,6 +226,12 @@ export function SearchDock({
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
   }
 
+  const submitFromInput = (event) => {
+    if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return
+    event.preventDefault()
+    event.currentTarget.form?.requestSubmit()
+  }
+
   const startVoice = async () => {
     if (recording) {
       mediaRef.current?.stop()
@@ -281,7 +287,7 @@ export function SearchDock({
             : <button type="submit" disabled={!agentReady || !query.trim()} aria-label="Send to Hermes"><Send size={18} /></button>}
         </> : <>
           <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
-          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
+          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
           <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
