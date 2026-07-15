@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { AgentBridgeClient, normalizeAgentBridgeUrl, readNdjsonStream } from '../src/lib/agentBridge.js'
+import { AgentBridgeClient, getSharedAgentBridgeClient, normalizeAgentBridgeUrl, readNdjsonStream } from '../src/lib/agentBridge.js'
 
 describe('Agent Bridge browser client', () => {
   it('accepts only plain HTTP loopback bridge origins', () => {
@@ -37,6 +37,31 @@ describe('Agent Bridge browser client', () => {
 
     await expect(client.health()).resolves.toMatchObject({ safe: true })
     expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps one bridge client and handshake nonce per loopback origin', () => {
+    const first = getSharedAgentBridgeClient({ baseUrl: 'http://127.0.0.1:3120' })
+    const second = getSharedAgentBridgeClient({ baseUrl: 'http://127.0.0.1:3120/' })
+    const other = getSharedAgentBridgeClient({ baseUrl: 'http://localhost:3120' })
+    expect(first).toBe(second)
+    expect(other).not.toBe(first)
+  })
+
+  it('re-handshakes an expired event stream and reports when the stream opens', async () => {
+    const body = new ReadableStream({ start(controller) { controller.close() } })
+    const onOpen = vi.fn()
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ nonce: 'first' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'nonce_invalid' } }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ nonce: 'second' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(body, { status: 200, headers: { 'X-VStart-Event-Cursor': '23' } }))
+    const client = new AgentBridgeClient({ fetchImpl })
+
+    await client.streamEvents('runtime-1', vi.fn(), { after: 17, onOpen })
+
+    expect(client.nonce).toBe('second')
+    expect(onOpen).toHaveBeenCalledWith({ cursor: 23 })
+    expect(fetchImpl.mock.calls[3][0]).toContain('after=17')
   })
 
   it('decodes NDJSON split across arbitrary network chunks', async () => {

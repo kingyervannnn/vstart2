@@ -1,4 +1,5 @@
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:3120'
+const sharedClients = new Map()
 
 export function normalizeAgentBridgeUrl(value = DEFAULT_BRIDGE_URL) {
   const url = new URL(value)
@@ -100,16 +101,22 @@ export class AgentBridgeClient {
   closeSession(sessionId) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/close`, { method: 'POST', body: {} }) }
   chooseDirectory() { return this.request('/v1/directories/choose', { method: 'POST', body: {} }) }
 
-  async streamEvents(sessionId, onEvent, { after = 0, signal } = {}) {
+  async streamEvents(sessionId, onEvent, { after = 0, onOpen, retryHandshake = true, signal } = {}) {
     if (!this.nonce) await this.handshake()
     const response = await this.fetchImpl(
       `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events?after=${encodeURIComponent(after)}`,
       { headers: { 'X-VStart-Agent-Session': this.nonce }, signal },
     )
+    if (response.status === 401 && retryHandshake) {
+      this.nonce = ''
+      await this.handshake()
+      return this.streamEvents(sessionId, onEvent, { after, onOpen, retryHandshake: false, signal })
+    }
     if (!response.ok || !response.body) {
       const payload = await response.json().catch(() => null)
       throw this.#error(response, payload, 'Agent Bridge event stream failed')
     }
+    onOpen?.({ cursor: Number(response.headers.get('X-VStart-Event-Cursor') || 0) })
     return readNdjsonStream(response.body, onEvent)
   }
 
@@ -119,4 +126,10 @@ export class AgentBridgeClient {
       code: payload?.error?.code || 'bridge_error',
     })
   }
+}
+
+export function getSharedAgentBridgeClient({ baseUrl = DEFAULT_BRIDGE_URL } = {}) {
+  const normalized = normalizeAgentBridgeUrl(baseUrl)
+  if (!sharedClients.has(normalized)) sharedClients.set(normalized, new AgentBridgeClient({ baseUrl: normalized }))
+  return sharedClients.get(normalized)
 }

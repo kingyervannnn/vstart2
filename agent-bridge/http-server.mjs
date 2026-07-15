@@ -143,7 +143,8 @@ export class AgentBridgeHttpServer {
           return
         }
         if (request.method === 'GET' && route.action === 'events') {
-          this.#streamEvents(request, response, Number(url.searchParams.get('after') || 0))
+          const after = url.searchParams.get('after')
+          this.#streamEvents(request, response, after === 'latest' ? null : Number(after || 0))
           return
         }
         if (request.method === 'POST' && route.action === 'turns') {
@@ -218,19 +219,23 @@ export class AgentBridgeHttpServer {
   }
 
   #streamEvents(request, response, after) {
+    const replayThrough = this.service.broker.sequence
     response.writeHead(200, {
       'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-store',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'X-VStart-Event-Cursor': String(replayThrough),
     })
-    const replayThrough = this.service.broker.sequence
+    response.flushHeaders?.()
     const onEvent = (event) => {
       if (event.sequence > replayThrough) response.write(`${JSON.stringify(event)}\n`)
     }
     this.service.broker.on('event', onEvent)
-    for (const event of this.service.broker.replay(after)) {
-      if (event.sequence <= replayThrough) response.write(`${JSON.stringify(event)}\n`)
+    if (after !== null) {
+      for (const event of this.service.broker.replay(after)) {
+        if (event.sequence <= replayThrough) response.write(`${JSON.stringify(event)}\n`)
+      }
     }
     const heartbeat = setInterval(() => {
       response.write(`${JSON.stringify({ type: 'bridge.heartbeat', timestamp: new Date().toISOString() })}\n`)
@@ -260,6 +265,7 @@ export class AgentBridgeHttpServer {
     response.setHeader('Vary', 'Origin')
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-VStart-Agent-Session')
+    response.setHeader('Access-Control-Expose-Headers', 'X-VStart-Event-Cursor')
     response.setHeader('Access-Control-Max-Age', '600')
   }
 

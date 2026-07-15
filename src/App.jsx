@@ -56,6 +56,7 @@ export function App() {
   const [headerDirection, setHeaderDirection] = useState('left')
   const [inlineResults, setInlineResults] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
+  const [agentDraft, setAgentDraft] = useState(null)
   const activeRef = useRef(null)
   const agentRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
@@ -147,7 +148,7 @@ export function App() {
   }, [activeWorkspace, selectWorkspace, workspaces])
 
   const onDialWheel = (event) => {
-    if (routedView.type !== 'dial' || folderId || settingsOpen) return
+    if (agentMode || routedView.type !== 'dial' || folderId || settingsOpen) return
     const wheel = wheelRef.current
     if (wheel.cooldown) return
     wheel.total += Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX
@@ -699,6 +700,7 @@ export function App() {
             onSessionLinked={linkAgentSession}
             onPreferencesChange={saveAgentPreferences}
             onStateChange={setAgentUi}
+            onEditMessage={(text) => setAgentDraft({ id: crypto.randomUUID(), text })}
           />
         ) : (
           <DialCanvas
@@ -732,6 +734,8 @@ export function App() {
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
           restoredQuery={routedInline?.query || ''}
+          draftRequest={agentDraft}
+          onDraftConsumed={() => setAgentDraft(null)}
           agentMode={agentMode}
           agentReady={agentUi.ready}
           agentRunning={agentUi.running}

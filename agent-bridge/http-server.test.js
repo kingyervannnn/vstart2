@@ -168,6 +168,20 @@ describe('AgentBridgeHttpServer security boundary', () => {
     abort.abort()
     expect(text).toContain('approval.request')
     expect(text).toContain('message.complete')
+
+    const latestAbort = new AbortController()
+    const latestCursor = service.broker.sequence
+    const latest = await fetch(`${baseUrl}/v1/sessions/runtime-1/events?after=latest`, {
+      headers,
+      signal: latestAbort.signal,
+    })
+    expect(latest.headers.get('X-VStart-Event-Cursor')).toBe(String(latestCursor))
+    service.broker.publish('tool.start', { sessionId: 'runtime-1', payload: { tool: 'fresh-only' } })
+    const latestChunk = await latest.body.getReader().read()
+    latestAbort.abort()
+    const latestText = new TextDecoder().decode(latestChunk.value)
+    expect(latestText).toContain('fresh-only')
+    expect(latestText).not.toContain('approval.request')
   })
 
   it('fails closed on secret prompts without forwarding sensitive payloads', async () => {

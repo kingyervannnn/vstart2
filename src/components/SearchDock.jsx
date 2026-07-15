@@ -23,6 +23,8 @@ export function SearchDock({
   onWorkspaceOffsetCommit,
   onInlineResults,
   restoredQuery = '',
+  draftRequest = null,
+  onDraftConsumed,
   agentMode = false,
   agentReady = false,
   agentRunning = false,
@@ -56,11 +58,34 @@ export function SearchDock({
   const [workspaceOffset, setWorkspaceOffset] = useState(configuredWorkspaceOffset)
   const [workspaceMoving, setWorkspaceMoving] = useState(false)
 
+  const resizeAgentComposer = useCallback((target) => {
+    const element = target || inputRef.current
+    if (!agentMode || !element || element.tagName !== 'TEXTAREA') return
+    element.style.height = '0px'
+    element.style.height = `${Math.min(144, Math.max(30, element.scrollHeight))}px`
+  }, [agentMode])
+
   useEffect(() => {
     if (!restoredQuery) return
     setQuery(restoredQuery)
     setInline(true)
   }, [restoredQuery])
+
+  useEffect(() => {
+    if (!agentMode || !draftRequest?.text) return
+    setQuery(draftRequest.text)
+    onDraftConsumed?.()
+    requestAnimationFrame(() => {
+      resizeAgentComposer()
+      inputRef.current?.focus()
+    })
+  }, [agentMode, draftRequest, onDraftConsumed, resizeAgentComposer])
+
+  useEffect(() => {
+    if (!agentMode) return undefined
+    const frame = requestAnimationFrame(resizeAgentComposer)
+    return () => cancelAnimationFrame(frame)
+  }, [agentMode, query, resizeAgentComposer])
 
   useEffect(() => {
     const next = { x: configuredX, y: configuredY, width: configuredWidth }
@@ -239,6 +264,12 @@ export function SearchDock({
     event.currentTarget.form?.requestSubmit()
   }
 
+  const submitFromAgentComposer = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return
+    event.preventDefault()
+    event.currentTarget.form?.requestSubmit()
+  }
+
   const startVoice = async () => {
     if (recording) {
       mediaRef.current?.stop()
@@ -272,15 +303,15 @@ export function SearchDock({
   return (
     <div
       ref={dockRef}
-      className={`search-dock-wrap ${editMode ? 'editing' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
-      style={{ left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%` }}
-      onPointerDown={beginDockMove}
-      onPointerMove={moveInteraction}
-      onPointerUp={endInteraction}
-      onPointerCancel={endInteraction}
-      onLostPointerCapture={endInteraction}
+      className={`search-dock-wrap ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
+      style={agentMode ? undefined : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%` }}
+      onPointerDown={agentMode ? undefined : beginDockMove}
+      onPointerMove={agentMode ? undefined : moveInteraction}
+      onPointerUp={agentMode ? undefined : endInteraction}
+      onPointerCancel={agentMode ? undefined : endInteraction}
+      onLostPointerCapture={agentMode ? undefined : endInteraction}
     >
-      <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />
+      {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />}
       <form
         className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} ${searchAppearance.outerGlow ? 'search-outer-glow' : ''} ${searchAppearance.glowOnFocus !== false ? 'glow-on-focus' : ''}`}
         style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
@@ -288,7 +319,8 @@ export function SearchDock({
       >
         {agentMode ? <>
           <button type="button" className="active" onClick={onAgentToggle} aria-label="Close Agent Mode" aria-pressed={true}><Sparkles size={18} /></button>
-          <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Agent Mode is not ready'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} autoComplete="off" disabled={!agentReady} />
+          <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />
+          <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
             : <button type="submit" disabled={!agentReady || !query.trim()} aria-label="Send to Hermes"><Send size={18} /></button>}
@@ -303,7 +335,7 @@ export function SearchDock({
       {!agentMode && suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
         {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
       </ul>}
-      {editMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
+      {editMode && !agentMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>
   )
 }
