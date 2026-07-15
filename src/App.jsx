@@ -123,6 +123,7 @@ export function App() {
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
+  const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
 
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
@@ -672,6 +673,7 @@ export function App() {
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
     >
+      {viewVeil && <div className={`view-veil ${viewVeil}-veil`} aria-hidden="true" />}
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
       <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
       <section className="dial-rail" onWheel={onDialWheel}>
