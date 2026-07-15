@@ -294,11 +294,15 @@ it can run beside V Start 1 without touching it.
 | `app` | new/adapted | Vite build served by nginx |
 | `storage-api` | fork/adapt V1 | PostgreSQL-backed app API and assets |
 | `db` | PostgreSQL 16 | Sole durable application store |
-| `gmail-api` | carry/adapt V1 | Mail integration used by widgets/rail view |
 | `image-search-api` | carry/adapt V1 | Image search and reverse-image helpers |
 | `notes-api` | carry/adapt V1 | Notes/vault integration |
 | `searxng` | carry V1 config | Inline web results |
 | `stt-api` | carry V1 | Local Faster-Whisper speech-to-text |
+
+Mail is intentionally not a Docker service. The widget connects to a loopback-only native
+bridge running as the signed-in macOS user so it can reuse the canonical `mailctl` account
+registry and Keychain credentials. Its typed API supports search, reading, draft-first
+compose/reply with attachments, draft listing, and explicitly confirmed sending.
 
 ### Excluded services
 

@@ -90,27 +90,6 @@ services:
       timeout: 3s
       retries: 5
 
-  gmail-api:
-    image: node:22-alpine
-    working_dir: /app
-    command: node server/integrations/gmail-server.mjs
-    environment:
-      GMAIL_PORT: 3510
-      GMAIL_DATA_DIR: /app/data
-      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
-      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
-    ports:
-      - "3510:3510"
-    volumes:
-      - ./server:/app/server:ro
-      - vstart2-gmail-data:/app/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3510/gmail/health >/dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   notes-api:
     image: node:22-alpine
     working_dir: /app
@@ -136,4 +115,3 @@ networks:
 
 volumes:
   vstart2-db-data:
-  vstart2-gmail-data:

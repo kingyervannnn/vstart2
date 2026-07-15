@@ -20,6 +20,9 @@
     "agent:bridge:manage": "node agent-bridge/launchd.mjs",
     "agent:bridge:smoke": "node agent-bridge/bridge-smoke.mjs",
     "test:agent-bridge": "vitest run agent-bridge",
+    "mail:bridge": "node mail-bridge/index.mjs",
+    "mail:bridge:manage": "node mail-bridge/launchd.mjs",
+    "test:mail-bridge": "vitest run mail-bridge",
     "test:watch": "vitest",
     "check:persistence": "node scripts/check-browser-persistence.mjs",
     "verify": "npm run lint && npm run check:persistence && npm test && npm run build"

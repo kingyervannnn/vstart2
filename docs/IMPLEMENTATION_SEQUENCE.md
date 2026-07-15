@@ -220,7 +220,7 @@ Import in small vertical slices:
 1. Clock.
 2. Weather.
 3. Notes widget plus full rail/overlay behavior and `notes-api`.
-4. Email widget plus full rail behavior and `gmail-api`.
+4. Email widget plus full rail behavior through the native, loopback-only `mailctl` bridge.
 5. Music controller using its existing backend contract.
 
 For every import:

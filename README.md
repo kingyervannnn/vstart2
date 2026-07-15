@@ -73,12 +73,15 @@ Parallel host ports:
 | PostgreSQL | `55432` |
 | Image search | `3310` |
 | Notes | `3410` |
-| Gmail | `3510` |
 | Speech to text | `8091` |
 | Agent bridge (optional native host service) | `3120` loopback only |
+| Mail bridge (native host service) | `3130` loopback only |
 
-Configure `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `IMGBB_API_KEY`, and optionally
-`VSTART2_NOTES_ROOT` in the shell or an untracked `.env` file before stack startup.
+Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
+untracked `.env` file before stack startup. Mail uses the existing local `mailctl`
+accounts and Keychain credentials through the native
+[Mail Bridge](mail-bridge/README.md); install it with
+`npm run mail:bridge:manage -- install`.
 There is intentionally no AI service or AI-provider configuration.
 
 To migrate an empty V Start 2 database from a running V Start 1 stack, use
