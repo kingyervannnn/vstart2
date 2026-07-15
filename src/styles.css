@@ -468,6 +468,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .shortcut-dialog footer { justify-content: flex-end; margin-top: 22px; }
 .shortcut-dialog footer button { border: 1px solid rgba(255,255,255,.16); border-radius: 11px; padding: 9px 14px; background: transparent; cursor: pointer; }
 .shortcut-dialog footer .primary { color: #10141d; border-color: transparent; background: #eaf0ff; font-weight: 700; }
+.confirm-backdrop { z-index: 240; }
+.confirm-dialog { width: min(430px, 100%); padding: 20px; border: 1px solid rgba(255,255,255,.2); border-radius: 20px; color: #f6f8ff; background: rgba(16,21,31,.96); box-shadow: 0 28px 80px rgba(0,0,0,.48); }
+.confirm-dialog header { display: flex; align-items: center; gap: 10px; }
+.confirm-dialog header > svg { width: 19px; color: #ff9da6; }
+.confirm-dialog h2 { flex: 1; margin: 0; font-size: 18px; }
+.confirm-dialog header button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.confirm-dialog header button svg { width: 15px; }
+.confirm-dialog p { margin: 16px 0 20px; color: rgba(246,248,255,.68); font-size: 11px; line-height: 1.55; }
+.confirm-dialog footer { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-dialog footer button { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 9px 13px; background: transparent; cursor: pointer; }
+.confirm-dialog footer button.danger { color: #fff; border-color: rgba(255,91,108,.42); background: rgba(255,76,94,.16); }
 .workspace-glyph-field { margin: 17px 0 0; padding: 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 13px; }
 .workspace-glyph-field legend { padding: 0 5px; color: rgba(246,248,255,.72); font-size: 10px; font-weight: 650; }
 .workspace-dialog-icon-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }

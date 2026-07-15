@@ -18,6 +18,7 @@ import { AppContextMenu } from './components/AppContextMenu.jsx'
 import { AgentMode } from './components/AgentMode.jsx'
 import { WorkspaceContextMenu } from './components/WorkspaceContextMenu.jsx'
 import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
+import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
 
@@ -47,6 +48,7 @@ export function App() {
   const [contextMenu, setContextMenu] = useState(null)
   const [workspaceMenu, setWorkspaceMenu] = useState(null)
   const [workspaceDialog, setWorkspaceDialog] = useState(null)
+  const [confirmation, setConfirmation] = useState(null)
   const [folderId, setFolderId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCount, setSavingCount] = useState(0)
@@ -337,24 +339,31 @@ export function App() {
     }
   }
 
-  const deleteItem = async (item, action) => {
-    const message = item.kind === 'folder'
-      ? action === 'returnChildren'
-        ? `Delete ${item.title} and return its shortcuts to the speed dial?`
-        : `Delete ${item.title} and every shortcut inside it?`
-      : `Delete ${item.title}?`
-    if (!window.confirm(message)) return
+  const performDeleteItem = async (item, action) => {
     setBusy(true)
     try {
       const result = await api.deleteItem(item.id, action)
       applyBootstrap(result.bootstrap)
       setDialog(null)
       setFolderId(null)
+      setToast({ type: 'success', message: `${item.title} deleted.` })
     } catch (error) {
       setToast({ type: 'error', message: error.message })
     } finally {
       setBusy(false)
     }
+  }
+
+  const deleteItem = (item, action) => {
+    if (item.kind !== 'folder') return performDeleteItem(item, action)
+    const keepChildren = action === 'returnChildren'
+    setConfirmation({
+      title: `Delete ${item.title}?`,
+      message: keepChildren ? 'The folder will be removed and its shortcuts will return to the speed dial.' : 'The folder and every shortcut inside it will be permanently deleted.',
+      confirmLabel: keepChildren ? 'Delete folder' : 'Delete folder and shortcuts',
+      action: () => performDeleteItem(item, action),
+    })
+    return undefined
   }
 
   const duplicateItem = async (item) => {
@@ -554,19 +563,37 @@ export function App() {
     }
   }
 
-  const deleteWorkspaceFromMenu = async (workspace) => {
+  const performDeleteWorkspace = async (workspace) => {
     if (workspaces.length <= 1) return
-    if (!window.confirm(`Delete ${workspace.name}? Its shortcuts will also be removed.`)) return
     setBusy(true)
     try {
       await deleteWorkspace(workspace.id)
       setWorkspaceMenu(null)
+      setSettingsOpen(false)
+      setToast({ type: 'success', message: `${workspace.name} deleted.` })
     } catch (error) {
       setToast({ type: 'error', message: error.message })
       await load()
     } finally {
       setBusy(false)
     }
+  }
+
+  const requestDeleteWorkspace = (workspace) => {
+    if (!workspace || workspaces.length <= 1) return
+    setConfirmation({
+      title: `Delete ${workspace.name}?`,
+      message: 'The workspace and all shortcuts that belong to it will be permanently deleted.',
+      confirmLabel: 'Delete workspace',
+      action: () => performDeleteWorkspace(workspace),
+    })
+  }
+
+  const runConfirmation = async () => {
+    const action = confirmation?.action
+    if (!action) return
+    setConfirmation(null)
+    await action()
   }
 
   const reorderWorkspace = async (workspaceId, direction) => {
@@ -756,10 +783,11 @@ export function App() {
         onCreate={() => { setWorkspaceMenu(null); setWorkspaceDialog({ workspace: null }) }}
         onRename={(workspace) => { setWorkspaceMenu(null); setWorkspaceDialog({ workspace }) }}
         onChangeIcon={(workspace, icon) => updateWorkspace(workspace, { icon })}
-        onDelete={deleteWorkspaceFromMenu}
+        onDelete={requestDeleteWorkspace}
       />}
       {workspaceDialog && <WorkspaceDialog workspace={workspaceDialog.workspace} busy={busy} onClose={() => setWorkspaceDialog(null)} onSubmit={saveWorkspaceDialog} />}
-      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} activeBackgroundId={backgroundId || null} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={deleteWorkspace} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} onSelectBackground={selectBackground} />}
+      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} activeBackgroundId={backgroundId || null} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={(id) => requestDeleteWorkspace(workspaces.find((workspace) => workspace.id === id))} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} onSelectBackground={selectBackground} />}
+      {confirmation && <ConfirmDialog {...confirmation} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={() => void runConfirmation()} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}
     </main>
