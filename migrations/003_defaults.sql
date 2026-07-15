@@ -17,6 +17,7 @@ VALUES (
     "search": {
       "engine": "google",
       "inlineEnabled": true,
+      "inlineLinkBehavior": "inline",
       "imageSearchEnabled": true,
       "shortcuts": { "focus": "/", "inline": "mod+enter" },
       "dock": {

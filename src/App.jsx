@@ -629,7 +629,7 @@ export function App() {
       <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => { setInlineResults(null); setWidgetView(kind) }} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {inlineResults ? (
-          <InlineResults {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} onCreateShortcut={quickShortcutFromResult} onClose={() => setInlineResults(null)} />
+          <InlineResults {...inlineResults} workspaces={workspaces} activeWorkspaceId={activeWorkspace.id} linkBehavior={settings.search?.inlineLinkBehavior || 'inline'} onCreateShortcut={quickShortcutFromResult} onClose={() => setInlineResults(null)} />
         ) : widgetView ? (
           <ServiceRailView kind={widgetView} onClose={() => setWidgetView(null)} />
         ) : agentMode ? (

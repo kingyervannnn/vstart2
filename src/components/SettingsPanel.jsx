@@ -97,6 +97,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
               <h3>Search</h3>
               <label className="setting-field"><span>Default search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option></select></label>
               <Toggle label="Inline results" checked={settings.search?.inlineEnabled !== false} onChange={(value) => onPatch({ search: { inlineEnabled: value } })} />
+              <label className="setting-field"><span>Result click behavior</span><select value={settings.search?.inlineLinkBehavior || 'inline'} onChange={(event) => onPatch({ search: { inlineLinkBehavior: event.target.value } })}><option value="inline">Open inline in right rail</option><option value="inline-fullscreen">Open inline full screen</option><option value="external">Open in a new tab</option></select></label>
+              <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
               <Toggle label="Image search" checked={settings.search?.imageSearchEnabled !== false} onChange={(value) => onPatch({ search: { imageSearchEnabled: value } })} />
               <Toggle label="Search bar outline" checked={searchAppearance.outline !== false} onChange={(value) => onPatch({ search: { appearance: { outline: value } } })} />
               <Toggle label="Outer glow" detail="Adds an accent-colored halo around the search bar." checked={searchAppearance.outerGlow} onChange={(value) => onPatch({ search: { appearance: { outerGlow: value } } })} />

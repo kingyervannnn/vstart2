@@ -33,7 +33,7 @@ describe('inline results actions', () => {
   it('offers explicit iframe and external destinations', async () => {
     render(<InlineResults query="example" results={results} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByRole('link', { name: 'New tab' }).getAttribute('href')).toBe('https://example.com/')
-    fireEvent.click(screen.getByRole('button', { name: 'Open here' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open inline' }))
     expect((await screen.findByTitle('Example result')).getAttribute('src')).toBe('https://example.com/')
     expect(screen.getByText('Native frame')).toBeTruthy()
   })
@@ -45,5 +45,25 @@ describe('inline results actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add shortcut in Work' }))
     await waitFor(() => expect(onCreateShortcut).toHaveBeenCalledWith(results[0], 'work'))
     expect(await screen.findByRole('button', { name: 'Added in Work' })).toBeTruthy()
+  })
+
+  it('offers a full-screen view that can cover the page chrome', () => {
+    const { container } = render(<InlineResults query="example" results={results} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open full screen' }))
+    expect(container.querySelector('.inline-results.full-screen')).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(container.querySelector('.inline-results.full-screen')).toBeFalsy()
+  })
+
+  it('uses the configured primary result behavior', async () => {
+    const { container } = render(<InlineResults query="example" results={results} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" linkBehavior="inline-fullscreen" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('link', { name: /Example result/ }))
+    expect((await screen.findByTitle('Example result')).getAttribute('src')).toBe('https://example.com/')
+    expect(container.querySelector('.inline-results.full-screen')).toBeTruthy()
+
+    cleanup()
+    render(<InlineResults query="example" results={results} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" linkBehavior="external" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+    const external = screen.getByRole('link', { name: /Example result/ })
+    expect(external.getAttribute('target')).toBe('_blank')
   })
 })

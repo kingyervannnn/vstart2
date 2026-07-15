@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, ExternalLink, LoaderCircle, PanelRightOpen, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
+import { ArrowLeft, Check, ExternalLink, LoaderCircle, Maximize2, Minimize2, PanelRightOpen, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { activateFrameAssist, deactivateFrameAssist, frameAssistStatus } from '../lib/frameAssist.js'
 
 function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcut }) {
@@ -37,8 +37,9 @@ function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcu
   )
 }
 
-export function InlineResults({ query, results, loading, error, workspaces, activeWorkspaceId, onCreateShortcut, onClose }) {
+export function InlineResults({ query, results, loading, error, workspaces, activeWorkspaceId, linkBehavior = 'inline', onCreateShortcut, onClose }) {
   const [frame, setFrame] = useState(null)
+  const [fullScreen, setFullScreen] = useState(false)
   const [extension, setExtension] = useState({ installed: false, iframeAssist: false, version: null })
   const activeRuleRef = useRef(null)
 
@@ -52,14 +53,24 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
     if (activeRuleRef.current) void deactivateFrameAssist(activeRuleRef.current)
   }, [])
 
+  useEffect(() => {
+    if (!fullScreen) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setFullScreen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [fullScreen])
+
   const releaseRule = () => {
     const ruleId = activeRuleRef.current
     activeRuleRef.current = null
     if (ruleId) void deactivateFrameAssist(ruleId)
   }
 
-  const openInside = async (result) => {
+  const openInside = async (result, forceFullScreen = false) => {
     releaseRule()
+    if (forceFullScreen) setFullScreen(true)
     setFrame({ result, src: null, loading: true, assist: 'preparing' })
     const activation = await activateFrameAssist(result.url)
     if (activation.ruleId) activeRuleRef.current = activation.ruleId
@@ -77,9 +88,15 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
     onClose()
   }
 
+  const followPrimaryResult = (event, result) => {
+    if (linkBehavior === 'external') return
+    event.preventDefault()
+    void openInside(result, linkBehavior === 'inline-fullscreen')
+  }
+
   if (frame) {
     return (
-      <section className="inline-results iframe-active" aria-label="Inline website">
+      <section className={`inline-results iframe-active${fullScreen ? ' full-screen' : ''}`} aria-label="Inline website">
         <header className="iframe-toolbar">
           <button className="iframe-back" type="button" onClick={backToResults} aria-label="Back to search results"><ArrowLeft /></button>
           <div className="iframe-title"><small>INLINE PAGE</small><strong>{frame.result.title}</strong><span>{frame.result.url}</span></div>
@@ -90,6 +107,7 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
             </span>
             <ShortcutTarget result={frame.result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
             <a className="inline-action external" href={frame.result.url} target="_blank" rel="noreferrer"><ExternalLink /> <span>New tab</span></a>
+            <button className="iframe-fullscreen" type="button" onClick={() => setFullScreen((value) => !value)} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
             <button className="iframe-close" type="button" onClick={close} aria-label="Close inline results"><X /></button>
           </div>
         </header>
@@ -102,10 +120,13 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
   }
 
   return (
-    <section className="inline-results" aria-label="Inline search results">
+    <section className={`inline-results${fullScreen ? ' full-screen' : ''}`} aria-label="Inline search results">
       <header>
         <div><small>INLINE RESULTS</small><h2>{query}</h2></div>
-        <button type="button" onClick={close} aria-label="Close inline results"><X /></button>
+        <div className="inline-results-header-actions">
+          <button type="button" onClick={() => setFullScreen((value) => !value)} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
+          <button type="button" onClick={close} aria-label="Close inline results"><X /></button>
+        </div>
       </header>
       {loading && <div className="results-state"><LoaderCircle className="spin" /> Searching</div>}
       {error && <div className="results-state error">{error}</div>}
@@ -113,11 +134,14 @@ export function InlineResults({ query, results, loading, error, workspaces, acti
         <ol>
           {results.map((result) => (
             <li key={`${result.url}:${result.title}`}>
-              <div className="inline-result-heading"><div><strong>{result.title}</strong><span>{result.url}</span></div></div>
-              {result.content && <p>{result.content}</p>}
+              <a className="inline-result-primary" href={result.url} target={linkBehavior === 'external' ? '_blank' : undefined} rel={linkBehavior === 'external' ? 'noreferrer' : undefined} onClick={(event) => followPrimaryResult(event, result)}>
+                <span className="inline-result-heading"><strong>{result.title}</strong><span>{result.url}</span></span>
+                {result.content && <span className="inline-result-description">{result.content}</span>}
+              </a>
               <div className="inline-result-actions">
-                <button className="inline-action" type="button" onClick={() => void openInside(result)}><PanelRightOpen /> <span>Open here</span></button>
-                <a className="inline-action external" href={result.url} target="_blank" rel="noreferrer"><ExternalLink /> <span>New tab</span></a>
+                <button className="inline-action" type="button" onClick={() => void openInside(result)} title="Open inline"><PanelRightOpen /> <span>Open inline</span></button>
+                <button className="inline-action" type="button" onClick={() => void openInside(result, true)} title="Open inline full screen"><Maximize2 /> <span>Open inline full screen</span></button>
+                <a className="inline-action external" href={result.url} target="_blank" rel="noreferrer" title="Open in a new tab"><ExternalLink /> <span>New tab</span></a>
                 <ShortcutTarget result={result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
               </div>
             </li>
