@@ -50,6 +50,38 @@ describe('music widget', () => {
     await waitFor(() => expect(musicApi.control).toHaveBeenCalledWith('source-one', 'next'))
   })
 
+  it('keeps transport controls visually stable while a command is pending', async () => {
+    let finishControl
+    musicApi.control.mockImplementationOnce(() => new Promise((resolve) => { finishControl = resolve }))
+    const { container } = render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Current Track')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }))
+
+    const controls = container.querySelector('.music-controls')
+    expect(controls).toHaveClass('command-pending')
+    expect(controls).toHaveAttribute('aria-busy', 'true')
+    expect(controls).not.toHaveClass('controls-unavailable')
+    expect([...controls.querySelectorAll('button')].every((button) => button.disabled)).toBe(true)
+
+    finishControl({ ok: true })
+    await waitFor(() => expect(controls).not.toHaveClass('command-pending'), { timeout: 1000 })
+  })
+
+  it('does not flash a stale play state back after an optimistic pause', async () => {
+    musicApi.state
+      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE' })
+      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE' })
+    render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.getByLabelText('Music controls')).toHaveAttribute('aria-busy', 'false'), { timeout: 1000 })
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+  })
+
   it('persists source changes through the settings patch', async () => {
     const onPatch = vi.fn()
     render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={onPatch} />)

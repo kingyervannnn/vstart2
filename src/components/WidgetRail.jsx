@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CloudSun, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { musicApi } from '../lib/music.js'
 
@@ -77,20 +77,33 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
   const [musicAction, setMusicAction] = useState('')
+  const musicActionRef = useRef('')
+  const musicGenerationRef = useRef(0)
   const widgets = settings.widgets || {}
   const musicGlowStyle = ['off', 'bottom', 'full'].includes(widgets.musicGlowStyle) ? widgets.musicGlowStyle : 'bottom'
   const musicGlowTrigger = ['always', 'connected', 'playing'].includes(widgets.musicGlowTrigger) ? widgets.musicGlowTrigger : 'connected'
 
-  const refreshMusic = useCallback(async (signal) => {
+  const refreshMusic = useCallback(async (signal, { force = false } = {}) => {
     if (!activeMusicSource) {
       setMusicState({ loading: false, error: 'No music source configured', data: null })
       return
     }
+    if (musicActionRef.current && !force) return
+    const generation = musicGenerationRef.current
     try {
       const data = await musicApi.state(activeMusicSource.id, signal)
-      setMusicState({ loading: false, error: '', data })
+      if (generation !== musicGenerationRef.current) return
+      const pendingAction = musicActionRef.current
+      setMusicState((current) => {
+        const reconciled = current.data && pendingAction === 'togglePlay'
+          ? { ...data, isPlaying: current.data.isPlaying }
+          : current.data && pendingAction === 'shuffle'
+            ? { ...data, shuffle: current.data.shuffle }
+            : data
+        return { loading: false, error: '', data: reconciled }
+      })
     } catch (error) {
-      if (error.name !== 'AbortError') setMusicState({ loading: false, error: error.message, data: null })
+      if (error.name !== 'AbortError' && generation === musicGenerationRef.current) setMusicState({ loading: false, error: error.message, data: null })
     }
   }, [activeMusicSource])
 
@@ -107,8 +120,12 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
 
   const controlMusic = async (action) => {
     if (!activeMusicSource || musicAction) return
+    let previousData = null
+    musicActionRef.current = action
+    musicGenerationRef.current += 1
     setMusicAction(action)
     setMusicState((current) => {
+      previousData = current.data
       if (!current.data) return current
       if (action === 'togglePlay') return { ...current, data: { ...current.data, isPlaying: !current.data.isPlaying } }
       if (action === 'shuffle') return { ...current, data: { ...current.data, shuffle: !current.data.shuffle } }
@@ -116,10 +133,12 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
     })
     try {
       await musicApi.control(activeMusicSource.id, action)
-      window.setTimeout(() => void refreshMusic(), 160)
+      await new Promise((resolveDelay) => window.setTimeout(resolveDelay, 160))
+      await refreshMusic(undefined, { force: true })
     } catch (error) {
-      setMusicState((current) => ({ ...current, error: error.message }))
+      setMusicState((current) => ({ ...current, error: error.message, data: previousData || current.data }))
     } finally {
+      musicActionRef.current = ''
       setMusicAction('')
     }
   }
@@ -154,7 +173,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
             <span><strong>{musicState.data?.song?.title || activeMusicSource?.name || 'Music'}</strong><small>{musicState.loading ? 'Connecting…' : musicState.error ? 'Source unavailable' : musicState.data?.song?.artist || 'No track selected'}</small></span>
             <ListMusic size={16} />
           </button>
-          <div className="music-controls" aria-label="Music controls">
+          <div className={`music-controls ${musicAction ? 'command-pending' : ''} ${!musicState.data ? 'controls-unavailable' : ''}`} aria-label="Music controls" aria-busy={Boolean(musicAction)}>
             <button type="button" className={musicState.data?.shuffle ? 'active' : ''} disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('shuffle')} aria-label="Shuffle"><Shuffle /></button>
             <button type="button" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('previous')} aria-label="Previous track"><SkipBack /></button>
             <button type="button" className="primary" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('togglePlay')} aria-label={musicState.data?.isPlaying ? 'Pause' : 'Play'}>{musicState.data?.isPlaying ? <Pause /> : <Play />}</button>

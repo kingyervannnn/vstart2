@@ -152,7 +152,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-controls { display: flex; align-items: center; justify-content: space-between; gap: 3px; }
 .music-controls button { position: relative; width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 50%; color: inherit; background: rgba(255,255,255,.06); cursor: pointer; }
 .music-controls button:hover, .music-controls button.active { color: var(--app-accent); background: rgba(255,255,255,.13); }
-.music-controls button:disabled { cursor: default; opacity: .32; }
+.music-controls button:disabled { cursor: default; }
+.music-controls.controls-unavailable button:disabled { opacity: .32; }
+.music-controls.command-pending button:disabled { opacity: 1; }
 .music-controls button.primary { width: 34px; height: 34px; background: rgba(255,255,255,.17); }
 .music-controls svg { width: 14px; height: 14px; }
 .music-controls button.primary svg { width: 16px; height: 16px; }
