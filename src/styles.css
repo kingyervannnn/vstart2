@@ -299,6 +299,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
   bottom: 0;
   left: calc(var(--widget-rail-width) - var(--view-left-bleed));
   pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(8px, 0, 0) scale(1.006);
+  transform-origin: right center;
   background: linear-gradient(145deg, var(--view-veil-top), var(--view-veil-bottom) 72%);
   backdrop-filter: blur(var(--view-veil-blur)) saturate(var(--view-veil-saturation));
   -webkit-backdrop-filter: blur(var(--view-veil-blur)) saturate(var(--view-veil-saturation));
@@ -306,10 +310,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
   -webkit-mask-composite: source-in;
   mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px);
   mask-composite: intersect;
+  transition: opacity 340ms cubic-bezier(.4, 0, 1, 1), transform 420ms cubic-bezier(.4, 0, 1, 1), visibility 0s linear 420ms;
+  will-change: opacity, transform;
 }
+.view-veil.is-visible { opacity: 1; visibility: visible; transform: translate3d(0, 0, 0) scale(1); transition: opacity 480ms cubic-bezier(.16, 1, .3, 1), transform 560ms cubic-bezier(.16, 1, .3, 1), visibility 0s; }
 .view-veil.agent-veil { --view-veil-blur: 7px; --view-veil-saturation: .97; --view-veil-top: rgba(8,12,20,.004); --view-veil-bottom: rgba(8,12,20,.09); }
 .view-veil.inline-veil { --view-veil-blur: 20px; --view-veil-saturation: .85; --view-veil-top: rgba(9,14,23,.31); --view-veil-bottom: rgba(9,14,23,.6); }
-.mirrored .view-veil { right: calc(var(--widget-rail-width) - var(--view-left-bleed)); left: 0; -webkit-mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); }
+.mirrored .view-veil { right: calc(var(--widget-rail-width) - var(--view-left-bleed)); left: 0; transform-origin: left center; -webkit-mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); }
+.mirrored .view-veil.is-hidden { transform: translate3d(-8px, 0, 0) scale(1.006); }
 .compact-mode .view-veil, .compact-mode.mirrored .view-veil { right: 0; left: 0; -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,.24) 26px, #000 88px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 24px, #000 82px); mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,.24) 26px, #000 88px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 24px, #000 82px); }
 .compact-mode .view-veil.service-veil, .compact-mode.mirrored .view-veil.service-veil { inset: 0; background: rgba(9,14,23,.38); -webkit-mask-image: none; mask-image: none; }
 

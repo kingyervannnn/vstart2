@@ -72,6 +72,7 @@ export function App() {
   const [toast, setToast] = useState(null)
   const [headerDirection, setHeaderDirection] = useState('left')
   const [inlineResults, setInlineResults] = useState(null)
+  const [lastViewVeil, setLastViewVeil] = useState('service')
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const [agentDraft, setAgentDraft] = useState(null)
   const [shortcutFilter, setShortcutFilter] = useState(null)
@@ -171,6 +172,11 @@ export function App() {
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+  const renderedViewVeil = viewVeil || lastViewVeil
+
+  useEffect(() => {
+    if (viewVeil) setLastViewVeil(viewVeil)
+  }, [viewVeil])
 
   useEffect(() => {
     const nextId = backgroundId || null
@@ -925,7 +931,11 @@ export function App() {
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
     >
-      {viewVeil && <div className={`view-veil ${viewVeil}-veil`} aria-hidden="true" />}
+      <div
+        className={`view-veil ${renderedViewVeil}-veil ${viewVeil ? 'is-visible' : 'is-hidden'}`}
+        data-view-veil={viewVeil || 'inactive'}
+        aria-hidden="true"
+      />
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
       <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} />
       <section className="dial-rail" onWheel={onDialWheel}>
