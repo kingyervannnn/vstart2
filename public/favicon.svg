@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <style>
-      .s { fill: none; stroke: #bdbdbd; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
-    </style>
-  </defs>
-  <rect x="10" y="10" width="16" height="16" rx="3" class="s"/>
-  <rect x="38" y="10" width="16" height="16" rx="3" class="s"/>
-  <rect x="10" y="38" width="16" height="16" rx="3" class="s"/>
-  <rect x="38" y="38" width="16" height="16" rx="3" class="s"/>
+  <style>
+    .mark { fill: #404650; }
+    @media (prefers-color-scheme: dark) { .mark { fill: #e6e9ef; } }
+  </style>
+  <path class="mark" d="M11 8 32 19.9 53 8v7.4L32 27.3 11 15.4Z"/>
+  <path class="mark" d="M11 24 32 35.9 53 24v7.4L32 43.3 11 31.4Z"/>
+  <path class="mark" d="M11 40 32 51.9 53 40v7.4L32 59.3 11 47.4Z"/>
 </svg>
