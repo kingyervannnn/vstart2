@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, PenLine, Play, RefreshCw, Reply, Search, Send, Trash2, X } from 'lucide-react'
+import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, PenLine, Play, Plus, RefreshCw, Reply, Save, Search, Send, Trash2, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { musicApi } from '../lib/music.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
@@ -144,6 +144,123 @@ function WeatherServiceView({ data }) {
       <div className="weather-detail-days">
         {days.map((day, index) => <article key={day.date}><span><small>{index === 0 ? 'Today' : new Intl.DateTimeFormat([], { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))}</small><strong>{new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(new Date(`${day.date}T12:00:00`))}</strong></span><span className="weather-high-low"><strong>{Math.round(day.high)}°</strong><small>{Math.round(day.low)}°</small></span><span className="weather-sun"><small>Sunrise {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunrise))}</small><small>Sunset {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunset))}</small></span></article>)}
       </div>
+    </div>
+  )
+}
+
+function resolvedNote(note, metadata) {
+  const stored = metadata?.[note.id]
+  return {
+    ...note,
+    title: stored?.title || note.title || note.id,
+    workspaceId: stored?.workspaceId || note.workspaceId || null,
+  }
+}
+
+function noteTitle(title, content) {
+  return String(title || '').trim()
+    || String(content || '').trim().split(/\r?\n/, 1)[0].replace(/^#+\s*/, '').slice(0, 100)
+    || 'Untitled note'
+}
+
+function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsPatch, openLinksInNewTab, onOpenInline, onClose }) {
+  const [notes, setNotes] = useState([])
+  const [scope, setScope] = useState(activeWorkspaceId || 'all')
+  const [query, setQuery] = useState('')
+  const [editor, setEditor] = useState(null)
+  const [state, setState] = useState({ loading: true, refreshing: false, saving: false, error: '' })
+  const metadata = useMemo(() => settings?.metadata || {}, [settings?.metadata])
+
+  const loadNotes = useCallback(async ({ refreshing = false } = {}) => {
+    setState((current) => ({ ...current, loading: !refreshing, refreshing, error: '' }))
+    try {
+      const response = await fetch('/notes/api/v1/vault/default/notes')
+      if (!response.ok) throw new Error('Notes service is unavailable')
+      const result = await response.json()
+      setNotes(result.notes || [])
+      setState({ loading: false, refreshing: false, saving: false, error: '' })
+    } catch (error) {
+      setState({ loading: false, refreshing: false, saving: false, error: error.message })
+    }
+  }, [])
+
+  useEffect(() => { void loadNotes() }, [loadNotes])
+
+  const decoratedNotes = useMemo(() => notes.map((note) => resolvedNote(note, metadata)), [metadata, notes])
+  const visibleNotes = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase()
+    return decoratedNotes
+      .filter((note) => scope === 'all' || note.workspaceId === scope)
+      .filter((note) => !normalizedQuery || (note.title + '\n' + note.content).toLocaleLowerCase().includes(normalizedQuery))
+      .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+  }, [decoratedNotes, query, scope])
+
+  const beginNote = (note = null) => {
+    setEditor(note ? { ...note, isNew: false } : {
+      id: crypto.randomUUID(),
+      title: '',
+      content: '',
+      workspaceId: scope === 'all' ? activeWorkspaceId : scope,
+      isNew: true,
+    })
+  }
+
+  const saveNote = async (event) => {
+    event.preventDefault()
+    if (!editor || state.saving) return
+    const title = noteTitle(editor.title, editor.content)
+    const workspaceId = editor.workspaceId || activeWorkspaceId || null
+    setState((current) => ({ ...current, saving: true, error: '' }))
+    try {
+      const response = await fetch('/notes/api/v1/vault/default/notes/' + encodeURIComponent(editor.id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content: editor.content, workspaceId }),
+      })
+      if (!response.ok) throw new Error('Could not save the note')
+      const saved = await response.json()
+      await onSettingsPatch?.({ metadata: { [editor.id]: { title, workspaceId } } })
+      setNotes((current) => [...current.filter((note) => note.id !== editor.id), { ...saved, title, workspaceId }])
+      setScope((current) => current === 'all' ? current : workspaceId || 'all')
+      setEditor(null)
+      setState({ loading: false, refreshing: false, saving: false, error: '' })
+    } catch (error) {
+      setState((current) => ({ ...current, saving: false, error: error.message }))
+    }
+  }
+
+  return (
+    <div className="notes-service-view">
+      <header className="mail-unified-header notes-unified-header">
+        <div className="mail-brand"><NotebookPen /><h2>Notes</h2></div>
+        <div className="mail-account-tabs" aria-label="Notes workspace">
+          <button type="button" className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
+          {workspaces.map((workspace) => <button type="button" key={workspace.id} className={scope === workspace.id ? 'active' : ''} title={workspace.name} onClick={() => setScope(workspace.id)}>{workspace.name}</button>)}
+        </div>
+        <form className="mail-search" onSubmit={(event) => event.preventDefault()}>
+          <input aria-label="Search notes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes…" />
+          <button type="submit" aria-label="Search notes"><Search /></button>
+        </form>
+        <div className="mail-toolbar-actions">
+          <button type="button" className="primary" onClick={() => beginNote()}><Plus /><span>New note</span></button>
+          <button type="button" className={'mail-refresh ' + (state.refreshing ? 'refreshing' : '')} onClick={() => void loadNotes({ refreshing: true })} aria-label="Refresh notes"><RefreshCw /></button>
+        </div>
+        <button type="button" className="mail-close" onClick={onClose} aria-label="Close notes"><X /></button>
+      </header>
+      {state.error && <div className="service-state error">{state.error}</div>}
+      {editor ? <form className="notes-editor" onSubmit={saveNote}>
+        <header><button type="button" className="mail-back" onClick={() => setEditor(null)}><ArrowLeft /> Notes</button><span>{editor.isNew ? 'New note' : 'Editing note'}</span></header>
+        <input autoFocus aria-label="Note title" value={editor.title} onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))} placeholder="Untitled note" />
+        <label><span>Workspace</span><select aria-label="Note workspace" value={editor.workspaceId || ''} onChange={(event) => setEditor((current) => ({ ...current, workspaceId: event.target.value }))}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
+        <textarea aria-label="Note content" value={editor.content} onChange={(event) => setEditor((current) => ({ ...current, content: event.target.value }))} placeholder="Start writing…" />
+        <footer><span /><button type="button" onClick={() => setEditor(null)}>Cancel</button><button type="submit" className="primary" disabled={state.saving}><Save />{state.saving ? 'Saving…' : 'Save note'}</button></footer>
+      </form> : <>
+        {state.loading && <div className="service-state">Loading notes…</div>}
+        {!state.loading && <div className="notes-service-list">
+          {visibleNotes.map((note) => <article key={note.id}><NotebookPen /><span>{scope === 'all' && note.workspaceId && <small className="mail-account-badge">{workspaces.find((workspace) => workspace.id === note.workspaceId)?.name || 'Workspace'}</small>}<strong>{note.title}</strong><p><LinkifiedText text={String(note.content || '').slice(0, 220) || 'Empty note'} openInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} /></p></span><button type="button" className="notes-edit-note" onClick={() => beginNote(note)} aria-label={'Edit ' + note.title}><PenLine /></button></article>)}
+          {!visibleNotes.length && <div className="service-state">{query ? 'No notes match this search.' : scope === 'all' ? 'No notes found in the mounted vault.' : 'No notes in this workspace yet.'}</div>}
+        </div>}
+      </>}
     </div>
   )
 }
@@ -574,21 +691,19 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   )
 }
 
-export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, openLinksInNewTab, onOpenInline, onClose }) {
-  const [state, setState] = useState({ loading: !['music', 'mail'].includes(kind), error: '', data: null })
+export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, notesSettings, onNotesSettingsPatch, workspaces = [], activeWorkspaceId, openLinksInNewTab, onOpenInline, onClose }) {
+  const [state, setState] = useState({ loading: !['music', 'mail', 'notes'].includes(kind), error: '', data: null })
 
   useEffect(() => {
-    if (kind === 'music' || kind === 'mail') {
+    if (kind === 'music' || kind === 'mail' || kind === 'notes') {
       setState({ loading: false, error: '', data: null })
       return undefined
     }
     const controller = new AbortController()
     setState({ loading: true, error: '', data: null })
-    const request = kind === 'notes'
-      ? fetch('/notes/api/v1/vault/default/notes', { signal: controller.signal }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Notes service is unavailable')))
-      : kind === 'weather'
-        ? fetch(WEATHER_URL, { signal: controller.signal }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Weather service is unavailable')))
-        : Promise.reject(new Error('Unknown service'))
+    const request = kind === 'weather'
+      ? fetch(WEATHER_URL, { signal: controller.signal }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Weather service is unavailable')))
+      : Promise.reject(new Error('Unknown service'))
     request.then((data) => setState({ loading: false, error: '', data })).catch((error) => {
       if (error.name !== 'AbortError') setState({ loading: false, error: error.message, data: null })
     })
@@ -604,15 +719,18 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
       </section>
     )
   }
+  if (kind === 'notes') {
+    return (
+      <section className="service-rail-view notes-service" aria-label="Notes">
+        <NotesServiceView workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} settings={notesSettings} onSettingsPatch={onNotesSettingsPatch} openLinksInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} onClose={onClose} />
+      </section>
+    )
+  }
   return (
     <section className={`service-rail-view ${kind}-service`} aria-label={meta.label}>
       <header><div><Icon /><span><small>WIDGET VIEW</small><h2>{meta.label}</h2></span></div><button type="button" onClick={onClose} aria-label={`Close ${kind}`}><X /></button></header>
       {state.loading && <div className="service-state">Connecting to the V Start 2 service…</div>}
       {state.error && <div className="service-state error">{state.error}</div>}
-      {!state.loading && !state.error && kind === 'notes' && <div className="notes-service-list">
-        {(state.data.notes || []).map((note) => <article key={note.id}><NotebookPen /><div><strong>{note.title || note.id}</strong><p><LinkifiedText text={String(note.content || '').slice(0, 220) || 'Empty note'} openInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} /></p></div></article>)}
-        {!(state.data.notes || []).length && <div className="service-state">No notes found in the mounted vault.</div>}
-      </div>}
       {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} />}
       {!state.loading && !state.error && kind === 'music' && <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} />}
     </section>

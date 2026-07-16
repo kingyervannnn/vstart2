@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, Pencil, RotateCcw, Settings } from 'lucide-react'
+import { RotateCcw, Settings } from 'lucide-react'
 import { api } from './lib/api.js'
 import { getSharedAgentBridgeClient } from './lib/agentBridge.js'
 import { mailBridge } from './lib/mailBridge.js'
@@ -100,6 +100,7 @@ export function App() {
     let live = true
     if (routedView.type === 'service') {
       setInlineResults(null)
+      setEditMode(false)
       return () => { live = false }
     }
     if (routedView.type === 'search' || routedView.type === 'frame') {
@@ -779,6 +780,10 @@ export function App() {
             kind={routedView.kind}
             musicSettings={settings.music}
             onMusicSettingsPatch={(patch) => patchSettings({ music: patch })}
+            notesSettings={settings.notes}
+            onNotesSettingsPatch={(patch) => patchSettings({ notes: patch })}
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspace.id}
             initialMailAccount={workspaceMailAccount}
             openLinksInNewTab={settings.general?.openLinksInNewTab}
             onOpenInline={openTextLinkInline}
@@ -822,7 +827,7 @@ export function App() {
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
-        {!(routedView.type === 'service' && ['mail', 'music'].includes(routedView.kind)) && <SearchDock
+        {!(routedView.type === 'service' && ['mail', 'music', 'notes'].includes(routedView.kind)) && <SearchDock
           settings={settings}
           profile={profile}
           compact={compact}
@@ -850,7 +855,6 @@ export function App() {
           onAgentStop={() => agentRef.current?.stop()}
         />}
         <div className="page-controls">
-          {!agentMode && <button type="button" className={editMode ? 'active' : ''} onClick={() => setEditMode((value) => !value)} aria-label={editMode ? 'Finish editing' : 'Edit page'}>{editMode ? <Check /> : <Pencil />}</button>}
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><Settings /></button>
         </div>
       </section>
