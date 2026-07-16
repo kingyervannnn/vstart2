@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CloudSun, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronDown, CloudSun, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { EnvironmentControl } from './EnvironmentControl.jsx'
@@ -95,11 +95,18 @@ function MusicWidgetArtwork({ src }) {
   return src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : <Music2 size={18} />
 }
 
+function musicTime(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0))
+  return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
+}
+
 export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   const musicSources = useMemo(() => (settings.music?.sources || []).filter((source) => source.enabled !== false), [settings.music?.sources])
   const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
   const [musicAction, setMusicAction] = useState('')
+  const [seekDraft, setSeekDraft] = useState(null)
+  const [volumeDraft, setVolumeDraft] = useState(null)
   const musicActionRef = useRef('')
   const musicGenerationRef = useRef(0)
   const widgets = settings.widgets || {}
@@ -122,6 +129,8 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
           ? { ...data, isPlaying: current.data.isPlaying }
           : current.data && pendingAction === 'shuffle'
             ? { ...data, shuffle: current.data.shuffle }
+            : current.data && pendingAction === 'toggleMute'
+              ? { ...data, isMuted: current.data.isMuted }
             : data
         return { loading: false, error: '', data: reconciled }
       })
@@ -133,6 +142,8 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   useEffect(() => {
     const controller = new AbortController()
     setMusicState((current) => ({ ...current, loading: true, error: '' }))
+    setSeekDraft(null)
+    setVolumeDraft(null)
     void refreshMusic(controller.signal)
     const timer = window.setInterval(() => void refreshMusic(controller.signal), 3000)
     return () => {
@@ -152,6 +163,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
       if (!current.data) return current
       if (action === 'togglePlay') return { ...current, data: { ...current.data, isPlaying: !current.data.isPlaying } }
       if (action === 'shuffle') return { ...current, data: { ...current.data, shuffle: !current.data.shuffle } }
+      if (action === 'toggleMute') return { ...current, data: { ...current.data, isMuted: !current.data.isMuted } }
       return current
     })
     try {
@@ -165,6 +177,51 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
       setMusicAction('')
     }
   }
+
+  const commitSeek = async (value) => {
+    if (!activeMusicSource || musicAction || musicState.data?.capabilities?.seek !== true) return
+    const duration = Math.max(0, Number(musicState.data?.song?.songDuration) || 0)
+    const seconds = Math.max(0, Math.min(duration, Number(value) || 0))
+    musicActionRef.current = 'seek'
+    musicGenerationRef.current += 1
+    setSeekDraft(seconds)
+    setMusicAction('seek')
+    try {
+      await musicApi.seek(activeMusicSource.id, seconds)
+      setMusicState((current) => current.data ? { ...current, data: { ...current.data, song: { ...current.data.song, elapsedSeconds: seconds } } } : current)
+    } catch (error) {
+      setMusicState((current) => ({ ...current, error: error.message }))
+    } finally {
+      musicActionRef.current = ''
+      setSeekDraft(null)
+      setMusicAction('')
+    }
+  }
+
+  const commitVolume = async (value) => {
+    if (!activeMusicSource || musicAction || musicState.data?.capabilities?.volume !== true) return
+    const volume = Math.max(0, Math.min(100, Number(value) || 0))
+    musicActionRef.current = 'volume'
+    musicGenerationRef.current += 1
+    setVolumeDraft(volume)
+    setMusicAction('volume')
+    try {
+      await musicApi.volume(activeMusicSource.id, volume)
+      setMusicState((current) => current.data ? { ...current, data: { ...current.data, volume, isMuted: volume === 0 } } : current)
+    } catch (error) {
+      setMusicState((current) => ({ ...current, error: error.message }))
+    } finally {
+      musicActionRef.current = ''
+      setVolumeDraft(null)
+      setMusicAction('')
+    }
+  }
+
+  const musicCapabilities = musicState.data?.capabilities || {}
+  const musicSong = musicState.data?.song
+  const musicDuration = Math.max(0, Number(musicSong?.songDuration) || 0)
+  const musicElapsed = seekDraft ?? musicSong?.elapsedSeconds ?? 0
+  const musicVolume = volumeDraft ?? musicState.data?.volume ?? 0
 
   if (compact) {
     return (
@@ -189,15 +246,30 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
       {widgets.environment !== false && <EnvironmentControl onOpen={() => onOpenWidget('environment')} />}
       {widgets.music !== false && (
         <section className={`music-widget music-glow-${musicGlowStyle} glow-trigger-${musicGlowTrigger} ${musicState.data && !musicState.error ? 'music-connected' : ''} ${musicState.data?.isPlaying ? 'music-playing' : ''} ${widgets.musicOutline === true ? 'music-outline' : 'music-no-outline'}`} style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>
-          <label className="music-source-select"><span>Source</span><select value={activeMusicSource?.id || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length} aria-label="Music source">
-            {!musicSources.length && <option value="">No source</option>}
-            {musicSources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
-          </select></label>
-          <button type="button" className="music-summary" onClick={() => onOpenWidget('music')} aria-label="Open music queue and search">
-            <MusicWidgetArtwork src={musicState.data?.song?.imageSrc} />
-            <span><strong>{musicState.data?.song?.title || activeMusicSource?.name || 'Music'}</strong><small>{musicState.loading ? 'Connecting…' : musicState.error ? 'Source unavailable' : musicState.data?.song?.artist || 'No track selected'}</small></span>
-            <ListMusic size={16} />
-          </button>
+          <div className="music-widget-utility">
+            <label className="music-source-select"><span className="sr-only">Source</span><select value={activeMusicSource?.id || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length} aria-label="Music source">
+              {!musicSources.length && <option value="">No source</option>}
+              {musicSources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
+            </select><ChevronDown aria-hidden="true" /></label>
+            {musicCapabilities.volume === true && <div className="music-widget-volume">
+              {musicCapabilities.mute === true && <button type="button" disabled={Boolean(musicAction)} onClick={() => void controlMusic('toggleMute')} aria-label={musicState.data?.isMuted ? 'Unmute' : 'Mute'}>{musicState.data?.isMuted ? <VolumeX /> : <Volume2 />}</button>}
+              <input type="range" min="0" max="100" step="1" value={musicVolume} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Music volume" />
+            </div>}
+          </div>
+          <div className="music-summary">
+            <button type="button" className="music-summary-open" onClick={() => onOpenWidget('music')} aria-label="Open music queue and search">
+              <MusicWidgetArtwork src={musicSong?.imageSrc} />
+              <span className="music-summary-copy"><strong>{musicSong?.title || activeMusicSource?.name || 'Music'}</strong><small>{musicState.loading ? 'Connecting…' : musicState.error ? 'Source unavailable' : musicSong?.artist || 'No track selected'}</small></span>
+              <ListMusic size={16} />
+            </button>
+            {musicDuration > 0 && <div className="music-widget-progress">
+              <time>{musicTime(musicElapsed)}</time>
+              {musicCapabilities.seek === true
+                ? <input type="range" min="0" max={musicDuration} step="1" value={musicElapsed} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Track position" />
+                : <progress max={musicDuration} value={musicElapsed} />}
+              <time>{musicTime(musicDuration)}</time>
+            </div>}
+          </div>
           <div className={`music-controls ${musicAction ? 'command-pending' : ''} ${!musicState.data ? 'controls-unavailable' : ''}`} aria-label="Music controls" aria-busy={Boolean(musicAction)}>
             <button type="button" className={musicState.data?.shuffle ? 'active' : ''} disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('shuffle')} aria-label="Shuffle"><Shuffle /></button>
             <button type="button" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('previous')} aria-label="Previous track"><SkipBack /></button>

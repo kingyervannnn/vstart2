@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../lib/music.js', () => ({
   musicApi: {
-    state: vi.fn(async (sourceId) => ({ sourceId, song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE' })),
+    state: vi.fn(async (sourceId) => ({ sourceId, song: { title: 'Current Track', artist: 'Current Artist', elapsedSeconds: 45, songDuration: 180 }, isPlaying: true, shuffle: false, repeatMode: 'NONE', volume: 35, isMuted: false, capabilities: { playback: true, seek: true, volume: true, mute: true } })),
     control: vi.fn(async () => ({ ok: true })),
+    seek: vi.fn(async () => ({ ok: true })),
+    volume: vi.fn(async () => ({ ok: true })),
   },
 }))
 
@@ -50,6 +52,23 @@ describe('music widget', () => {
     await waitFor(() => expect(musicApi.control).toHaveBeenCalledWith('source-one', 'next'))
   })
 
+  it('keeps source-aware seek and volume controls available in the compact treatment', async () => {
+    render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
+    const position = await screen.findByRole('slider', { name: 'Track position' })
+    const volume = screen.getByRole('slider', { name: 'Music volume' })
+
+    expect(position).toHaveValue('45')
+    expect(volume).toHaveValue('35')
+    fireEvent.change(position, { target: { value: '90' } })
+    fireEvent.pointerUp(position)
+    await waitFor(() => expect(musicApi.seek).toHaveBeenCalledWith('source-one', 90))
+    await waitFor(() => expect(screen.getByLabelText('Music controls')).toHaveAttribute('aria-busy', 'false'))
+    fireEvent.change(volume, { target: { value: '52' } })
+    fireEvent.pointerUp(volume)
+
+    await waitFor(() => expect(musicApi.volume).toHaveBeenCalledWith('source-one', 52))
+  })
+
   it('keeps transport controls visually stable while a command is pending', async () => {
     let finishControl
     musicApi.control.mockImplementationOnce(() => new Promise((resolve) => { finishControl = resolve }))
@@ -70,8 +89,8 @@ describe('music widget', () => {
 
   it('does not flash a stale play state back after an optimistic pause', async () => {
     musicApi.state
-      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE' })
-      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE' })
+      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE', capabilities: { playback: true } })
+      .mockResolvedValueOnce({ sourceId: 'source-one', song: { title: 'Current Track', artist: 'Current Artist' }, isPlaying: true, shuffle: false, repeatMode: 'NONE', capabilities: { playback: true } })
     render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
 
