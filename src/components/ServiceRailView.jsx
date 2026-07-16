@@ -4,6 +4,7 @@ import { mailBridge } from '../lib/mailBridge.js'
 import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
+import { VoiceSearchButton } from './VoiceSearchButton.jsx'
 
 const SERVICE_META = {
   notes: { label: 'Notes', Icon: NotebookPen },
@@ -183,8 +184,8 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
     <div className="music-service-view">
       <header className="mail-unified-header music-unified-header">
         <div className="mail-brand"><Music2 /><h2>Music</h2></div>
+        {capabilities.search === true && <form className="music-header-search" onSubmit={submitSearch}><Search /><input aria-label="Search music" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs, artists, or albums…" /><VoiceSearchButton label="Voice music search" onTranscript={setQuery} onError={setNotice} /><button type="submit" disabled={!query.trim() || search.loading}>{search.loading ? 'Searching…' : 'Search'}</button></form>}
         <label className="music-header-source"><span>Source</span><select aria-label="Music source" value={activeSource?.id || ''} disabled={!sources.length} onChange={(event) => onSettingsPatch({ activeSourceId: event.target.value })}>{!sources.length && <option value="">No source</option>}{sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label>
-        {capabilities.search === true && <form className="music-header-search" onSubmit={submitSearch}><Search /><input aria-label="Search music" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs, artists, or albums…" /><button disabled={!query.trim() || search.loading}>{search.loading ? 'Searching…' : 'Search'}</button></form>}
         <div className="mail-toolbar-actions"><button type="button" onClick={refreshMusic} aria-label="Refresh music"><RefreshCw /></button></div>
         <button type="button" className="mail-close" onClick={onClose} aria-label="Close music"><X /></button>
       </header>
@@ -211,7 +212,7 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
         </div>
       </section>
       <div className={'music-browser-grid ' + (query || search.loading || search.results.length || search.error ? 'with-search' : '')}>
-        {capabilities.queue === true && <section><h3><ListMusic /> Queue <button type="button" onClick={() => loadQueue()} aria-label="Refresh queue"><RefreshCw /></button></h3>
+        {capabilities.queue === true && <section><h3><ListMusic /> Queue</h3>
           {queue.loading && <div className="service-state">Reading queue…</div>}
           {queue.error && <div className="service-state error">{queue.error}</div>}
           {!queue.loading && !queue.error && <div className="music-item-list">{queue.items.map((item) => <button type="button" key={`${item.index}:${item.videoId || item.title}`} className={item.selected || item.videoId === player.data?.song?.videoId ? 'active' : ''} onClick={() => chooseQueueItem(item)}><MusicArtwork src={item.imageUrl} /><span><strong>{item.title}</strong><small>{item.detail || item.artist}</small></span><time>{item.duration}</time><Play /></button>)}{!queue.items.length && <div className="service-state">The active player queue is empty.</div>}</div>}
@@ -329,14 +330,15 @@ function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsP
     <div className="notes-service-view">
       <header className="mail-unified-header notes-unified-header">
         <div className="mail-brand"><NotebookPen /><h2>Notes</h2></div>
+        <form className="mail-search" onSubmit={(event) => event.preventDefault()}>
+          <input aria-label="Search notes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes…" />
+          <VoiceSearchButton label="Voice notes search" onTranscript={setQuery} onError={(message) => setState((current) => ({ ...current, error: message }))} />
+          <button type="submit" aria-label="Search notes"><Search /></button>
+        </form>
         <div className="mail-account-tabs" aria-label="Notes workspace">
           <button type="button" className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
           {workspaces.map((workspace) => <button type="button" key={workspace.id} className={scope === workspace.id ? 'active' : ''} title={workspace.name} onClick={() => setScope(workspace.id)}>{workspace.name}</button>)}
         </div>
-        <form className="mail-search" onSubmit={(event) => event.preventDefault()}>
-          <input aria-label="Search notes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes…" />
-          <button type="submit" aria-label="Search notes"><Search /></button>
-        </form>
         <div className="mail-toolbar-actions">
           <button type="button" className="primary" onClick={() => beginNote()}><Plus /><span>New note</span></button>
           <button type="button" className={'mail-refresh ' + (state.refreshing ? 'refreshing' : '')} onClick={() => void loadNotes({ refreshing: true })} aria-label="Refresh notes"><RefreshCw /></button>
@@ -747,14 +749,15 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     <div className="mail-service-view">
       <header ref={headerRef} className={`mail-unified-header ${headerHidden ? 'is-hidden' : ''}`}>
         <div className="mail-brand"><Mail /><h2>Mail</h2></div>
+        <form className="mail-search" onSubmit={submitSearch}>
+          <input aria-label="Search mail (Gmail query syntax)" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Search mail…" />
+          <VoiceSearchButton label="Voice mail search" onTranscript={setQueryInput} onError={setNotice} />
+          <button type="submit" aria-label="Search mail"><Search /></button>
+        </form>
         <div className="mail-account-tabs" aria-label="Mail account">
           <button type="button" className={account === 'all' ? 'active' : ''} onClick={() => setAccount('all')}>All</button>
           {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => setAccount(item.alias)}>{item.alias}</button>)}
         </div>
-        <form className="mail-search" onSubmit={submitSearch}>
-          <input aria-label="Search mail (Gmail query syntax)" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Search mail…" />
-          <button type="submit" aria-label="Search mail"><Search /></button>
-        </form>
         <div className="mail-toolbar-actions">
           <button type="button" onClick={openDrafts}><FileText /><span>Drafts</span></button>
           <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>

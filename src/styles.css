@@ -583,9 +583,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-close svg { width: 14px; }
 .mail-search { min-width: 120px; height: 30px; display: flex; flex: 1 1 190px; align-items: center; padding-left: 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); }
 .mail-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 11px; }
-.mail-search button { width: 30px; align-self: stretch; display: grid; place-items: center; border: 0; border-radius: 0 9px 9px 0; color: inherit; background: transparent; cursor: pointer; opacity: .5; }
+.mail-search button { width: 30px; align-self: stretch; display: grid; place-items: center; border: 0; border-radius: 0; color: inherit; background: transparent; cursor: pointer; opacity: .5; }
+.mail-search button:last-child { border-radius: 0 9px 9px 0; }
 .mail-search button:hover, .mail-search:focus-within button { opacity: .9; }
 .mail-search button svg { width: 13px; }
+.service-voice-button.recording { color: #ffb4bd; background: rgba(255,82,101,.12); opacity: 1; }
+.service-voice-button:disabled { cursor: wait; opacity: .48; }
 .mail-notice { margin-top: 10px; border: 1px solid color-mix(in srgb, var(--app-accent) 28%, transparent); border-radius: 10px; padding: 8px 10px; color: inherit; background: color-mix(in srgb, var(--app-accent) 10%, transparent); cursor: pointer; font-size: 9px; }
 .mail-message-list { display: grid; gap: 2px; margin-top: 12px; }
 .mail-message-list > button, .mail-message-open { width: 100%; display: grid; gap: 3px; padding: 12px 4px; border: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
@@ -705,6 +708,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-header-search > svg { width: 13px; flex: none; opacity: .42; }
 .music-header-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 10px; }
 .music-header-search button { height: 24px; border: 0; border-radius: 7px; padding: 0 8px; color: inherit; background: rgba(255,255,255,.07); cursor: pointer; font-size: 8px; }
+.music-header-search .service-voice-button { width: 24px; flex: none; display: grid; place-items: center; padding: 0; }
+.music-header-search .service-voice-button svg { width: 12px; }
 .music-header-search button:disabled { opacity: .34; cursor: default; }
 .music-service-view h3 button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; color: inherit; background: rgba(255,255,255,.04); cursor: pointer; }
 .music-service-view h3 button svg { width: 14px; }
@@ -740,10 +745,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-service-view h3 button { width: 28px; height: 28px; margin-left: auto; border-radius: 9px; }
 .music-service-view .service-state { padding: 26px 0 10px; }
 .music-item-list, .music-search-results { display: grid; gap: 3px; margin-top: 10px; }
-.music-item-list { max-height: 350px; overflow: auto; padding-right: 3px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent; }
-.music-item-list::-webkit-scrollbar { width: 6px; }
-.music-item-list::-webkit-scrollbar-track { background: transparent; }
-.music-item-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(255,255,255,.24); background-clip: padding-box; }
+.music-item-list { overflow: visible; }
 .music-item-list > button, .music-search-results article { min-width: 0; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; border: 0; border-radius: 10px; padding: 6px; color: inherit; background: transparent; text-align: left; }
 .music-item-list > button { cursor: pointer; }
 .music-item-list > button:hover, .music-item-list > button.active { background: rgba(255,255,255,.07); }

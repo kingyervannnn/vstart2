@@ -34,6 +34,7 @@ describe('Notes service view', () => {
     expect(screen.getByRole('button', { name: 'Home' }).className).toContain('active')
     expect(screen.getByRole('button', { name: 'New note' })).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Search notes' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Voice notes search' })).toBeTruthy()
   })
 
   it('creates a note in the selected workspace and persists its metadata', async () => {
