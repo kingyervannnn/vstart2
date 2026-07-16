@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square } from 'lucide-react'
+import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
+import { googleLensUrl, prepareImageAttachment, uploadImageForLens } from '../lib/imageAttachment.js'
 import { clampDockGeometry, shouldDropSuggestionsUp } from '../lib/searchDock.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
 
@@ -22,6 +23,7 @@ export function SearchDock({
   onGeometryCommit,
   onWorkspaceOffsetCommit,
   onInlineResults,
+  onInlineImageSearch,
   restoredQuery = '',
   draftRequest = null,
   onDraftConsumed,
@@ -63,6 +65,11 @@ export function SearchDock({
   const [interactionKind, setInteractionKind] = useState(null)
   const [workspaceOffset, setWorkspaceOffset] = useState(configuredWorkspaceOffset)
   const [workspaceMoving, setWorkspaceMoving] = useState(false)
+  const [imageAttachment, setImageAttachment] = useState(null)
+  const [imageDragActive, setImageDragActive] = useState(false)
+  const [imageBusy, setImageBusy] = useState(false)
+  const [imageError, setImageError] = useState('')
+  const imageDragDepthRef = useRef(0)
 
   const resizeAgentComposer = useCallback((target) => {
     const element = target || inputRef.current
@@ -250,18 +257,111 @@ export function SearchDock({
   const submit = async (event) => {
     event.preventDefault()
     const value = query.trim()
-    if (!value) return
+    if ((!value && !imageAttachment) || imageBusy) return
     setSuggestionsOpen(false)
+    setImageError('')
     if (agentMode) {
-      if (!agentReady) return
-      const accepted = await onAgentSubmit?.(value)
-      if (accepted) setQuery('')
+      if (!agentReady || (agentRunning && imageAttachment)) return
+      const text = value || 'Analyze this image.'
+      if (imageAttachment) setImageBusy(true)
+      try {
+        const accepted = imageAttachment
+          ? await onAgentSubmit?.(text, imageAttachment)
+          : await onAgentSubmit?.(text)
+        if (accepted) {
+          setQuery('')
+          setImageAttachment(null)
+        } else if (imageAttachment) {
+          setImageError('Hermes could not accept the image. Try again when the current turn is finished.')
+        }
+      } catch (error) {
+        setImageError(error.message || 'Hermes could not accept the image.')
+      } finally {
+        setImageBusy(false)
+      }
+      return
+    }
+    if (imageAttachment) {
+      const opensNewTab = settings.general?.openLinksInNewTab !== false
+      const pendingWindow = !inline && opensNewTab ? window.open('about:blank', '_blank') : null
+      setImageBusy(true)
+      try {
+        const publicUrl = await uploadImageForLens(imageAttachment)
+        const target = googleLensUrl(publicUrl, value)
+        if (inline) {
+          onInlineImageSearch?.({ query: value || 'Visual search', url: target })
+        } else if (opensNewTab) {
+          if (pendingWindow) pendingWindow.location.href = target
+          else window.open(target, '_blank')
+        } else {
+          window.location.assign(target)
+        }
+        setQuery('')
+        setImageAttachment(null)
+      } catch (error) {
+        pendingWindow?.close()
+        setImageError(error.message || 'Image search failed.')
+      } finally {
+        setImageBusy(false)
+      }
       return
     }
     if (inline) return onInlineResults(value)
     const searchQuery = imageMode ? `${value} images` : value
     const target = (ENGINES[settings.search?.engine] || ENGINES.google)(searchQuery)
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
+  }
+
+  const attachImage = async (file) => {
+    setImageError('')
+    try {
+      setImageAttachment(await prepareImageAttachment(file))
+      if (!agentMode) setImageMode(true)
+      inputRef.current?.focus()
+    } catch (error) {
+      setImageAttachment(null)
+      setImageError(error.message || 'The image could not be attached.')
+    }
+  }
+
+  const onImageDragEnter = (event) => {
+    if (![...(event.dataTransfer?.types || [])].includes('Files')) return
+    event.preventDefault()
+    imageDragDepthRef.current += 1
+    setImageDragActive(true)
+  }
+
+  const onImageDragOver = (event) => {
+    if (![...(event.dataTransfer?.types || [])].includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onImageDragLeave = (event) => {
+    event.preventDefault()
+    imageDragDepthRef.current = Math.max(0, imageDragDepthRef.current - 1)
+    if (!imageDragDepthRef.current) setImageDragActive(false)
+  }
+
+  const onImageDrop = (event) => {
+    event.preventDefault()
+    imageDragDepthRef.current = 0
+    setImageDragActive(false)
+    const file = [...(event.dataTransfer?.files || [])].find((candidate) => candidate.type?.startsWith('image/'))
+    if (!file) {
+      setImageError('Drop a PNG, JPEG, WebP, or GIF image.')
+      return
+    }
+    void attachImage(file)
+  }
+
+  const onImagePaste = (event) => {
+    const file = [...(event.clipboardData?.items || [])]
+      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      ?.getAsFile()
+    if (!file) return
+    event.preventDefault()
+    void attachImage(file)
   }
 
   const submitFromInput = (event) => {
@@ -319,25 +419,32 @@ export function SearchDock({
     >
       {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />}
       <form
-        className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() ? 'has-query' : ''}`}
+        className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() || imageAttachment ? 'has-query' : ''} ${imageDragActive ? 'image-drop-active' : ''}`}
         style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
         onSubmit={submit}
+        onDragEnter={onImageDragEnter}
+        onDragOver={onImageDragOver}
+        onDragLeave={onImageDragLeave}
+        onDrop={onImageDrop}
       >
         {agentMode ? <>
           <button type="button" className="active" onClick={onAgentToggle} aria-label="Close Agent Mode" aria-pressed={true}><Sparkles size={18} /></button>
-          <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />
+          {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
+          <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
-            : <button type="submit" disabled={!agentReady || !query.trim()} aria-label="Send to Hermes"><Send size={18} /></button>}
+            : <button type="submit" disabled={!agentReady || (!query.trim() && !imageAttachment) || imageBusy} aria-label="Send to Hermes">{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Send size={18} />}</button>}
         </> : <>
           <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
-          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={`Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
+          {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
+          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
           <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
         </>}
       </form>
+      {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
       {!agentMode && suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
         {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
       </ul>}

@@ -77,6 +77,14 @@ input.on('line', (line) => {
     event('message.complete', request.params.session_id, { text: 'hello', status: 'complete' })
     return
   }
+  if (request.method === 'image.attach_bytes') {
+    result(request.id, {
+      attached: true,
+      filename: request.params.filename,
+      size: request.params.content_base64.length,
+    })
+    return
+  }
   if (request.method === 'approval.respond') {
     const resolved = pendingApproval === request.params.session_id && request.params.choice === 'once' && request.params.all === false
     result(request.id, { resolved })

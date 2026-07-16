@@ -24,7 +24,10 @@ const baseProps = {
 }
 
 describe('Assistant composer', () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
 
   it('is fixed-purpose, expandable, voice-enabled, and hides workspace controls', async () => {
     render(<SearchDock {...baseProps} />)
@@ -55,5 +58,23 @@ describe('Assistant composer', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Message Hermes' }), { target: { value: 'Glow now' } })
     expect(dock.classList.contains('has-query')).toBe(true)
+  })
+
+  it('accepts a dropped image and can send it without typed text', async () => {
+    const onAgentSubmit = vi.fn().mockResolvedValue(true)
+    const { container } = render(<SearchDock {...baseProps} onAgentSubmit={onAgentSubmit} />)
+    const file = new File([new Uint8Array([1, 2, 3])], 'reference.png', { type: 'image/png' })
+
+    fireEvent.drop(container.querySelector('form'), {
+      dataTransfer: { types: ['Files'], files: [file] },
+    })
+
+    await screen.findByRole('button', { name: 'Remove attached image' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Message Hermes' }), { key: 'Enter' })
+
+    await waitFor(() => expect(onAgentSubmit).toHaveBeenCalledWith(
+      'Analyze this image.',
+      expect.objectContaining({ name: 'reference.png', mimeType: 'image/png', data: 'AQID' }),
+    ))
   })
 })

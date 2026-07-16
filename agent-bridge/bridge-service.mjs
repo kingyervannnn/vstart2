@@ -97,6 +97,7 @@ export class AgentBridgeService {
       secrets: false,
       remoteAccess: false,
       providerCredentials: false,
+      imageAttachments: true,
       directoryPicker: process.platform === 'darwin',
     }
   }
@@ -147,6 +148,16 @@ export class AgentBridgeService {
       this.broker.cancelTurn(runtimeSessionId, turnId)
       throw error
     }
+  }
+
+  async attachImage(runtimeSessionId, { filename, data }) {
+    this.#assertSafe()
+    this.#assertBetweenTurns(runtimeSessionId)
+    return this.gateway.request('image.attach_bytes', {
+      session_id: runtimeSessionId,
+      filename,
+      content_base64: data,
+    })
   }
 
   async steer(runtimeSessionId, text) {

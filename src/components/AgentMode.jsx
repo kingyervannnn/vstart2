@@ -311,18 +311,32 @@ export const AgentMode = forwardRef(function AgentMode({
   }, [onNavigate, onSessionLinked, retryKey, settings.agent?.bridgeUrl, settings.agent?.defaultFastMode, settings.agent?.defaultReasoningEffort, settings.agent?.enabled, settings.agent?.workspaceDefaultsEnabled, targetSessionId, workspace.id])
 
   useImperativeHandle(ref, () => ({
-    async submit(text) {
+    async submit(text, attachment = null) {
       const client = clientRef.current
       const sessionId = runtimeSessionRef.current
       if (!client || !sessionId || connection.state !== 'ready') return false
       if (running) {
+        if (attachment) return false
         await client.steer(sessionId, text)
         setActivities((current) => [...current.slice(-39), { id: crypto.randomUUID(), type: 'steer', payload: { message: text } }])
         return true
       }
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'user', text, streaming: false }])
-      setRunning(true)
       try {
+        if (attachment) {
+          await client.attachImage(sessionId, {
+            filename: attachment.name,
+            mimeType: attachment.mimeType,
+            data: attachment.data,
+          })
+        }
+        setMessages((current) => [...current, {
+          id: crypto.randomUUID(),
+          role: 'user',
+          text,
+          streaming: false,
+          ...(attachment ? { attachment: { name: attachment.name, dataUrl: attachment.dataUrl } } : {}),
+        }])
+        setRunning(true)
         await client.submitTurn(sessionId, text)
         return true
       } catch (error) {
@@ -441,7 +455,11 @@ export const AgentMode = forwardRef(function AgentMode({
       <div ref={transcriptRef} className="agent-transcript" aria-live="polite">
         <div className="agent-transcript-stack">
           {!messages.length && connection.state === 'ready' && <div className="agent-empty"><Bot /><h2>What should Hermes work on?</h2><p>This session uses local tools through the loopback Agent Bridge. Tool actions remain approval-gated.</p></div>}
-          {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}><div className="agent-message-heading"><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><div className="agent-message-actions"><button type="button" onClick={() => void copyMessage(message)} aria-label={`Copy ${message.role} message`} title="Copy message">{copiedMessageId === message.id ? <Check /> : <Copy />}</button>{message.role === 'user' && <button type="button" onClick={() => onEditMessage?.(message.text)} aria-label="Edit and resend message" title="Edit and resend"><Pencil /></button>}</div></div><p><LinkifiedText text={message.text || (message.streaming ? '…' : '')} openInNewTab={settings.general?.openLinksInNewTab} onOpenInline={onOpenInline} /></p></article>)}
+          {messages.map((message) => <article key={message.id} className={`agent-message ${message.role} ${message.streaming ? 'streaming' : ''}`}>
+            <div className="agent-message-heading"><small>{message.role === 'user' ? 'YOU' : 'HERMES'}</small><div className="agent-message-actions"><button type="button" onClick={() => void copyMessage(message)} aria-label={`Copy ${message.role} message`} title="Copy message">{copiedMessageId === message.id ? <Check /> : <Copy />}</button>{message.role === 'user' && <button type="button" onClick={() => onEditMessage?.(message.text)} aria-label="Edit and resend message" title="Edit and resend"><Pencil /></button>}</div></div>
+            {message.attachment && <figure className="agent-message-image"><img src={message.attachment.dataUrl} alt={message.attachment.name} /><figcaption>{message.attachment.name}</figcaption></figure>}
+            <p><LinkifiedText text={message.text || (message.streaming ? '…' : '')} openInNewTab={settings.general?.openLinksInNewTab} onOpenInline={onOpenInline} /></p>
+          </article>)}
 
           {settings.agent?.showToolActivity !== false && activities.length > 0 && <section className="agent-activity" aria-label="Tool activity">
             <h3><Wrench /> Tool activity</h3>

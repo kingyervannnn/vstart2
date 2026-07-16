@@ -80,6 +80,14 @@ describe('AgentBridgeHttpServer security boundary', () => {
     const created = await createdResponse.json()
     expect(created).toMatchObject({ session_id: 'runtime-1', stored_session_id: 'stored-1' })
 
+    const imageResponse = await fetch(`${baseUrl}/v1/sessions/runtime-1/images`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ filename: 'reference.png', mimeType: 'image/png', data: 'AQID' }),
+    })
+    expect(imageResponse.status).toBe(201)
+    await expect(imageResponse.json()).resolves.toMatchObject({ attached: true, filename: 'reference.png', size: 4 })
+
     const turnResponse = await fetch(`${baseUrl}/v1/sessions/runtime-1/turns`, {
       method: 'POST',
       headers,

@@ -557,6 +557,12 @@ export function App() {
   }
 
   const runInlineSearch = (query) => navigateView({ type: 'search', query })
+  const runInlineImageSearch = ({ query, url }) => navigateView({
+    type: 'frame',
+    query,
+    result: { title: 'Google Lens results', url },
+    fullScreen: false,
+  })
 
   const createWorkspace = async (nameOrValues) => {
     const values = typeof nameOrValues === 'string' ? { name: nameOrValues } : nameOrValues
@@ -780,6 +786,7 @@ export function App() {
           onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
+          onInlineImageSearch={runInlineImageSearch}
           restoredQuery={routedInline?.query || ''}
           draftRequest={agentDraft}
           onDraftConsumed={() => setAgentDraft(null)}
@@ -787,7 +794,7 @@ export function App() {
           agentReady={agentUi.ready}
           agentRunning={agentUi.running}
           onAgentToggle={toggleAgentMode}
-          onAgentSubmit={(value) => agentRef.current?.submit(value)}
+          onAgentSubmit={(value, attachment) => agentRef.current?.submit(value, attachment)}
           onAgentStop={() => agentRef.current?.stop()}
         />}
         <div className="page-controls">

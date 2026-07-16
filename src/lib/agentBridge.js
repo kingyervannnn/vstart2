@@ -89,6 +89,7 @@ export class AgentBridgeClient {
   createSession(values = {}) { return this.request('/v1/sessions', { method: 'POST', body: values }) }
   resumeSession(sessionId) { return this.request('/v1/sessions/resume', { method: 'POST', body: { sessionId } }) }
   history(sessionId) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/history`) }
+  attachImage(sessionId, image) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/images`, { method: 'POST', body: image }) }
   submitTurn(sessionId, text) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/turns`, { method: 'POST', body: { text } }) }
   steer(sessionId, text) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/steer`, { method: 'POST', body: { text } }) }
   interrupt(sessionId) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/interrupt`, { method: 'POST', body: {} }) }

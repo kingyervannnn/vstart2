@@ -105,7 +105,7 @@ async function parseMultipartFormData(req) {
 }
 
 // Removed OpenWeb Ninja, Yandex, and TinEye functions - no longer used
-// Only SearXNG and Google Lens (via ImgBB) are supported now
+// Only SearXNG and Google Lens visual search are supported now.
 
 
 const server = http.createServer(async (req, res) => {
@@ -266,12 +266,41 @@ const server = http.createServer(async (req, res) => {
           console.warn('No ImgBB API key provided (neither in request nor environment)')
         }
 
+        // Method 2: Use short-lived anonymous hosting so visual search works without
+        // requiring an account-level key. Litterbox removes the upload after one hour.
+        if (!publicUrl) {
+          try {
+            const temporaryUpload = new FormData()
+            temporaryUpload.append('reqtype', 'fileupload')
+            temporaryUpload.append('time', '1h')
+            temporaryUpload.append(
+              'fileToUpload',
+              new Blob([imageBuffer], { type: imageFile.contentType || 'application/octet-stream' }),
+              imageFile.filename || 'visual-search-image',
+            )
+            const temporaryResponse = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+              method: 'POST',
+              body: temporaryUpload,
+            })
+            const temporaryUrl = (await temporaryResponse.text()).trim()
+            if (temporaryResponse.ok && /^https:\/\/litter\.catbox\.moe\/[A-Za-z0-9._-]+$/.test(temporaryUrl)) {
+              publicUrl = temporaryUrl
+              console.log('✅ Image uploaded to temporary public hosting for Lens')
+            } else {
+              lastError = `Temporary image hosting error: ${temporaryResponse.status}`
+            }
+          } catch (error) {
+            lastError = error.message
+            console.warn('Temporary image hosting failed:', error.message)
+          }
+        }
+
         // Clean up temporary file
         try {
           await unlink(imageFile.path)
         } catch { /* The temporary file may already be gone. */ }
 
-        // Method 2: Fallback to local storage (but this won't work with Google Lens due to localhost)
+        // Method 3: Fallback to local storage (but this won't work with Google Lens due to localhost)
         if (!publicUrl) {
           console.warn('No public URL obtained, falling back to local storage')
           // Save locally as fallback (though Google Lens can't access localhost)

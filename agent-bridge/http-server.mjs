@@ -7,6 +7,7 @@ import { AgentBridgeService, BridgeError } from './bridge-service.mjs'
 
 const PROTOCOL_VERSION = 1
 const MAX_BODY_BYTES = 128 * 1_024
+const MAX_IMAGE_BODY_BYTES = 12 * 1_024 * 1_024
 const NONCE_TTL_MS = 15 * 60 * 1_000
 const REQUESTS_PER_MINUTE = 180
 const DEFAULT_ALLOWED_ORIGINS = new Set(['http://localhost:3000', 'http://127.0.0.1:3000'])
@@ -17,6 +18,14 @@ const createSessionSchema = z.object({
 }).strict()
 const resumeSchema = z.object({ sessionId: z.string().trim().min(1).max(200) }).strict()
 const turnSchema = z.object({ text: z.string().min(1).max(65_536) }).strict()
+const imageSchema = z.object({
+  filename: z.string().trim().min(1).max(240).refine(
+    (value) => !value.includes('/') && !value.includes('\\') && [...value].every((character) => character.charCodeAt(0) >= 32),
+    'Filename contains unsupported characters',
+  ),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
+  data: z.string().min(4).max(11_200_000).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+}).strict()
 const steerSchema = z.object({ text: z.string().trim().min(1).max(8_192) }).strict()
 const modelSchema = z.object({
   provider: z.string().regex(/^[a-zA-Z0-9._-]+$/).max(100),
@@ -152,6 +161,11 @@ export class AgentBridgeHttpServer {
           this.#send(response, 202, await this.service.submitTurn(sessionId, body.text))
           return
         }
+        if (request.method === 'POST' && route.action === 'images') {
+          const body = await this.#readJson(request, imageSchema, MAX_IMAGE_BODY_BYTES)
+          this.#send(response, 201, await this.service.attachImage(sessionId, body))
+          return
+        }
         if (request.method === 'POST' && route.action === 'steer') {
           const body = await this.#readJson(request, steerSchema)
           this.#send(response, 200, await this.service.steer(sessionId, body.text))
@@ -209,7 +223,7 @@ export class AgentBridgeHttpServer {
   }
 
   #matchSessionRoute(pathname) {
-    const simple = pathname.match(new RegExp(`^/v1/sessions/${idPart}/(history|status|events|turns|steer|interrupt|model|reasoning|fast-mode|directory|close)$`))
+    const simple = pathname.match(new RegExp(`^/v1/sessions/${idPart}/(history|status|events|turns|images|steer|interrupt|model|reasoning|fast-mode|directory|close)$`))
     if (simple) return { sessionId: simple[1], action: simple[2] }
     const approval = pathname.match(new RegExp(`^/v1/sessions/${idPart}/approvals/${idPart}$`))
     if (approval) return { sessionId: approval[1], action: 'approval', requestId: decodeURIComponent(approval[2]) }
@@ -291,7 +305,7 @@ export class AgentBridgeHttpServer {
     if (window.count > REQUESTS_PER_MINUTE) throw new BridgeError(429, 'rate_limited', 'Too many Agent Bridge requests')
   }
 
-  async #readJson(request, schema) {
+  async #readJson(request, schema, maxBytes = MAX_BODY_BYTES) {
     if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
       throw new BridgeError(415, 'content_type_required', 'Content-Type must be application/json')
     }
@@ -299,7 +313,7 @@ export class AgentBridgeHttpServer {
     const chunks = []
     for await (const chunk of request) {
       size += chunk.length
-      if (size > MAX_BODY_BYTES) throw new BridgeError(413, 'body_too_large', 'Request body is too large')
+      if (size > maxBytes) throw new BridgeError(413, 'body_too_large', 'Request body is too large')
       chunks.push(chunk)
     }
     let parsed
