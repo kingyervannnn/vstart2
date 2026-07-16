@@ -575,7 +575,19 @@ export function App() {
   }
 
   const runInlineSearch = (query) => navigateView({ type: 'search', query, category: 'general' })
-  const runInlineImageSearch = ({ query }) => navigateView({ type: 'search', query, category: 'images' })
+  const runInlineImageSearch = ({ query, visualUrl }) => {
+    if (visualUrl) {
+      navigateView({
+        type: 'frame',
+        query,
+        category: 'images',
+        result: { title: 'Visual search results', url: visualUrl },
+        fullScreen: settings.search?.inlineLinkBehavior === 'inline-fullscreen',
+      })
+      return
+    }
+    navigateView({ type: 'search', query, category: 'images' })
+  }
 
   const createWorkspace = async (nameOrValues) => {
     const values = typeof nameOrValues === 'string' ? { name: nameOrValues } : nameOrValues

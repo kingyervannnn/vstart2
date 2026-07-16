@@ -55,7 +55,10 @@ describe('Search dock visual search', () => {
   })
 
   it('routes an inline image search without leaving the start page', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, public: true, url: 'https://images.example/reference.png' }),
+    })
     vi.stubGlobal('fetch', fetch)
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const onInlineImageSearch = vi.fn()
@@ -67,12 +70,20 @@ describe('Search dock visual search', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'red mountain bicycle' } })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
 
-    await waitFor(() => expect(onInlineImageSearch).toHaveBeenCalledWith({ query: 'red mountain bicycle', category: 'images' }))
-    expect(fetch).not.toHaveBeenCalled()
+    await waitFor(() => expect(onInlineImageSearch).toHaveBeenCalledTimes(1))
+    const request = onInlineImageSearch.mock.calls[0][0]
+    expect(request).toMatchObject({ query: 'red mountain bicycle', category: 'images' })
+    expect(new URL(request.visualUrl).searchParams.get('url')).toBe('https://images.example/reference.png')
+    expect(new URL(request.visualUrl).searchParams.get('text')).toBe('red mountain bicycle')
+    expect(fetch).toHaveBeenCalledWith('/image-search/upload-for-lens', expect.objectContaining({ method: 'POST' }))
     expect(open).not.toHaveBeenCalled()
   })
 
-  it('explains that SearXNG inline image results need a text query', async () => {
+  it('runs an inline reverse-image search without requiring text', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, public: true, url: 'https://images.example/reference.png' }),
+    }))
     const onInlineImageSearch = vi.fn()
     const { container } = render(<SearchDock {...props} onInlineImageSearch={onInlineImageSearch} />)
 
@@ -81,7 +92,11 @@ describe('Search dock visual search', () => {
     await screen.findByRole('button', { name: 'Remove attached image' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
 
-    expect(await screen.findByText(/Inline image search uses SearXNG/)).toBeTruthy()
-    expect(onInlineImageSearch).not.toHaveBeenCalled()
+    await waitFor(() => expect(onInlineImageSearch).toHaveBeenCalledTimes(1))
+    const request = onInlineImageSearch.mock.calls[0][0]
+    expect(request).toMatchObject({ query: '', category: 'images' })
+    expect(new URL(request.visualUrl).searchParams.get('url')).toBe('https://images.example/reference.png')
+    expect(new URL(request.visualUrl).searchParams.has('text')).toBe(false)
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
