@@ -104,6 +104,29 @@ describe('Assistant composer', () => {
     ))
   })
 
+  it('opens an image picker from the composer and attaches the selected file', async () => {
+    const onAgentSubmit = vi.fn().mockResolvedValue(true)
+    const { container } = render(<SearchDock {...baseProps} onAgentSubmit={onAgentSubmit} />)
+    const picker = container.querySelector('.search-image-file-input')
+    const openPicker = vi.fn()
+    picker.click = openPicker
+
+    fireEvent.click(screen.getByRole('button', { name: 'Attach image' }))
+    expect(openPicker).toHaveBeenCalledTimes(1)
+    expect(picker.getAttribute('accept')).toBe('image/png,image/jpeg,image/webp,image/gif')
+
+    const file = new File([new Uint8Array([1, 2, 3])], 'picked.png', { type: 'image/png' })
+    fireEvent.change(picker, { target: { files: [file] } })
+
+    expect(await screen.findByRole('button', { name: 'Remove attached image' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Replace attached image' })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Message Hermes' }), { key: 'Enter' })
+    await waitFor(() => expect(onAgentSubmit).toHaveBeenCalledWith(
+      'Analyze this image.',
+      expect.objectContaining({ name: 'picked.png', mimeType: 'image/png', data: 'AQID' }),
+    ))
+  })
+
   it('drives the recording waveform from live microphone samples', async () => {
     const stopTrack = vi.fn()
     const stream = { getTracks: () => [{ stop: stopTrack }] }

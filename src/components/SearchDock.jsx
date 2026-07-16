@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Send, Sparkles, Square, X } from 'lucide-react'
+import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Paperclip, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
@@ -44,6 +44,7 @@ export function SearchDock({
 }) {
   const dockRef = useRef(null)
   const inputRef = useRef(null)
+  const imageFileInputRef = useRef(null)
   const interactionRef = useRef(null)
   const workspaceDragRef = useRef(null)
   const geometryRef = useRef(null)
@@ -470,6 +471,17 @@ export function SearchDock({
     }
   }
 
+  const chooseImage = () => {
+    if (imageBusy || agentRunning) return
+    if (imageFileInputRef.current) imageFileInputRef.current.value = ''
+    imageFileInputRef.current?.click()
+  }
+
+  const onImageFileChange = (event) => {
+    const file = event.currentTarget.files?.[0]
+    if (file) void attachImage(file)
+  }
+
   const onImageDragEnter = (event) => {
     if (![...(event.dataTransfer?.types || [])].includes('Files')) return
     event.preventDefault()
@@ -597,6 +609,7 @@ export function SearchDock({
         onDragLeave={onImageDragLeave}
         onDrop={onImageDrop}
       >
+        <input ref={imageFileInputRef} className="search-image-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onImageFileChange} tabIndex="-1" aria-hidden="true" />
         {agentMode ? <>
           <button type="button" className="active" onClick={onAgentToggle} aria-label="Close Agent Mode" aria-pressed={true}><Sparkles size={18} /></button>
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
@@ -604,6 +617,7 @@ export function SearchDock({
             ? <VoiceWaveform levels={voiceLevels} />
             : <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
+          <button type="button" className="agent-attachment-button" onClick={chooseImage} aria-label={imageAttachment ? 'Replace attached image' : 'Attach image'} title={imageAttachment ? 'Replace attached image' : 'Attach image'} disabled={imageBusy || agentRunning}><Paperclip size={16} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
