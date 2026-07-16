@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, PenLine, Play, Plus, RefreshCw, Reply, Save, Search, Send, Trash2, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
+import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
-
-const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7'
 
 const SERVICE_META = {
   notes: { label: 'Notes', Icon: NotebookPen },
@@ -129,7 +128,7 @@ function MusicServiceView({ musicSettings, onSettingsPatch }) {
   )
 }
 
-function WeatherServiceView({ data }) {
+function WeatherServiceView({ data, location, celsius }) {
   const current = data.current
   const days = (data.daily?.time || []).map((date, index) => ({
     date,
@@ -140,7 +139,7 @@ function WeatherServiceView({ data }) {
   }))
   return (
     <div className="weather-service-view">
-      <section className="weather-detail-current"><CloudSun /><div><small>NEW YORK · FEELS LIKE {Math.round(current.apparent_temperature)}°</small><strong>{Math.round(current.temperature_2m)}°F</strong><p>{Math.round(current.relative_humidity_2m)}% humidity · {Math.round(current.wind_speed_10m)} mph wind</p></div></section>
+      <section className="weather-detail-current"><CloudSun /><div><small>{location.city.toLocaleUpperCase()} · FEELS LIKE {Math.round(current.apparent_temperature)}°</small><strong>{Math.round(current.temperature_2m)}°{celsius ? 'C' : 'F'}</strong><p>{Math.round(current.relative_humidity_2m)}% humidity · {Math.round(current.wind_speed_10m)} {celsius ? 'km/h' : 'mph'} wind</p></div></section>
       <div className="weather-detail-days">
         {days.map((day, index) => <article key={day.date}><span><small>{index === 0 ? 'Today' : new Intl.DateTimeFormat([], { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))}</small><strong>{new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(new Date(`${day.date}T12:00:00`))}</strong></span><span className="weather-high-low"><strong>{Math.round(day.high)}°</strong><small>{Math.round(day.low)}°</small></span><span className="weather-sun"><small>Sunrise {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunrise))}</small><small>Sunset {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunset))}</small></span></article>)}
       </div>
@@ -691,8 +690,11 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   )
 }
 
-export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, notesSettings, onNotesSettingsPatch, workspaces = [], activeWorkspaceId, openLinksInNewTab, onOpenInline, onClose }) {
+export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, notesSettings, onNotesSettingsPatch, weatherSettings, workspaces = [], activeWorkspaceId, openLinksInNewTab, onOpenInline, onClose }) {
   const [state, setState] = useState({ loading: !['music', 'mail', 'notes'].includes(kind), error: '', data: null })
+  const weatherLocation = activeWeatherLocation(weatherSettings)
+  const weatherCelsius = weatherSettings?.celsius === true
+  const weatherUrl = weatherForecastUrl(weatherLocation, { celsius: weatherCelsius, detailed: true })
 
   useEffect(() => {
     if (kind === 'music' || kind === 'mail' || kind === 'notes') {
@@ -702,13 +704,13 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
     const controller = new AbortController()
     setState({ loading: true, error: '', data: null })
     const request = kind === 'weather'
-      ? fetch(WEATHER_URL, { signal: controller.signal }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Weather service is unavailable')))
+      ? fetch(weatherUrl, { signal: controller.signal }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Weather service is unavailable')))
       : Promise.reject(new Error('Unknown service'))
     request.then((data) => setState({ loading: false, error: '', data })).catch((error) => {
       if (error.name !== 'AbortError') setState({ loading: false, error: error.message, data: null })
     })
     return () => controller.abort()
-  }, [kind])
+  }, [kind, weatherUrl])
 
   const meta = SERVICE_META[kind] || SERVICE_META.mail
   const Icon = meta.Icon
@@ -731,7 +733,7 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
       <header><div><Icon /><span><small>WIDGET VIEW</small><h2>{meta.label}</h2></span></div><button type="button" onClick={onClose} aria-label={`Close ${kind}`}><X /></button></header>
       {state.loading && <div className="service-state">Connecting to the V Start 2 service…</div>}
       {state.error && <div className="service-state error">{state.error}</div>}
-      {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} />}
+      {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} location={weatherLocation} celsius={weatherCelsius} />}
       {!state.loading && !state.error && kind === 'music' && <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} />}
     </section>
   )

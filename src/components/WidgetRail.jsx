@@ -1,38 +1,60 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CloudSun, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 
-function ClockWidget({ compact }) {
+function ClockFace({ location, now, twentyFourHour, primary = false, active = false, onSelect }) {
+  const time = formatLocationTime(now, location, twentyFourHour)
+  if (!primary) {
+    return (
+      <button type="button" className={'sub-clock ' + (active ? 'active' : '')} onClick={() => onSelect(location.id)} aria-label={'Show ' + location.city + ' weather'}>
+        <small>{location.city}</small>
+        <span><strong>{time.hour}:{time.minute}</strong>{!twentyFourHour && <em>{time.period}</em>}</span>
+      </button>
+    )
+  }
+  const date = new Intl.DateTimeFormat([], {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: location.timeZone,
+  }).format(now)
+  return (
+    <button type="button" className={'primary-clock ' + (active ? 'active' : '')} onClick={() => onSelect(location.id)} aria-label={'Show ' + location.city + ' weather'}>
+      <span className="primary-clock-time"><strong>{time.hour}:{time.minute}</strong>{!twentyFourHour && <em>{time.period}</em>}</span>
+      <small>{date}</small>
+    </button>
+  )
+}
+
+function ClockWidget({ settings, onLocationSelect }) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
-  const time = useMemo(() => new Intl.DateTimeFormat([], {
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  }).format(now), [now])
-  const date = useMemo(() => new Intl.DateTimeFormat([], {
-    weekday: compact ? 'short' : 'long', month: 'short', day: 'numeric', year: 'numeric',
-  }).format(now), [compact, now])
+  const locations = configuredWeatherLocations(settings)
+  const activeLocation = activeWeatherLocation(settings)
+  const twentyFourHour = settings.twentyFourHour === true
   return (
     <section className="clock-widget" aria-label="Clock">
-      <strong>{time.replace(/\s?[AP]M$/i, '')}</strong>
-      <span>{time.match(/[AP]M/i)?.[0] || ''}</span>
-      <small>{date}</small>
+      <ClockFace primary location={locations.primary} now={now} twentyFourHour={twentyFourHour} active={activeLocation.id === locations.primary.id} onSelect={onLocationSelect} />
+      {!!locations.secondary.length && <div className="sub-clock-list">{locations.secondary.map((location) => <ClockFace key={location.id} location={location} now={now} twentyFourHour={twentyFourHour} active={activeLocation.id === location.id} onSelect={onLocationSelect} />)}</div>}
     </section>
   )
 }
 
-function WeatherWidget({ compact, onOpen }) {
+function WeatherWidget({ compact, settings, onOpen }) {
   const [weather, setWeather] = useState(null)
+  const location = activeWeatherLocation(settings)
+  const celsius = settings.celsius === true
+  const weatherUrl = weatherForecastUrl(location, { celsius })
   useEffect(() => {
     const controller = new AbortController()
-    fetch('https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_days=7', { signal: controller.signal })
+    setWeather(null)
+    fetch(weatherUrl, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('weather unavailable')))
       .then(setWeather)
       .catch(() => {})
     return () => controller.abort()
-  }, [])
+  }, [weatherUrl])
 
   const days = (weather?.daily?.time || []).slice(0, 5).map((date, index) => ({
     date,
@@ -45,8 +67,8 @@ function WeatherWidget({ compact, onOpen }) {
       <div className="weather-current">
         <CloudSun size={compact ? 20 : 28} strokeWidth={1.35} />
         <div>
-          <small>NEW YORK</small>
-          <strong>{weather?.current ? `${Math.round(weather.current.temperature_2m)}°F` : '—°F'}</strong>
+          <small>{location.city.toLocaleUpperCase()}</small>
+          <strong>{weather?.current ? Math.round(weather.current.temperature_2m) + '°' + (celsius ? 'C' : 'F') : '—°' + (celsius ? 'C' : 'F')}</strong>
         </div>
       </div>
       {!compact && <div className="weather-days" aria-label="Five-day forecast">
@@ -156,8 +178,8 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
 
   return (
     <aside className="widget-rail" aria-label="Widgets">
-      {widgets.clock !== false && <ClockWidget compact={compact} />}
-      {widgets.weather !== false && <WeatherWidget compact={compact} onOpen={() => onOpenWidget('weather')} />}
+      {widgets.clock !== false && <ClockWidget settings={widgets} onLocationSelect={(locationId) => onPatch({ widgets: { activeWeatherLocationId: locationId } })} />}
+      {widgets.weather !== false && <WeatherWidget compact={compact} settings={widgets} onOpen={() => onOpenWidget('weather')} />}
       <div className="widget-access-list">
         {widgets.notes !== false && <WidgetAccess icon={NotebookPen} label="Notes" detail="Open notes" onClick={() => onOpenWidget('notes')} />}
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}

@@ -81,10 +81,24 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .compact-widget-dock button:hover, .compact-widget-dock button:focus-visible { color: var(--app-text); }
 .compact-widget-dock svg { width: 15px; height: 15px; }
 
-.clock-widget { display: grid; grid-template-columns: auto 1fr; align-items: start; width: max-content; }
-.clock-widget strong { font-size: clamp(48px, 5vw, 74px); line-height: .86; letter-spacing: -.065em; font-weight: 560; }
-.clock-widget > span { padding: 2px 0 0 10px; color: #fa515c; font-size: 14px; font-weight: 800; }
-.clock-widget small { grid-column: 1 / -1; margin-top: 12px; color: #f15d68; text-transform: uppercase; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+.clock-widget { display: flex; align-items: flex-start; gap: clamp(8px, 1vw, 14px); width: max-content; max-width: 100%; }
+.primary-clock { min-width: 0; display: grid; gap: 10px; border: 0; padding: 0 0 5px; color: inherit; background: transparent; text-align: left; cursor: pointer; transition: filter 160ms ease; }
+.primary-clock:hover, .primary-clock:focus-visible { outline: 0; filter: brightness(1.12); }
+.primary-clock-time { display: flex; align-items: flex-start; }
+.primary-clock-time strong { font-size: clamp(42px, 4.1vw, 68px); line-height: .86; letter-spacing: -.065em; font-weight: 560; font-variant-numeric: tabular-nums; }
+.primary-clock-time em { padding: 2px 0 0 8px; color: #fa515c; font-size: 13px; font-style: normal; font-weight: 800; }
+.primary-clock > small { color: #f15d68; text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: .055em; white-space: nowrap; }
+.sub-clock-list { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding-top: 1px; }
+.sub-clock { width: clamp(98px, 10vw, 126px); min-height: 31px; flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border: 1px solid transparent; border-radius: 10px; padding: 6px 8px; color: inherit; background: transparent; text-align: left; cursor: pointer; opacity: .62; transition: opacity 160ms ease, border-color 180ms ease, background 180ms ease, transform 180ms cubic-bezier(.16,1,.3,1); }
+.sub-clock:hover, .sub-clock:focus-visible { outline: 0; opacity: .9; transform: translateY(-2px); }
+.sub-clock.active { border-color: color-mix(in srgb, var(--app-accent) 34%, transparent); background: color-mix(in srgb, var(--app-accent) 9%, transparent); opacity: 1; }
+.sub-clock > small { min-width: 0; overflow: hidden; color: color-mix(in srgb, var(--app-accent) 72%, var(--app-text)); font-size: 8px; font-weight: 700; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.sub-clock > span { flex: none; display: flex; align-items: baseline; gap: 3px; }
+.sub-clock strong { font-size: clamp(12px, 1.15vw, 16px); font-weight: 590; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+.sub-clock em { color: color-mix(in srgb, var(--app-accent) 70%, var(--app-text)); font-size: 7px; font-style: normal; font-weight: 750; }
+.mirrored .clock-widget { margin-left: auto; flex-direction: row-reverse; }
+.mirrored .primary-clock, .mirrored .sub-clock { text-align: right; }
+.mirrored .primary-clock-time, .mirrored .sub-clock > span { justify-content: flex-end; }
 
 .weather-widget { width: min(100%, 360px); display: grid; gap: 12px; margin-top: 28px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .weather-current { display: flex; align-items: center; gap: 13px; }
@@ -854,6 +868,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .setting-field input[type="color"] { width: 42px; height: 30px; border: 0; border-radius: 7px; background: transparent; }
 .setting-field input[type="range"] { width: 200px; accent-color: var(--app-accent); }
 .range-setting output { margin-left: 7px; color: var(--app-text); opacity: .82; }
+.time-weather-settings { display: grid; margin: 18px 0 22px; padding: 13px 15px 15px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
+.time-weather-settings h4 { margin: 0 0 2px; font-size: 12px; }
+.time-weather-settings .setting-field { min-height: 52px; }
+.time-weather-settings .setting-note { margin-top: 13px; }
 .setting-note { display: flex; flex-direction: column; gap: 5px; margin-top: 18px; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.035); }
 .setting-note strong { font-size: 11px; }
 .setting-note span { font-size: 10px; line-height: 1.45; opacity: .57; }

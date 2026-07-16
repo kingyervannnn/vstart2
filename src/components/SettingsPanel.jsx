@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
+import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
 import { musicApi } from '../lib/music.js'
 
@@ -71,6 +72,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
     ? settings.widgets.musicGlowTrigger
     : 'connected'
   const musicSources = settings.music?.sources || []
+  const weatherLocations = configuredWeatherLocations(settings.widgets)
+  const secondaryLocationIds = weatherLocations.secondary.map((location) => location.id)
 
   useEffect(() => {
     let live = true
@@ -108,6 +111,27 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
     const source = { id: `music-${crypto.randomUUID()}`, name, adapter: 'youtube-music-desktop', baseUrl, enabled: true }
     void updateMusicSources([...musicSources, source], settings.music?.activeSourceId || source.id)
     setNewMusicSource({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
+  }
+
+  const selectPrimaryLocation = (locationId) => {
+    void onPatch({
+      widgets: {
+        primaryLocationId: locationId,
+        activeWeatherLocationId: locationId,
+        secondaryLocationIds: secondaryLocationIds.filter((id) => id !== locationId),
+      },
+    })
+  }
+
+  const selectSecondaryLocation = (index, locationId) => {
+    const next = [...secondaryLocationIds]
+    if (locationId) next[index] = locationId
+    else next.splice(index, 1)
+    const normalized = [...new Set(next.filter((id) => id && id !== weatherLocations.primary.id))].slice(0, 2)
+    const activeWeatherLocationId = normalized.includes(settings.widgets?.activeWeatherLocationId)
+      ? settings.widgets.activeWeatherLocationId
+      : weatherLocations.primary.id
+    void onPatch({ widgets: { secondaryLocationIds: normalized, activeWeatherLocationId } })
   }
 
   const testMusicSource = async (source) => {
@@ -239,6 +263,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
             {page === 'widgets' && <>
               <h3>Widgets</h3>
               {['clock', 'weather', 'notes', 'email', 'music'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              <div className="time-weather-settings">
+                <h4>Time &amp; weather</h4>
+                <label className="setting-field"><span>Primary city</span><select value={weatherLocations.primary.id} onChange={(event) => selectPrimaryLocation(event.target.value)}>{LOCATION_OPTIONS.map((location) => <option key={location.id} value={location.id}>{location.city} · {location.country}</option>)}</select></label>
+                {[0, 1].map((index) => <label className="setting-field" key={index}><span>Secondary city {index + 1}</span><select value={secondaryLocationIds[index] || ''} onChange={(event) => selectSecondaryLocation(index, event.target.value)}><option value="">None</option>{LOCATION_OPTIONS.map((location) => <option key={location.id} value={location.id} disabled={location.id === weatherLocations.primary.id || secondaryLocationIds.some((id, selectedIndex) => selectedIndex !== index && id === location.id)}>{location.city} · {location.country}</option>)}</select></label>)}
+                <Toggle label="24-hour time" detail="Applies to the primary and secondary clocks." checked={settings.widgets?.twentyFourHour === true} onChange={(value) => onPatch({ widgets: { twentyFourHour: value } })} />
+                <Toggle label="Celsius" detail="Also changes weather wind speed to km/h." checked={settings.widgets?.celsius === true} onChange={(value) => onPatch({ widgets: { celsius: value } })} />
+                <div className="setting-note"><strong>Clocks control weather context.</strong><span>Click the main or secondary clock to switch both weather views to that city.</span></div>
+              </div>
               <label className="setting-field"><span>Music player glow</span><select value={musicGlowStyle} onChange={(event) => onPatch({ widgets: { musicGlowStyle: event.target.value } })}>{GLOW_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               {musicGlowStyle !== 'off' && <label className="setting-field"><span>Show music glow</span><select value={musicGlowTrigger} onChange={(event) => onPatch({ widgets: { musicGlowTrigger: event.target.value } })}>{MUSIC_GLOW_TRIGGERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
               <Toggle label="Music player outline" detail="Off by default for a lighter floating treatment." checked={settings.widgets?.musicOutline === true} onChange={(value) => onPatch({ widgets: { musicOutline: value } })} />
