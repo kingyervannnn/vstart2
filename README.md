@@ -118,6 +118,11 @@ The import is transactional and content-deduplicated. `--select` optionally make
 matching imported image the global background; imported assets remain selectable from
 Settings → Backgrounds.
 
+Settings → Backgrounds also provides a database-backed 100–120% wallpaper zoom in
+one-percent steps. It overscans a dedicated viewport background layer without scaling
+the interface, which covers rounded-browser edge seams while preserving layout and drag
+coordinates.
+
 ## Verify it
 
 ```sh

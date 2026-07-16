@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
+import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
@@ -80,6 +81,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const weatherLocations = configuredWeatherLocations(settings.widgets)
   const secondaryLocationIds = weatherLocations.secondary.map((location) => location.id)
   const backgroundRotation = settings.backgrounds?.rotation || {}
+  const backgroundZoom = normalizeBackgroundZoom(settings.backgrounds?.zoomPercent)
   const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
   const workspaceBackgroundPool = backgroundRotation.workspacePools?.[activeWorkspaceId] || []
 
@@ -255,6 +257,15 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'backgrounds' && <>
               <h3>Backgrounds</h3>
+              <div className="background-zoom-settings">
+                <span><strong>Background zoom</strong><small>Overscans only the wallpaper to cover rounded-browser edge seams. Shortcuts and widgets stay at their normal size.</small></span>
+                <div>
+                  <button type="button" onClick={() => onPatch({ backgrounds: { zoomPercent: Math.max(BACKGROUND_ZOOM_MIN, backgroundZoom - 1) } })} disabled={backgroundZoom <= BACKGROUND_ZOOM_MIN} aria-label="Decrease background zoom">−</button>
+                  <label><input key={backgroundZoom} type="number" min={BACKGROUND_ZOOM_MIN} max={BACKGROUND_ZOOM_MAX} step="1" defaultValue={backgroundZoom} onBlur={(event) => onPatch({ backgrounds: { zoomPercent: normalizeBackgroundZoom(event.target.value) } })} onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()} aria-label="Background zoom percent" /><span>%</span></label>
+                  <button type="button" onClick={() => onPatch({ backgrounds: { zoomPercent: Math.min(BACKGROUND_ZOOM_MAX, backgroundZoom + 1) } })} disabled={backgroundZoom >= BACKGROUND_ZOOM_MAX} aria-label="Increase background zoom">+</button>
+                  {backgroundZoom !== BACKGROUND_ZOOM_DEFAULT && <button type="button" className="background-zoom-reset" onClick={() => onPatch({ backgrounds: { zoomPercent: BACKGROUND_ZOOM_DEFAULT } })}>Reset</button>}
+                </div>
+              </div>
               <Toggle label="Workspace-specific backgrounds" checked={settings.backgrounds?.workspaceSpecific} onChange={(value) => onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && rotationScope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })} />
               <div className="background-rotation-settings">
                 <Toggle label="Rotate backgrounds" detail="Advances automatically and saves the selected image in PostgreSQL." checked={backgroundRotation.enabled === true} onChange={(value) => onPatch({ backgrounds: { rotation: { enabled: value } } })} />

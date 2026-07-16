@@ -42,6 +42,7 @@ VALUES (
     "backgrounds": {
       "workspaceSpecific": false,
       "globalAssetId": null,
+      "zoomPercent": 100,
       "rotation": {
         "enabled": false,
         "intervalMinutes": 15,

@@ -19,17 +19,29 @@ button, a { -webkit-tap-highlight-color: transparent; }
   --app-font: Inter, system-ui, sans-serif;
   --widget-rail-width: clamp(260px, 28vw, 430px);
   position: fixed;
+  z-index: 1;
   inset: 0;
   display: flex;
   gap: 0;
   overflow: clip;
   color: var(--app-text);
   font-family: var(--app-font);
+  background: transparent;
+  isolation: isolate;
+}
+
+.app-background-layer {
+  position: fixed;
+  z-index: 0;
+  inset: -1px;
+  pointer-events: none;
   background-color: #1d283d;
   background-image: var(--app-background-image, radial-gradient(circle at 68% 26%, rgba(220, 230, 255, .62), transparent 24%), radial-gradient(circle at 66% 52%, rgba(109, 128, 167, .88), transparent 38%), linear-gradient(150deg, #8296b7 0%, #a8b5cc 34%, #42566e 61%, #1a2e35 100%));
-  background-size: cover;
   background-position: center;
-  isolation: isolate;
+  background-size: cover;
+  transform: scale(var(--app-background-scale, 1));
+  transform-origin: center;
+  transition: transform 180ms ease;
 }
 
 .vstart-app::before {
@@ -1101,6 +1113,17 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .mail-workspace-settings strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .mail-workspace-settings small { opacity: .46; font-size: 8px; }
 .mail-workspace-settings select { width: min(220px, 48%); height: 34px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 0 9px; color: #eef2ff; background: rgba(255,255,255,.055); font-size: 9px; }
+.background-zoom-settings { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
+.background-zoom-settings > span { min-width: 0; display: grid; gap: 4px; }
+.background-zoom-settings strong { font-size: 12px; }
+.background-zoom-settings small { max-width: 420px; opacity: .5; font-size: 8px; line-height: 1.4; }
+.background-zoom-settings > div { flex: none; display: flex; align-items: center; gap: 5px; }
+.background-zoom-settings button { min-width: 31px; height: 31px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0 8px; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; font-size: 12px; }
+.background-zoom-settings button:disabled { cursor: default; opacity: .3; }
+.background-zoom-settings label { height: 31px; display: flex; align-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0 7px; background: rgba(255,255,255,.04); }
+.background-zoom-settings input { width: 39px; border: 0; outline: 0; padding: 0; color: inherit; background: transparent; font-size: 10px; text-align: right; }
+.background-zoom-settings label span { opacity: .5; font-size: 9px; }
+.background-zoom-settings .background-zoom-reset { min-width: 46px; font-size: 8px; }
 .background-rotation-settings { margin-top: 14px; padding: 0 14px 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
 .background-rotation-settings .setting-row { min-height: 54px; }
 .background-rotation-controls { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; align-items: end; }
@@ -1214,6 +1237,8 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
   .iframe-toolbar-actions .result-shortcut-target { order: 3; }
   .iframe-assist-status { margin-right: auto; }
   .page-controls { right: 8px; bottom: 8px; }
+  .background-zoom-settings { align-items: stretch; flex-direction: column; gap: 10px; }
+  .background-zoom-settings > div { flex-wrap: wrap; }
 }
 
 @media (hover: none) {

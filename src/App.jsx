@@ -9,6 +9,7 @@ import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
 import { backgroundImageLayers, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
+import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
@@ -861,6 +862,9 @@ export function App() {
     '--app-glow': adaptiveGlowColor || manualGlowColor,
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
+  }
+  const backgroundStyle = {
+    '--app-background-scale': backgroundZoomScale(settings.backgrounds?.zoomPercent),
     ...(backgroundId ? { '--app-background-image': backgroundImageLayers(backgroundId) } : {}),
   }
   const showCompactInnerRing = compact
@@ -869,7 +873,8 @@ export function App() {
     && routedView.type !== 'service'
     && !agentMode
 
-  return (
+  return (<>
+    <div className="app-background-layer" style={backgroundStyle} aria-hidden="true" />
     <main
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
@@ -1027,5 +1032,5 @@ export function App() {
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}
     </main>
-  )
+  </>)
 }
