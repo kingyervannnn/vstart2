@@ -55,4 +55,5 @@ export const api = {
   uploadAsset: (kind, mimeType, data, originalName) => mutation('/api/assets', 'POST', { kind, mimeType, data, originalName }, 'asset-create'),
   search: (query) => request(`/api/search?q=${encodeURIComponent(query)}`),
   suggestions: (query) => request(`/api/suggestions?q=${encodeURIComponent(query)}`),
+  shortcutMetadata: (url, signal) => request(`/api/shortcut-metadata?url=${encodeURIComponent(url)}`, { signal }),
 }

@@ -5,6 +5,7 @@ import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
 import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
 import { loadBootstrap } from './queries.mjs'
+import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
 
 const PORT = Number(process.env.PORT || 3110)
@@ -209,6 +210,11 @@ async function handleRequest(request, response) {
 
   if (request.method === 'GET' && pathname === '/api/bootstrap') {
     return sendJson(response, 200, await loadBootstrap(pool))
+  }
+
+  if (request.method === 'GET' && pathname === '/api/shortcut-metadata') {
+    const destination = parse(httpUrl, url.searchParams.get('url') || '')
+    return sendJson(response, 200, await predictShortcutTitle(destination))
   }
 
   if (request.method === 'POST' && pathname === '/api/assets') {

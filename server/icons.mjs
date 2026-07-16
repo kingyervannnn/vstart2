@@ -1,7 +1,6 @@
 import crypto from 'node:crypto'
-import dns from 'node:dns/promises'
-import net from 'node:net'
 import { HttpError } from './http.mjs'
+import { assertPublicHttpUrl } from './public-url.mjs'
 
 const MAX_ICON_BYTES = 768 * 1024
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'])
@@ -27,40 +26,10 @@ function faviconCandidates(value) {
   ]
 }
 
-function isPrivateV4(address) {
-  const parts = address.split('.').map(Number)
-  return parts[0] === 10 || parts[0] === 127 || parts[0] === 0 ||
-    (parts[0] === 169 && parts[1] === 254) ||
-    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-    (parts[0] === 192 && parts[1] === 168) ||
-    (parts[0] >= 224)
-}
-
-function isPrivateAddress(address) {
-  if (net.isIPv4(address)) return isPrivateV4(address)
-  if (!net.isIPv6(address)) return true
-  const normalized = address.toLowerCase()
-  return normalized === '::' || normalized === '::1' || normalized.startsWith('fc') ||
-    normalized.startsWith('fd') || normalized.startsWith('fe8') || normalized.startsWith('fe9') ||
-    normalized.startsWith('fea') || normalized.startsWith('feb') || normalized.startsWith('::ffff:127.') ||
-    normalized.startsWith('::ffff:10.') || normalized.startsWith('::ffff:192.168.')
-}
-
-async function assertPublicUrl(value) {
-  const url = new URL(value)
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Unsupported image protocol')
-  if (url.username || url.password) throw new Error('Credentials are not allowed in image URLs')
-  const addresses = await dns.lookup(url.hostname, { all: true, verbatim: true })
-  if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) {
-    throw new Error('Image URL resolves to a non-public address')
-  }
-  return url
-}
-
 async function fetchPublicImage(source) {
   let current = source
   for (let redirect = 0; redirect <= 3; redirect += 1) {
-    const url = await assertPublicUrl(current)
+    const url = await assertPublicHttpUrl(current)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000)
     let response
