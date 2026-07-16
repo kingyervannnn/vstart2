@@ -52,6 +52,7 @@ export const AgentMode = forwardRef(function AgentMode({
   onStateChange,
   onEditMessage,
   onOpenInline,
+  onClose,
 }, ref) {
   const clientRef = useRef(null)
   const transcriptRef = useRef(null)
@@ -435,6 +436,7 @@ export const AgentMode = forwardRef(function AgentMode({
     return (
       <section className={`agent-mode agent-${connection.state}`} aria-label="Agent Mode">
         <div className="agent-state-card">
+          <button type="button" className="agent-state-exit" onClick={onClose} aria-label="Exit Agent Mode" title="Exit Agent Mode"><X /></button>
           <Icon />
           <small>HERMES AGENT MODE</small>
           <h2>{connection.state === 'locked' ? 'Safety lock active' : connection.state === 'disabled' ? 'Agent Mode disabled' : 'Agent Bridge unavailable'}</h2>
@@ -459,6 +461,7 @@ export const AgentMode = forwardRef(function AgentMode({
           </select>
           <button type="button" onClick={() => onNavigate('new')} aria-label="New agent session" disabled={connection.state !== 'ready'}><Plus /></button>
         </div>
+        <button type="button" className="agent-exit" onClick={onClose} aria-label="Exit Agent Mode" title="Exit Agent Mode"><X /></button>
       </header>
 
       <div ref={transcriptRef} className="agent-transcript" aria-live="polite">

@@ -83,6 +83,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .compact-widget-dock button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 68%, transparent); background: transparent; cursor: pointer; }
 .compact-widget-dock button:hover, .compact-widget-dock button:focus-visible { color: var(--app-text); }
 .compact-widget-dock svg { width: 15px; height: 15px; }
+.compact-mode.agent-active .compact-widget-dock, .compact-mode.agent-active .page-controls { opacity: 0; visibility: hidden; pointer-events: none; }
 
 .clock-widget { display: flex; align-items: flex-start; gap: clamp(8px, 1vw, 14px); width: max-content; max-width: 100%; }
 .primary-clock { min-width: 0; display: grid; gap: 10px; border: 0; padding: 0 0 5px; color: inherit; background: transparent; text-align: left; cursor: pointer; transition: filter 160ms ease; }
@@ -204,6 +205,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .view-veil.inline-veil { --view-veil-blur: 20px; --view-veil-saturation: .85; --view-veil-top: rgba(9,14,23,.31); --view-veil-bottom: rgba(9,14,23,.6); }
 .mirrored .view-veil { right: calc(var(--widget-rail-width) - var(--view-left-bleed)); left: 0; -webkit-mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); mask-image: linear-gradient(to left, transparent 0, rgba(0,0,0,.24) 38px, #000 136px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 28px, #000 92px); }
 .compact-mode .view-veil, .compact-mode.mirrored .view-veil { right: 0; left: 0; -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,.24) 26px, #000 88px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 24px, #000 82px); mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,.24) 26px, #000 88px), linear-gradient(to bottom, transparent 0, rgba(0,0,0,.26) 24px, #000 82px); }
+.compact-mode .view-veil.service-veil, .compact-mode.mirrored .view-veil.service-veil { inset: 0; background: rgba(9,14,23,.38); -webkit-mask-image: none; mask-image: none; }
 
 .scrolling-header {
   position: absolute;
@@ -457,6 +459,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .agent-toolbar { min-height: 52px; flex: none; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .agent-session-picker, .agent-runtime-controls { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .agent-session-picker { flex: 1; }
+.agent-exit { width: 34px; flex: none; margin-left: auto; padding: 0 !important; }
 .agent-runtime-controls { order: 2; justify-content: flex-end; }
 .agent-session-picker > svg { width: 18px; height: 18px; flex: none; color: var(--app-accent); }
 .agent-toolbar select, .agent-control-deck select { min-width: 0; height: 34px; border: 1px solid rgba(255,255,255,.11); border-radius: 10px; padding: 0 28px 0 10px; color: var(--app-text); background: rgba(14,19,29,.2); outline: 0; font-size: 10px; }
@@ -526,7 +529,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .agent-statusbar .agent-control-error { min-width: 0; overflow: hidden; color: #ffb4bb; white-space: nowrap; text-overflow: ellipsis; }
 .agent-statusbar svg { width: 11px; height: 11px; }
 .agent-statusbar button { height: 25px; margin-left: auto; color: #ffb2ba; }
-.agent-state-card { width: min(470px, calc(100% - 32px)); margin: auto; display: flex; flex-direction: column; align-items: center; padding: 30px; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: rgba(13,18,28,.47); box-shadow: 0 22px 70px rgba(0,0,0,.22); text-align: center; }
+.agent-state-card { position: relative; width: min(470px, calc(100% - 32px)); margin: auto; display: flex; flex-direction: column; align-items: center; padding: 30px; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: rgba(13,18,28,.47); box-shadow: 0 22px 70px rgba(0,0,0,.22); text-align: center; }
+.agent-state-card .agent-state-exit { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 9px; }
+.agent-state-card .agent-state-exit svg { width: 14px; height: 14px; margin: 0; }
 .agent-state-card > svg { width: 34px; height: 34px; margin-bottom: 12px; color: var(--app-accent); }
 .agent-locked .agent-state-card > svg { color: #ffc76a; }
 .agent-state-card small { font-size: 8px; letter-spacing: .2em; opacity: .48; }
@@ -893,6 +898,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .settings-backdrop { padding: 28px; }
 .settings-panel { width: min(960px, 100%); height: min(720px, 100%); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 25px; color: #eef2ff; background: rgba(12,17,26,.94); box-shadow: 0 30px 90px rgba(0,0,0,.45); }
+.compact-mode .settings-backdrop { padding: 0; }
+.compact-mode .settings-panel { width: 100%; height: 100%; border-radius: 0; }
 .settings-panel > header { height: 72px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 21px; border-bottom: 1px solid rgba(255,255,255,.12); }
 .settings-panel > header > div { flex: 1; }
 .settings-panel > header small { font-size: 9px; letter-spacing: .2em; opacity: .52; }
