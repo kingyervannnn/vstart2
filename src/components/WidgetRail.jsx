@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CloudSun, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { CloudSun, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
+import { EnvironmentControl } from './EnvironmentControl.jsx'
 
 function ClockFace({ location, now, twentyFourHour, primary = false, active = false, onSelect }) {
   const time = formatLocationTime(now, location, twentyFourHour)
@@ -172,6 +173,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
         {widgets.notes !== false && <button type="button" onClick={() => onOpenWidget('notes')} aria-label="Open notes"><NotebookPen /></button>}
         {widgets.email !== false && <button type="button" onClick={() => onOpenWidget('mail')} aria-label="Open inbox"><Mail /></button>}
         {widgets.music !== false && <button type="button" onClick={() => onOpenWidget('music')} aria-label="Open music queue"><Music2 /></button>}
+        {widgets.environment !== false && <button type="button" onClick={() => onOpenWidget('environment')} aria-label="Open environment controls"><Lightbulb /></button>}
       </nav>
     )
   }
@@ -184,6 +186,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
         {widgets.notes !== false && <WidgetAccess icon={NotebookPen} label="Notes" detail="Open notes" onClick={() => onOpenWidget('notes')} />}
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}
       </div>
+      {widgets.environment !== false && <EnvironmentControl onOpen={() => onOpenWidget('environment')} />}
       {widgets.music !== false && (
         <section className={`music-widget music-glow-${musicGlowStyle} glow-trigger-${musicGlowTrigger} ${musicState.data && !musicState.error ? 'music-connected' : ''} ${musicState.data?.isPlaying ? 'music-playing' : ''} ${widgets.musicOutline === true ? 'music-outline' : 'music-no-outline'}`} style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>
           <label className="music-source-select"><span>Source</span><select value={activeMusicSource?.id || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length} aria-label="Music source">

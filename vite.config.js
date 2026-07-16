@@ -18,6 +18,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/stt/, ''),
       },
+      '/environment-bridge': {
+        target: process.env.VSTART2_ENVIRONMENT_BRIDGE_URL || 'http://127.0.0.1:3140',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/environment-bridge/, ''),
+      },
     },
   },
 })

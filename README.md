@@ -78,6 +78,7 @@ Parallel host ports:
 | Speech to text | `8091` |
 | Agent bridge (optional native host service) | `/agent-bridge` via V Start; `3120` loopback only |
 | Mail bridge (native host service) | `3130` loopback only |
+| Environment bridge (native host service) | `/environment-bridge` via V Start; `3140` loopback only |
 
 Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
 untracked `.env` file before stack startup. Mail uses the existing local `mailctl`
@@ -85,6 +86,12 @@ accounts and Keychain credentials through the native
 [Mail Bridge](mail-bridge/README.md); install it with
 `npm run mail:bridge:manage -- install`.
 There is intentionally no AI service or AI-provider configuration.
+
+The Environment widget uses the existing `room-light` CLI through a narrow native
+[Environment Bridge](environment-bridge/README.md). Install it with
+`npm run environment:bridge:manage -- install`. The bridge discovers the CLI's sanitized
+color and intensity capabilities at runtime, so newly configured options appear without a
+V Start code change; it never accepts arbitrary shell commands.
 
 The Music widget is connected through a database-backed source registry. V Start seeds a
 YouTube Music Desktop source at `http://127.0.0.1:26538`; enable the YouTube Music

@@ -60,6 +60,7 @@ VALUES (
       "notes": true,
       "email": true,
       "music": true,
+      "environment": true,
       "musicBlur": 18
     }
   }'::jsonb

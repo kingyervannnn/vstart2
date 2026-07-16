@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, CloudSun, FileText, Forward, Lightbulb, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
 import { VoiceSearchButton } from './VoiceSearchButton.jsx'
+import { EnvironmentControl } from './EnvironmentControl.jsx'
 
 const SERVICE_META = {
   notes: { label: 'Notes', Icon: NotebookPen },
   mail: { label: 'Mail', Icon: Mail },
   weather: { label: 'Weather', Icon: CloudSun },
   music: { label: 'Music', Icon: Music2 },
+  environment: { label: 'Environment', Icon: Lightbulb },
 }
 
 function MusicArtwork({ src, large = false }) {
@@ -791,13 +793,13 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
 }
 
 export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, notesSettings, onNotesSettingsPatch, weatherSettings, workspaces = [], activeWorkspaceId, openLinksInNewTab, onOpenInline, onClose }) {
-  const [state, setState] = useState({ loading: !['music', 'mail', 'notes'].includes(kind), error: '', data: null })
+  const [state, setState] = useState({ loading: !['music', 'mail', 'notes', 'environment'].includes(kind), error: '', data: null })
   const weatherLocation = activeWeatherLocation(weatherSettings)
   const weatherCelsius = weatherSettings?.celsius === true
   const weatherUrl = weatherForecastUrl(weatherLocation, { celsius: weatherCelsius, detailed: true })
 
   useEffect(() => {
-    if (kind === 'music' || kind === 'mail' || kind === 'notes') {
+    if (kind === 'music' || kind === 'mail' || kind === 'notes' || kind === 'environment') {
       setState({ loading: false, error: '', data: null })
       return undefined
     }
@@ -834,6 +836,9 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
         <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} onClose={onClose} />
       </section>
     )
+  }
+  if (kind === 'environment') {
+    return <section className="service-rail-view environment-service" aria-label="Environment"><EnvironmentControl expanded onClose={onClose} /></section>
   }
   return (
     <section className={`service-rail-view ${kind}-service`} aria-label={meta.label}>

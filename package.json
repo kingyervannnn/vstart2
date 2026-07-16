@@ -23,6 +23,9 @@
     "mail:bridge": "node mail-bridge/index.mjs",
     "mail:bridge:manage": "node mail-bridge/launchd.mjs",
     "test:mail-bridge": "vitest run mail-bridge",
+    "environment:bridge": "node environment-bridge/index.mjs",
+    "environment:bridge:manage": "node environment-bridge/launchd.mjs",
+    "test:environment-bridge": "vitest run environment-bridge",
     "test:watch": "vitest",
     "check:persistence": "node scripts/check-browser-persistence.mjs",
     "verify": "npm run lint && npm run check:persistence && npm test && npm run build"

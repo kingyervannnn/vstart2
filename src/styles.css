@@ -139,6 +139,74 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .widget-inline-panel ul { list-style: none; margin: 7px 0 0; padding: 0; display: grid; gap: 4px; }
 .widget-inline-panel li { max-width: 100%; overflow: hidden; font-size: 10px; opacity: .72; white-space: nowrap; text-overflow: ellipsis; }
 
+.environment-control { min-width: 0; color: inherit; }
+.environment-control.widget { width: min(100%, 300px); display: grid; gap: 10px; margin-top: 17px; padding: 12px 0; border-block: 1px solid rgba(255,255,255,.13); }
+.environment-control.widget.compact-strip { grid-template-columns: minmax(72px, 1fr) 60px 48px 51px 27px; align-items: center; gap: 4px; padding-block: 8px; }
+.environment-open, .environment-heading-button { min-width: 0; border: 0; padding: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
+.environment-open { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+.environment-open .environment-heading-icon { width: 25px; height: 25px; border-radius: 8px; }
+.environment-open > span:last-child { min-width: 0; display: grid; gap: 1px; }
+.environment-open strong, .environment-open small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.environment-open strong { font-size: 9px; }
+.environment-open small { color: color-mix(in srgb, var(--app-text) 48%, transparent); font-size: 7px; }
+.environment-strip-select { position: relative; min-width: 0; display: block; }
+.environment-strip-select::after { content: '⌄'; position: absolute; right: 5px; top: 50%; translate: 0 -58%; color: color-mix(in srgb, var(--app-text) 45%, transparent); font-size: 8px; pointer-events: none; }
+.environment-strip-select select { width: 100%; height: 28px; appearance: none; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; padding: 0 13px 0 6px; color: color-mix(in srgb, var(--app-text) 78%, transparent); background: rgba(12,17,25,.15); outline: 0; cursor: pointer; font-size: 7px; }
+.environment-color-select i { position: absolute; z-index: 1; left: 6px; top: 50%; width: 8px; height: 8px; translate: 0 -50%; border: 1px solid rgba(255,255,255,.46); border-radius: 50%; background: var(--environment-swatch); box-shadow: 0 0 8px color-mix(in srgb, var(--environment-swatch) 42%, transparent); pointer-events: none; }
+.environment-color-select select { padding-left: 18px; }
+.environment-control.compact-strip .environment-power { min-width: 0; width: 51px; height: 28px; padding-inline: 6px; }
+.environment-expand, .environment-strip-retry { width: 27px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 9px; padding: 0; color: color-mix(in srgb, var(--app-text) 54%, transparent); background: transparent; cursor: pointer; }
+.environment-expand:hover, .environment-expand:focus-visible, .environment-strip-retry:hover, .environment-strip-retry:focus-visible { outline: 0; color: var(--app-text); background: rgba(255,255,255,.05); }
+.environment-expand svg, .environment-strip-retry svg { width: 13px; height: 13px; }
+.environment-heading-button { display: flex; align-items: center; gap: 9px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.environment-control > header { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.environment-heading { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.environment-heading-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 10px; color: color-mix(in srgb, var(--app-accent) 76%, var(--app-text)); background: color-mix(in srgb, var(--app-accent) 10%, transparent); }
+.environment-heading-icon svg { width: 15px; height: 15px; }
+.environment-heading > span:last-child { min-width: 0; display: grid; gap: 2px; }
+.environment-heading strong { font-size: 11px; }
+.environment-heading small { overflow: hidden; color: color-mix(in srgb, var(--app-text) 49%, transparent); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.environment-header-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.environment-power { min-width: 58px; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 999px; padding: 0 9px; color: color-mix(in srgb, var(--app-text) 55%, transparent); background: rgba(255,255,255,.035); cursor: pointer; font-size: 8px; transition: color 150ms ease, border-color 150ms ease, background 150ms ease; }
+.environment-power.on { color: #fff5ce; border-color: rgba(255,224,139,.28); background: rgba(255,205,94,.1); }
+.environment-power:disabled { cursor: default; opacity: .45; }
+.environment-power svg { width: 12px; height: 12px; }
+.environment-channel-list { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.environment-channel-list button { min-width: 0; height: 31px; display: flex; align-items: center; gap: 6px; overflow: hidden; border: 1px solid transparent; border-radius: 9px; padding: 0 7px; color: color-mix(in srgb, var(--app-text) 56%, transparent); background: transparent; cursor: pointer; font-size: 8px; transition: color 140ms ease, border-color 140ms ease, background 140ms ease; }
+.environment-channel-list button:hover, .environment-channel-list button:focus-visible { outline: 0; color: var(--app-text); background: rgba(255,255,255,.045); }
+.environment-channel-list button.active { color: var(--app-text); border-color: rgba(255,255,255,.13); background: rgba(255,255,255,.055); }
+.environment-channel-list button:disabled { cursor: default; opacity: .55; }
+.environment-channel-list i { width: 11px; height: 11px; flex: none; border: 1px solid rgba(255,255,255,.42); border-radius: 50%; background: var(--environment-swatch); box-shadow: 0 0 10px color-mix(in srgb, var(--environment-swatch) 42%, transparent); }
+.environment-channel-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.environment-intensity { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding-top: 1px; color: color-mix(in srgb, var(--app-text) 50%, transparent); font-size: 8px; }
+.environment-intensity input[type='range'] { width: 100%; height: 16px; appearance: none; margin: 0; background: transparent; cursor: pointer; }
+.environment-intensity input[type='range']::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 72%, white), rgba(255,255,255,.16)); }
+.environment-intensity input[type='range']::-webkit-slider-thumb { width: 12px; height: 12px; appearance: none; margin-top: -4.5px; border: 1px solid rgba(255,255,255,.58); border-radius: 50%; background: color-mix(in srgb, var(--app-accent) 74%, white); box-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 34%, transparent); }
+.environment-intensity input[type='range']:focus-visible { outline: 0; filter: brightness(1.16); }
+.environment-intensity input[type='range']:disabled { cursor: default; opacity: .48; }
+.environment-intensity output { min-width: 30px; color: color-mix(in srgb, var(--app-text) 78%, transparent); font-variant-numeric: tabular-nums; text-align: right; }
+.environment-retry, .environment-inline-error { min-height: 33px; display: flex; align-items: center; gap: 7px; border: 0; border-radius: 9px; padding: 0 7px; color: #ffc2c7; background: transparent; cursor: pointer; font-size: 8px; text-align: left; }
+.environment-retry { color: color-mix(in srgb, var(--app-text) 55%, transparent); }
+.environment-retry svg, .environment-inline-error svg { width: 12px; height: 12px; flex: none; }
+.environment-close { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; color: inherit; background: rgba(255,255,255,.045); cursor: pointer; }
+.environment-close svg { width: 14px; height: 14px; }
+.environment-service { padding-top: 0; }
+.environment-control.expanded { width: min(760px, 100%); display: grid; gap: 20px; margin: 0 auto; padding-top: 7px; }
+.environment-control.expanded > header { min-height: 55px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,.11); }
+.environment-control.expanded .environment-heading-icon { width: 38px; height: 38px; border-radius: 12px; }
+.environment-control.expanded .environment-heading-icon svg { width: 18px; height: 18px; }
+.environment-control.expanded .environment-heading strong { font-size: 18px; }
+.environment-control.expanded .environment-heading small { font-size: 9px; }
+.environment-control.expanded .environment-channel-list { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; }
+.environment-control.expanded .environment-channel-list button { height: 48px; padding-inline: 12px; border-color: rgba(255,255,255,.08); border-radius: 13px; font-size: 10px; }
+.environment-control.expanded .environment-channel-list button.active { border-color: rgba(255,255,255,.2); }
+.environment-control.expanded .environment-channel-list i { width: 16px; height: 16px; }
+.environment-control.expanded .environment-intensity { min-height: 48px; padding: 0 12px; border-block: 1px solid rgba(255,255,255,.09); font-size: 10px; }
+.environment-control.expanded .environment-intensity input[type='range'] { height: 24px; }
+.environment-control.expanded .environment-intensity input[type='range']::-webkit-slider-runnable-track { height: 4px; }
+.environment-control.expanded .environment-intensity input[type='range']::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -5.5px; }
+
 .music-widget {
   position: relative;
   display: grid;

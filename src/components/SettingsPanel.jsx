@@ -326,7 +326,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'widgets' && <>
               <h3>Widgets</h3>
-              {['clock', 'weather', 'notes', 'email', 'music'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              {['clock', 'weather', 'notes', 'email', 'music', 'environment'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
               <div className="time-weather-settings">
                 <h4>Time &amp; weather</h4>
                 <label className="setting-field"><span>Primary city</span><select value={weatherLocations.primary.id} onChange={(event) => selectPrimaryLocation(event.target.value)}>{LOCATION_OPTIONS.map((location) => <option key={location.id} value={location.id}>{location.city} · {location.country}</option>)}</select></label>

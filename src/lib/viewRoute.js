@@ -1,4 +1,4 @@
-const SERVICE_VIEWS = new Set(['mail', 'music', 'notes', 'weather'])
+const SERVICE_VIEWS = new Set(['environment', 'mail', 'music', 'notes', 'weather'])
 
 function safeHttpUrl(value) {
   try {
