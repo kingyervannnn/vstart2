@@ -7,6 +7,7 @@ import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
+import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -23,6 +24,25 @@ import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
+const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+
+function backgroundMimeType(file) {
+  if (BACKGROUND_MIME_TYPES.has(file.type)) return file.type
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  return ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' })[extension] || ''
+}
+
+function readBackgroundFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const value = String(reader.result || '')
+      resolve(value.slice(value.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
+    reader.readAsDataURL(file)
+  })
+}
 
 function LoadingShell({ error, onRetry }) {
   return (
@@ -238,6 +258,42 @@ export function App() {
     }).finally(() => setSavingCount((value) => Math.max(0, value - 1)))
     return settingsQueueRef.current
   }, [applyBootstrap, load])
+
+  const rotateBackground = useCallback(async () => {
+    const current = bootstrapRef.current
+    const currentSettings = current?.settings?.document || {}
+    const workspace = current?.workspaces?.find((item) => item.id === activeWorkspace?.id)
+    if (!workspace) return { rotated: false, count: 0 }
+    const candidates = backgroundRotationCandidates({
+      settings: currentSettings,
+      assets: current.backgroundAssets || [],
+      collections: current.backgroundCollections || [],
+      workspaceId: workspace.id,
+    })
+    const currentId = currentSettings.backgrounds?.workspaceSpecific && workspace.backgroundAssetId
+      ? workspace.backgroundAssetId
+      : currentSettings.backgrounds?.globalAssetId
+    const nextId = nextBackgroundId(candidates, currentId)
+    if (!nextId || nextId === currentId) return { rotated: false, count: candidates.length }
+
+    if (currentSettings.backgrounds?.workspaceSpecific) {
+      const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: nextId, version: workspace.version })
+      applyBootstrap(result.bootstrap)
+    } else {
+      await patchSettings({ backgrounds: { globalAssetId: nextId } })
+    }
+    return { rotated: true, count: candidates.length }
+  }, [activeWorkspace?.id, applyBootstrap, patchSettings])
+
+  useEffect(() => {
+    const rotation = settings.backgrounds?.rotation
+    if (!rotation?.enabled) return undefined
+    if (rotation.scope === 'workspace' && !settings.backgrounds?.workspaceSpecific) return undefined
+    const timer = window.setInterval(() => {
+      void rotateBackground().catch((error) => setToast({ type: 'error', message: error.message }))
+    }, backgroundRotationInterval(rotation.intervalMinutes) * 60_000)
+    return () => window.clearInterval(timer)
+  }, [rotateBackground, settings.backgrounds?.rotation, settings.backgrounds?.workspaceSpecific])
 
   const linkAgentSession = useCallback(async (workspaceId, hermesSessionId, titleOverride = null) => {
     const result = await api.linkAgentSession({ workspaceId, hermesSessionId, titleOverride })
@@ -696,27 +752,33 @@ export function App() {
     applyBootstrap(result.bootstrap)
   }
 
-  const uploadBackground = async (file) => {
-    if (!file) return
-    if (file.size > 20 * 1024 * 1024) throw new Error('Backgrounds must be smaller than 20 MB.')
-    const data = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const value = String(reader.result || '')
-        resolve(value.slice(value.indexOf(',') + 1))
-      }
-      reader.onerror = () => reject(new Error('The background could not be read.'))
-      reader.readAsDataURL(file)
-    })
+  const uploadBackgrounds = async (files, collectionName = null) => {
+    const images = Array.from(files || []).filter((file) => backgroundMimeType(file))
+    if (!images.length) throw new Error('That selection does not contain a supported image.')
+    const oversized = images.find((file) => file.size > 20 * 1024 * 1024)
+    if (oversized) throw new Error(`${oversized.name} is larger than 20 MB.`)
     setSavingCount((value) => value + 1)
     try {
-      const asset = await api.uploadAsset('background', file.type, data, file.name)
-      if (settings.backgrounds?.workspaceSpecific) {
-        const result = await api.updateWorkspace(activeWorkspace.id, { backgroundAssetId: asset.assetId, version: activeWorkspace.version })
-        applyBootstrap(result.bootstrap)
-      } else {
-        await patchSettings({ backgrounds: { globalAssetId: asset.assetId } })
+      const assetIds = []
+      for (const file of images) {
+        const asset = await api.uploadAsset('background', backgroundMimeType(file), await readBackgroundFile(file), file.name, collectionName || undefined)
+        assetIds.push(asset.assetId)
       }
+      const uniqueAssetIds = [...new Set(assetIds)]
+      const current = bootstrapRef.current
+      const currentSettings = current.settings.document
+      const workspace = current.workspaces.find((item) => item.id === activeWorkspace.id)
+      if (currentSettings.backgrounds?.workspaceSpecific) {
+        const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: uniqueAssetIds[0], version: workspace.version })
+        applyBootstrap(result.bootstrap)
+        const pools = currentSettings.backgrounds?.rotation?.workspacePools || {}
+        const workspacePool = [...new Set([...(pools[workspace.id] || []), ...uniqueAssetIds])]
+        await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [workspace.id]: workspacePool } } } })
+      } else {
+        await patchSettings({ backgrounds: { globalAssetId: uniqueAssetIds[0] } })
+      }
+      setToast({ type: 'success', message: collectionName ? `${uniqueAssetIds.length} background${uniqueAssetIds.length === 1 ? '' : 's'} imported from ${collectionName}.` : `${images[0].name} uploaded.` })
+      return uniqueAssetIds
     } finally {
       setSavingCount((value) => Math.max(0, value - 1))
     }
@@ -728,9 +790,37 @@ export function App() {
       if (settings.backgrounds?.workspaceSpecific) {
         const result = await api.updateWorkspace(activeWorkspace.id, { backgroundAssetId: assetId, version: activeWorkspace.version })
         applyBootstrap(result.bootstrap)
+        if (assetId) {
+          const pools = bootstrapRef.current.settings.document.backgrounds?.rotation?.workspacePools || {}
+          const workspacePool = pools[activeWorkspace.id] || []
+          if (!workspacePool.includes(assetId)) {
+            await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [activeWorkspace.id]: [...workspacePool, assetId] } } } })
+          }
+        }
       } else {
         await patchSettings({ backgrounds: { globalAssetId: assetId } })
       }
+    } finally {
+      setSavingCount((value) => Math.max(0, value - 1))
+    }
+  }
+
+  const toggleWorkspaceBackground = async (assetId) => {
+    const currentSettings = bootstrapRef.current.settings.document
+    const pools = currentSettings.backgrounds?.rotation?.workspacePools || {}
+    const currentPool = pools[activeWorkspace.id] || []
+    const nextPool = currentPool.includes(assetId)
+      ? currentPool.filter((id) => id !== assetId)
+      : [...currentPool, assetId]
+    await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [activeWorkspace.id]: nextPool } } } })
+  }
+
+  const deleteBackground = async (assetId) => {
+    setSavingCount((value) => value + 1)
+    try {
+      const result = await api.deleteBackground(assetId)
+      applyBootstrap(result.bootstrap)
+      setToast({ type: 'success', message: 'Background deleted.' })
     } finally {
       setSavingCount((value) => Math.max(0, value - 1))
     }
@@ -910,7 +1000,7 @@ export function App() {
         onDelete={requestDeleteWorkspace}
       />}
       {workspaceDialog && <WorkspaceDialog workspace={workspaceDialog.workspace} busy={busy} onClose={() => setWorkspaceDialog(null)} onSubmit={saveWorkspaceDialog} />}
-      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} activeBackgroundId={backgroundId || null} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={(id) => requestDeleteWorkspace(workspaces.find((workspace) => workspace.id === id))} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackground={uploadBackground} onSelectBackground={selectBackground} />}
+      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} backgroundCollections={bootstrap.backgroundCollections || []} activeBackgroundId={backgroundId || null} activeWorkspaceId={activeWorkspace.id} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={(id) => requestDeleteWorkspace(workspaces.find((workspace) => workspace.id === id))} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackgrounds={uploadBackgrounds} onSelectBackground={selectBackground} onDeleteBackground={deleteBackground} onToggleWorkspaceBackground={toggleWorkspaceBackground} onRotateBackground={rotateBackground} />}
       {confirmation && <ConfirmDialog {...confirmation} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={() => void runConfirmation()} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}

@@ -49,22 +49,39 @@ function openPlacements(bootstrap, workspaceId, preferredItemId = null, containe
 const initial = (await call('/bootstrap')).body
 assert.ok(initial.workspaces[0], 'default workspace exists')
 const backgroundName = `Integration ${runId}.png`
+const backgroundCollectionName = `Integration folder ${runId}`
 const background = await mutation('/assets', 'POST', {
   kind: 'background',
   mimeType: 'image/png',
   data: tinyPng,
   originalName: backgroundName,
+  collectionName: backgroundCollectionName,
 }, `${runId}:background-create`)
 assert.equal(background.response.status, 201)
 let backgroundBootstrap = (await call('/bootstrap')).body
 const backgroundMetadata = backgroundBootstrap.backgroundAssets.find((asset) => asset.id === background.body.assetId)
 assert.equal(backgroundMetadata.originalName, backgroundName, 'background metadata is available without loading binary content')
+const backgroundCollection = backgroundBootstrap.backgroundCollections.find((collection) => collection.name === backgroundCollectionName)
+assert.ok(backgroundCollection?.assetIds.includes(background.body.assetId), 'folder imports retain database-backed collection membership')
 const backgroundContent = await fetch(`${base}/assets/${background.body.assetId}`)
 assert.equal(backgroundContent.status, 200)
 assert.equal(backgroundContent.headers.get('content-type'), 'image/png')
+const selectedBackground = await mutation('/settings', 'PATCH', {
+  version: backgroundBootstrap.settings.version,
+  patch: {
+    backgrounds: {
+      globalAssetId: background.body.assetId,
+      rotation: { workspacePools: { [initial.workspaces[0].id]: [background.body.assetId] } },
+    },
+  },
+}, `${runId}:background-select`)
+assert.equal(selectedBackground.response.status, 200)
 const backgroundDeleted = await mutation(`/assets/${background.body.assetId}`, 'DELETE', {}, `${runId}:background-delete`)
 assert.equal(backgroundDeleted.response.status, 200)
 assert.ok(!backgroundDeleted.body.bootstrap.backgroundAssets.some((asset) => asset.id === background.body.assetId), 'unused backgrounds can be removed cleanly')
+assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.globalAssetId, null, 'deleting the selected background clears its active reference')
+assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.rotation.workspacePools[initial.workspaces[0].id], undefined, 'deleting a background clears empty workspace rotation pools')
+assert.ok(!backgroundDeleted.body.bootstrap.backgroundCollections.some((collection) => collection.id === backgroundCollection.id), 'empty imported folders are removed')
 const createdWorkspace = await mutation('/workspaces', 'POST', { name: `Smoke ${runId}`, icon: 'Briefcase' }, `${runId}:workspace-a`)
 assert.equal(createdWorkspace.response.status, 201)
 const workspace = createdWorkspace.body.bootstrap.workspaces.find((value) => value.id === createdWorkspace.body.workspaceId)

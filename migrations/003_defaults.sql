@@ -35,7 +35,14 @@ VALUES (
     },
     "backgrounds": {
       "workspaceSpecific": false,
-      "globalAssetId": null
+      "globalAssetId": null,
+      "rotation": {
+        "enabled": false,
+        "intervalMinutes": 15,
+        "scope": "all",
+        "collectionId": null,
+        "workspacePools": {}
+      }
     },
     "workspaces": {
       "individualTypography": false,

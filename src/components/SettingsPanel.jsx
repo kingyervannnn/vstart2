@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
@@ -46,10 +47,11 @@ function Toggle({ label, detail, checked, onChange }) {
   )
 }
 
-export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBackgroundId, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackground, onSelectBackground }) {
+export function SettingsPanel({ settings, workspaces, backgroundAssets, backgroundCollections, activeBackgroundId, activeWorkspaceId, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackgrounds, onSelectBackground, onDeleteBackground, onToggleWorkspaceBackground, onRotateBackground }) {
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
+  const [pendingBackgroundDeleteId, setPendingBackgroundDeleteId] = useState('')
   const [mailAccounts, setMailAccounts] = useState(() => mailBridge.peekAccounts())
   const [mailConnection, setMailConnection] = useState('checking')
   const [newMusicSource, setNewMusicSource] = useState({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
@@ -74,6 +76,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
   const musicSources = settings.music?.sources || []
   const weatherLocations = configuredWeatherLocations(settings.widgets)
   const secondaryLocationIds = weatherLocations.secondary.map((location) => location.id)
+  const backgroundRotation = settings.backgrounds?.rotation || {}
+  const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
+  const workspaceBackgroundPool = backgroundRotation.workspacePools?.[activeWorkspaceId] || []
 
   useEffect(() => {
     let live = true
@@ -238,27 +243,76 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
             </>}
             {page === 'backgrounds' && <>
               <h3>Backgrounds</h3>
-              <Toggle label="Workspace-specific backgrounds" checked={settings.backgrounds?.workspaceSpecific} onChange={(value) => onPatch({ backgrounds: { workspaceSpecific: value } })} />
+              <Toggle label="Workspace-specific backgrounds" checked={settings.backgrounds?.workspaceSpecific} onChange={(value) => onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && rotationScope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })} />
+              <div className="background-rotation-settings">
+                <Toggle label="Rotate backgrounds" detail="Advances automatically and saves the selected image in PostgreSQL." checked={backgroundRotation.enabled === true} onChange={(value) => onPatch({ backgrounds: { rotation: { enabled: value } } })} />
+                {backgroundRotation.enabled === true && <div className="background-rotation-controls">
+                  <label className="setting-field"><span>Rotation pool</span><select value={rotationScope} onChange={(event) => onPatch({ backgrounds: { rotation: { scope: event.target.value } } })}>
+                    <option value="all">All backgrounds</option>
+                    <option value="folder">Imported folder</option>
+                    {settings.backgrounds?.workspaceSpecific && <option value="workspace">Current workspace pool</option>}
+                  </select></label>
+                  {rotationScope === 'folder' && <label className="setting-field"><span>Folder</span><select value={backgroundRotation.collectionId || ''} onChange={(event) => onPatch({ backgrounds: { rotation: { collectionId: event.target.value || null } } })}>
+                    <option value="">Choose a folder</option>
+                    {(backgroundCollections || []).map((collection) => <option key={collection.id} value={collection.id}>{collection.name} · {collection.assetIds.length}</option>)}
+                  </select></label>}
+                  <label className="setting-field background-interval-field"><span>Change every</span><span><input key={backgroundRotation.intervalMinutes ?? 15} type="number" min="1" max="1440" step="1" defaultValue={backgroundRotationInterval(backgroundRotation.intervalMinutes)} onBlur={(event) => onPatch({ backgrounds: { rotation: { intervalMinutes: backgroundRotationInterval(event.target.value) } } })} onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()} /> minutes</span></label>
+                  <button type="button" className="background-rotate-now" onClick={async () => {
+                    setBackgroundError('')
+                    try {
+                      const result = await onRotateBackground()
+                      if (!result.rotated) setBackgroundError(result.count ? 'Add at least two backgrounds to this rotation pool.' : 'This rotation pool is empty.')
+                    } catch (error) { setBackgroundError(error.message) }
+                  }}><Play /> Rotate now</button>
+                  {rotationScope === 'workspace' && <p className="field-help">Use the check buttons on background cards to build this workspace’s pool. Selecting or uploading a background adds it automatically.</p>}
+                </div>}
+              </div>
               <div className="background-library" aria-label="Background library">
                 <button type="button" className={!activeBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null)} aria-pressed={!activeBackgroundId}>
                   <span>None</span>
                 </button>
-                {backgroundAssets.map((asset) => <button type="button" key={asset.id} className={activeBackgroundId === asset.id ? 'active' : ''} onClick={() => onSelectBackground(asset.id)} aria-pressed={activeBackgroundId === asset.id} title={asset.originalName || 'Background'}>
-                  {asset.byteLength <= 8 * 1024 * 1024
-                    ? <img src={`/api/assets/${asset.id}`} alt="" loading="lazy" />
-                    : <span className="background-large-preview">{asset.mimeType === 'image/gif' ? 'Animated GIF' : 'Large image'}</span>}
-                  <span>{asset.originalName || 'Background'}</span>
-                  <small>{Math.max(1, Math.round(asset.byteLength / 1024))} KiB</small>
-                </button>)}
+                {backgroundAssets.map((asset) => {
+                  const collections = (backgroundCollections || []).filter((collection) => collection.assetIds.includes(asset.id))
+                  const inWorkspacePool = workspaceBackgroundPool.includes(asset.id)
+                  const pendingDelete = pendingBackgroundDeleteId === asset.id
+                  return <article key={asset.id} className={`background-card ${activeBackgroundId === asset.id ? 'active' : ''}`}>
+                    <button type="button" className="background-card-select" onClick={() => onSelectBackground(asset.id)} aria-pressed={activeBackgroundId === asset.id} title={asset.originalName || 'Background'}>
+                      {asset.byteLength <= 8 * 1024 * 1024
+                        ? <img src={`/api/assets/${asset.id}`} alt="" loading="lazy" />
+                        : <span className="background-large-preview">{asset.mimeType === 'image/gif' ? 'Animated GIF' : 'Large image'}</span>}
+                      <span>{asset.originalName || 'Background'}</span>
+                      <small>{collections[0]?.name || `${Math.max(1, Math.round(asset.byteLength / 1024))} KiB`}</small>
+                    </button>
+                    <div className="background-card-actions">
+                      {settings.backgrounds?.workspaceSpecific && <button type="button" className={inWorkspacePool ? 'included' : ''} onClick={() => onToggleWorkspaceBackground(asset.id)} title={inWorkspacePool ? 'Remove from this workspace rotation pool' : 'Include in this workspace rotation pool'} aria-label={inWorkspacePool ? 'Remove from workspace rotation pool' : 'Include in workspace rotation pool'}>{inWorkspacePool ? <Check /> : <Plus />}</button>}
+                      <button type="button" className={`background-delete ${pendingDelete ? 'confirming' : ''}`} onClick={async () => {
+                        if (!pendingDelete) { setPendingBackgroundDeleteId(asset.id); return }
+                        setBackgroundError('')
+                        try { await onDeleteBackground(asset.id); setPendingBackgroundDeleteId('') }
+                        catch (error) { setBackgroundError(error.message) }
+                      }} title={pendingDelete ? 'Click again to delete' : 'Delete background'} aria-label={pendingDelete ? 'Confirm delete background' : 'Delete background'}>{pendingDelete ? 'Delete?' : <Trash2 />}</button>
+                    </div>
+                  </article>
+                })}
               </div>
-              <label className="background-upload"><strong>Upload background</strong><span>{settings.backgrounds?.workspaceSpecific ? 'Applies to the active workspace.' : 'Applies globally.'} Images are stored in PostgreSQL.</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={async (event) => {
-                setBackgroundError('')
-                try { await onUploadBackground(event.target.files?.[0]) }
-                catch (error) { setBackgroundError(error.message) }
-                event.target.value = ''
-              }} /></label>
+              <div className="background-upload-options">
+                <label className="background-upload"><Upload /><strong>Upload images</strong><span>{settings.backgrounds?.workspaceSpecific ? 'Adds them to the active workspace.' : 'Adds them to the global library.'}</span><input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" disabled={saving} onChange={async (event) => {
+                  setBackgroundError('')
+                  try { await onUploadBackgrounds(event.target.files) }
+                  catch (error) { setBackgroundError(error.message) }
+                  event.target.value = ''
+                }} /></label>
+                <label className="background-upload"><FolderUp /><strong>Import image folder</strong><span>Keeps the folder as a rotation collection.</span><input type="file" multiple webkitdirectory="" directory="" disabled={saving} onChange={async (event) => {
+                  setBackgroundError('')
+                  const files = Array.from(event.target.files || [])
+                  const collectionName = files[0]?.webkitRelativePath?.split('/')[0] || 'Imported backgrounds'
+                  try { await onUploadBackgrounds(files, collectionName) }
+                  catch (error) { setBackgroundError(error.message) }
+                  event.target.value = ''
+                }} /></label>
+              </div>
               {backgroundError && <p className="form-error">{backgroundError}</p>}
-              <div className="setting-note"><strong>Database-backed assets</strong><span>Background selection is restored from PostgreSQL; no browser cache is used.</span></div>
+              <div className="setting-note"><strong>Database-backed assets</strong><span>Images, folder membership, workspace pools, rotation settings, and the current selection are restored from PostgreSQL.</span></div>
             </>}
             {page === 'widgets' && <>
               <h3>Widgets</h3>

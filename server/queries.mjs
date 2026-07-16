@@ -25,6 +25,15 @@ export async function loadBootstrap(client) {
     WHERE kind = 'background'
     ORDER BY created_at DESC, id
   `)
+  const backgroundCollections = await client.query(`
+    SELECT c.id, c.name, c.created_at,
+           COALESCE(array_agg(ca.asset_id ORDER BY ca.created_at, ca.asset_id)
+             FILTER (WHERE ca.asset_id IS NOT NULL), '{}') AS asset_ids
+    FROM background_collections c
+    LEFT JOIN background_collection_assets ca ON ca.collection_id = c.id
+    GROUP BY c.id
+    ORDER BY c.created_at DESC, c.name
+  `)
   const items = await client.query(`
       SELECT id, workspace_id, parent_folder_id, pin_group_id, kind, title, url, icon_asset_id,
              icon_override_url, favicon_url, version, created_at, updated_at
@@ -63,6 +72,12 @@ export async function loadBootstrap(client) {
       mimeType: row.mime_type,
       byteLength: Number(row.byte_length),
       originalName: row.original_name,
+      createdAt: row.created_at,
+    })),
+    backgroundCollections: backgroundCollections.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      assetIds: row.asset_ids,
       createdAt: row.created_at,
     })),
     items: items.rows.map((row) => ({

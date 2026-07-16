@@ -100,6 +100,25 @@ const agentSessionUpdateSchema = z.object({
 
 const musicSourceId = z.string().trim().min(1).max(80).optional()
 
+function removeBackgroundReferences(document, assetId, removedCollectionIds = []) {
+  const next = structuredClone(document || {})
+  const backgrounds = next.backgrounds || {}
+  const rotation = backgrounds.rotation || {}
+
+  if (backgrounds.globalAssetId === assetId) backgrounds.globalAssetId = null
+  if (rotation.workspacePools && typeof rotation.workspacePools === 'object') {
+    rotation.workspacePools = Object.fromEntries(Object.entries(rotation.workspacePools).flatMap(([workspaceId, ids]) => {
+      const remaining = Array.isArray(ids) ? ids.filter((id) => id !== assetId) : []
+      return remaining.length ? [[workspaceId, remaining]] : []
+    }))
+  }
+  if (removedCollectionIds.includes(rotation.collectionId)) rotation.collectionId = null
+
+  backgrounds.rotation = rotation
+  next.backgrounds = backgrounds
+  return next
+}
+
 function assertPlacementBounds(profileName, value) {
   const canvas = CANVASES[profileName]
   if (value.x + value.width > canvas.width || value.y + value.height > canvas.height) {
@@ -274,6 +293,7 @@ async function handleRequest(request, response) {
       mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
       data: z.string().max(27 * 1024 * 1024),
       originalName: z.string().trim().min(1).max(255).optional(),
+      collectionName: z.string().trim().min(1).max(160).optional(),
       mutationId: z.string().max(200).optional(),
     }), body)
     return mutate(request, response, `asset.create:${data.kind}`, data, async (client) => {
@@ -289,6 +309,19 @@ async function handleRequest(request, response) {
           SET original_name = COALESCE(assets.original_name, EXCLUDED.original_name)
         RETURNING id
       `, [id, data.kind, data.mimeType, sha256, content.length, content, data.originalName || null])
+      if (data.kind === 'background' && data.collectionName) {
+        const collection = await client.query(`
+          INSERT INTO background_collections(id, name)
+          VALUES ($1, $2)
+          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+          RETURNING id
+        `, [crypto.randomUUID(), data.collectionName])
+        await client.query(`
+          INSERT INTO background_collection_assets(collection_id, asset_id)
+          VALUES ($1, $2)
+          ON CONFLICT DO NOTHING
+        `, [collection.rows[0].id, asset.rows[0].id])
+      }
       return { status: 201, body: { assetId: asset.rows[0].id } }
     })
   }
@@ -315,15 +348,31 @@ async function handleRequest(request, response) {
       const asset = await client.query('SELECT kind FROM assets WHERE id = $1 FOR UPDATE', [match[0]])
       if (!asset.rowCount) throw new HttpError(404, 'Asset not found')
       if (asset.rows[0].kind !== 'background') throw new HttpError(400, 'Only background assets can be removed from the library')
-      const referenced = await client.query(`
-        SELECT EXISTS(SELECT 1 FROM workspaces WHERE background_asset_id = $1::uuid)
-          OR EXISTS(
-            SELECT 1 FROM app_settings
-            WHERE document #>> '{backgrounds,globalAssetId}' = $1::text
-          ) AS value
+      const settings = await client.query("SELECT document FROM app_settings WHERE id = 'default' FOR UPDATE")
+      await client.query(`
+        UPDATE workspaces
+        SET background_asset_id = NULL, version = version + 1, updated_at = now()
+        WHERE background_asset_id = $1
       `, [match[0]])
-      if (referenced.rows[0].value) throw new HttpError(409, 'Select another background before removing this one')
       await client.query('DELETE FROM assets WHERE id = $1', [match[0]])
+      const removedCollections = await client.query(`
+        DELETE FROM background_collections c
+        WHERE NOT EXISTS (
+          SELECT 1 FROM background_collection_assets ca WHERE ca.collection_id = c.id
+        )
+        RETURNING id
+      `)
+      if (settings.rowCount) {
+        const currentDocument = settings.rows[0].document
+        const nextDocument = removeBackgroundReferences(currentDocument, match[0], removedCollections.rows.map((row) => row.id))
+        if (JSON.stringify(nextDocument) !== JSON.stringify(currentDocument)) {
+          await client.query(`
+            UPDATE app_settings
+            SET document = $1::jsonb, version = version + 1, updated_at = now()
+            WHERE id = 'default'
+          `, [JSON.stringify(nextDocument)])
+        }
+      }
       return { status: 200, body: { bootstrap: await loadBootstrap(client) } }
     })
   }
