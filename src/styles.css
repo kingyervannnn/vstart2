@@ -45,9 +45,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .vstart-app.edge-effect { border-radius: 13px; border: 1px solid rgba(255, 255, 255, .3); }
 .vstart-app.edge-glow { box-shadow: inset 0 0 25px color-mix(in srgb, var(--app-accent) 62%, transparent), 0 0 22px color-mix(in srgb, var(--app-accent) 35%, transparent); }
+.vstart-app.compact-mode.edge-glow { box-shadow: inset 0 17px 32px -17px color-mix(in srgb, var(--app-accent) 88%, transparent), inset 0 0 31px color-mix(in srgb, var(--app-accent) 70%, transparent), 0 0 26px color-mix(in srgb, var(--app-accent) 42%, transparent); }
 .vstart-app.mirrored { flex-direction: row-reverse; }
 
 .compact-mode .dial-rail { width: 100%; flex-basis: 100%; }
+.compact-mode .search-dock-wrap:not(.agent-composer-wrap) { transform: translate(-50%, calc(-50% + 12px)); }
 
 .widget-rail {
   flex: 0 0 var(--widget-rail-width);
@@ -75,7 +77,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   background: rgba(14,20,29,.14);
   backdrop-filter: blur(14px);
 }
+.compact-mode .compact-widget-dock { left: 22px; bottom: 21px; }
 .mirrored .compact-widget-dock { right: 14px; left: auto; }
+.compact-mode.mirrored .compact-widget-dock { right: 22px; left: auto; }
 .compact-widget-dock button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 68%, transparent); background: transparent; cursor: pointer; }
 .compact-widget-dock button:hover, .compact-widget-dock button:focus-visible { color: var(--app-text); }
 .compact-widget-dock svg { width: 15px; height: 15px; }
@@ -228,6 +232,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @keyframes marquee-loop { to { transform: translateX(-50%); } }
 
 .compact-mode .scrolling-header { font-size: clamp(14px, 1.6vw, 18px); }
+.compact-mode.edge-glow .scrolling-header { background: linear-gradient(180deg, color-mix(in srgb, var(--app-accent) 23%, rgba(235,241,255,.2)), transparent); box-shadow: inset 0 1px color-mix(in srgb, var(--app-text) 24%, transparent), inset 0 13px 24px -16px color-mix(in srgb, var(--app-accent) 76%, transparent), 0 8px 20px -17px color-mix(in srgb, var(--app-accent) 58%, transparent); }
+.compact-mode .shortcut-icon-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 6%), 80px); }
+.compact-mode .shortcut-icon-shell.folder-preview-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 10%), 84px); }
 .compact-inner-ring {
   position: absolute;
   z-index: 18;
