@@ -232,13 +232,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @keyframes marquee-loop { to { transform: translateX(-50%); } }
 
 .compact-mode .scrolling-header { font-size: clamp(14px, 1.6vw, 18px); }
+.compact-ring-active .scrolling-header { top: 13px; left: 18px; width: calc(100% - 36px); height: 40px; border-radius: 13px 13px 0 0; background: linear-gradient(180deg, rgba(235,241,255,.16), rgba(235,241,255,.035) 70%, transparent); }
+.compact-ring-active .dial-canvas { top: 57px; }
 .compact-mode.edge-glow .scrolling-header { background: linear-gradient(180deg, color-mix(in srgb, var(--app-accent) 23%, rgba(235,241,255,.2)), transparent); box-shadow: inset 0 1px color-mix(in srgb, var(--app-text) 24%, transparent), inset 0 13px 24px -16px color-mix(in srgb, var(--app-accent) 76%, transparent), 0 8px 20px -17px color-mix(in srgb, var(--app-accent) 58%, transparent); }
 .compact-mode .shortcut-icon-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 6%), 80px); }
 .compact-mode .shortcut-icon-shell.folder-preview-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 10%), 84px); }
 .compact-inner-ring {
   position: absolute;
   z-index: 18;
-  inset: 57px 12px 12px;
+  inset: 12px;
   border: 1px solid color-mix(in srgb, var(--app-text) 31%, transparent);
   border-radius: 20px;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.035), 0 0 24px rgba(4,8,15,.1);
