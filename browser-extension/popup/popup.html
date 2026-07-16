@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add to V Start</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span><small>V START MULTI-TOOL</small><strong>Add this page</strong></span>
+      </header>
+
+      <section id="loading" class="state">Connecting to V Start…</section>
+      <section id="error" class="state error" hidden>
+        <strong>Couldn’t add this page</strong>
+        <span id="error-message"></span>
+        <button id="retry" type="button">Try again</button>
+      </section>
+
+      <form id="capture-form" hidden>
+        <div class="page-preview">
+          <span class="favicon-shell"><img id="favicon" alt="" hidden /><span id="favicon-fallback">↗</span></span>
+          <span><strong id="page-host"></strong><small id="page-url"></small></span>
+        </div>
+
+        <label>
+          <span>Shortcut name</span>
+          <input id="title" name="title" maxlength="120" required autocomplete="off" />
+        </label>
+
+        <label>
+          <span>Workspace</span>
+          <select id="workspace" name="workspace" required></select>
+          <small id="detection-note" class="field-note"></small>
+        </label>
+
+        <label id="pin-option" class="pin-option">
+          <input id="pin-across" name="pinAcross" type="checkbox" />
+          <span><strong id="pin-label">Pin across workspaces</strong><small>Keep one linked shortcut available everywhere.</small></span>
+        </label>
+
+        <button id="submit" class="primary" type="submit">Add shortcut</button>
+        <p id="status" role="status" aria-live="polite"></p>
+      </form>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

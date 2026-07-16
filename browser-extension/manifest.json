@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "V Start Multi-Tool",
-  "description": "Local browser companion for V Start inline tools, beginning with temporary iframe assistance.",
-  "version": "0.1.0",
+  "description": "Local browser companion for V Start inline tools and one-click shortcut capture.",
+  "version": "0.2.0",
   "minimum_chrome_version": "120",
   "permissions": [
+    "activeTab",
     "alarms",
     "declarativeNetRequest"
   ],
@@ -13,7 +14,8 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "src/service-worker.js"
+    "service_worker": "src/service-worker.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -28,6 +30,7 @@
     }
   ],
   "action": {
-    "default_title": "V Start Multi-Tool"
+    "default_title": "Add this page to V Start",
+    "default_popup": "popup/popup.html"
   }
 }

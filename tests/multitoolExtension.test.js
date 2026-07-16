@@ -8,14 +8,28 @@ describe('V Start Multi-Tool extension contract', () => {
   it('ships a narrowly scoped Manifest V3 companion', async () => {
     const manifest = JSON.parse(await readExtensionFile('manifest.json'))
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.permissions.sort()).toEqual(['alarms', 'declarativeNetRequest'])
+    expect(manifest.permissions.sort()).toEqual(['activeTab', 'alarms', 'declarativeNetRequest'])
     expect(manifest.permissions).not.toContain('cookies')
     expect(manifest.permissions).not.toContain('history')
+    expect(manifest.permissions).not.toContain('tabs')
     expect(manifest.permissions).not.toContain('webRequest')
+    expect(manifest.background.type).toBe('module')
+    expect(manifest.action.default_popup).toBe('popup/popup.html')
     expect(manifest.content_scripts[0].matches).toEqual([
       'http://localhost:3000/*',
       'http://127.0.0.1:3000/*',
     ])
+  })
+
+  it('captures only the user-activated current tab through the V Start API', async () => {
+    const worker = await readExtensionFile('src/service-worker.js')
+    const popup = await readExtensionFile('popup/popup.js')
+    expect(worker).toContain("chrome.tabs.query({ active: true, currentWindow: true })")
+    expect(worker).toContain("'/api/bootstrap'")
+    expect(worker).toContain("'/api/shortcuts'")
+    expect(worker).toContain("message?.type === 'vstartMultitool.capture.add'")
+    expect(popup).toContain("type: 'vstartMultitool.capture.context'")
+    expect(popup).toContain('pinAcross: pinInput.checked')
   })
 
   it('uses expiring destination and initiator-scoped subframe rules', async () => {
