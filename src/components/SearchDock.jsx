@@ -336,9 +336,9 @@ export function SearchDock({
     }
   }, [endWorkspaceMove, moveWorkspace, workspaceMoving])
 
-  const submit = async (event) => {
-    event.preventDefault()
-    const value = query.trim()
+  const submit = async (event, selectedQuery = null) => {
+    event?.preventDefault()
+    const value = String(selectedQuery ?? query).trim()
     if ((!value && !imageAttachment) || imageBusy) return
     setSuggestionsOpen(false)
     setImageError('')
@@ -571,7 +571,7 @@ export function SearchDock({
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
       {suggestionsVisible && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
-        {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
+        {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); void submit(null, suggestion) }}>{suggestion}</button></li>)}
       </ul>}
       {editMode && !agentMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>

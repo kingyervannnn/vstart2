@@ -99,4 +99,22 @@ describe('Search dock visual search', () => {
     expect(new URL(request.visualUrl).searchParams.has('text')).toBe(false)
     expect(screen.queryByRole('alert')).toBeNull()
   })
+
+  it('submits a clicked suggestion through the active inline mode', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ suggestions: ['openai documentation'] }),
+    }))
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const onInlineResults = vi.fn()
+    render(<SearchDock {...props} onInlineResults={onInlineResults} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle inline results' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'openai' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'openai documentation' }))
+
+    expect(onInlineResults).toHaveBeenCalledWith('openai documentation')
+    expect(open).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('openai documentation')
+  })
 })
