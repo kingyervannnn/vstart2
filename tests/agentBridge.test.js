@@ -47,6 +47,38 @@ describe('Agent Bridge browser client', () => {
     expect(other).not.toBe(first)
   })
 
+  it('prewarms bridge inventory and a lazy session once for concurrent callers', async () => {
+    const fetchImpl = vi.fn(async (url, options = {}) => {
+      const path = new URL(url).pathname
+      if (path === '/v1/handshake') return new Response(JSON.stringify({ nonce: 'warm' }), { status: 200 })
+      if (path === '/v1/health') return new Response(JSON.stringify({ safe: true, status: 'ready' }), { status: 200 })
+      if (path === '/v1/models') return new Response(JSON.stringify({ providers: [{ slug: 'local' }] }), { status: 200 })
+      if (path === '/v1/sessions') {
+        return options.method === 'POST'
+          ? new Response(JSON.stringify({ session_id: 'runtime-warm' }), { status: 201 })
+          : new Response(JSON.stringify({ sessions: [] }), { status: 200 })
+      }
+      return new Response(null, { status: 404 })
+    })
+    const client = new AgentBridgeClient({ fetchImpl })
+
+    const [first, second] = await Promise.all([client.prewarm(), client.prewarm()])
+
+    expect(first).toBe(second)
+    expect(first).toMatchObject({
+      health: { safe: true },
+      modelOptions: { providers: [{ slug: 'local' }] },
+      sessionList: { sessions: [] },
+      session: { session_id: 'runtime-warm' },
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(5)
+    await expect(client.prewarm()).resolves.toMatchObject({ session: { session_id: 'runtime-warm' } })
+    expect(fetchImpl).toHaveBeenCalledTimes(6)
+    expect(fetchImpl.mock.calls.filter(([url]) => new URL(url).pathname === '/v1/health')).toHaveLength(2)
+    expect(client.consumePrewarmedSession()).toMatchObject({ session_id: 'runtime-warm' })
+    expect(client.consumePrewarmedSession()).toBeNull()
+  })
+
   it('re-handshakes an expired event stream and reports when the stream opens', async () => {
     const body = new ReadableStream({ start(controller) { controller.close() } })
     const onOpen = vi.fn()

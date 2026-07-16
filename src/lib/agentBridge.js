@@ -1,4 +1,5 @@
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:3120'
+const DEFAULT_PREWARM_MAX_AGE_MS = 5 * 60 * 1_000
 const sharedClients = new Map()
 
 export function normalizeAgentBridgeUrl(value = DEFAULT_BRIDGE_URL) {
@@ -47,6 +48,9 @@ export class AgentBridgeClient {
     this.baseUrl = normalizeAgentBridgeUrl(baseUrl)
     this.fetchImpl = (...args) => fetchImpl(...args)
     this.nonce = ''
+    this.handshakeGeneration = 0
+    this.prewarmSnapshot = null
+    this.prewarmPromise = null
   }
 
   async handshake() {
@@ -58,6 +62,7 @@ export class AgentBridgeClient {
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.nonce) throw this.#error(response, body, 'Agent Bridge handshake failed')
     this.nonce = body.nonce
+    this.handshakeGeneration += 1
     return body
   }
 
@@ -101,6 +106,68 @@ export class AgentBridgeClient {
   resolveClarification(sessionId, requestId, answer) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/clarifications/${encodeURIComponent(requestId)}`, { method: 'POST', body: { answer } }) }
   closeSession(sessionId) { return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/close`, { method: 'POST', body: {} }) }
   chooseDirectory() { return this.request('/v1/directories/choose', { method: 'POST', body: {} }) }
+
+  async prewarm({ createSession = true, force = false, maxAgeMs = DEFAULT_PREWARM_MAX_AGE_MS } = {}) {
+    if (this.prewarmPromise) {
+      const pending = await this.prewarmPromise
+      if (!createSession || pending.session || !pending.health?.safe) return pending
+      return this.prewarm({ createSession, force: true, maxAgeMs })
+    }
+
+    const warm = async () => {
+      const cached = this.prewarmSnapshot
+      const cacheFresh = cached && Date.now() - cached.readyAt <= Math.max(0, maxAgeMs)
+      let connectionWasReset = false
+      if (!force && cacheFresh && (!createSession || cached.session)) {
+        const generation = this.handshakeGeneration
+        const health = await this.health()
+        if (generation === this.handshakeGeneration && health.safe) {
+          this.prewarmSnapshot = { ...cached, health, readyAt: Date.now() }
+          return this.prewarmSnapshot
+        }
+        if (!health.safe) {
+          this.prewarmSnapshot = { health, sessionList: null, modelOptions: null, session: null, readyAt: Date.now() }
+          return this.prewarmSnapshot
+        }
+        connectionWasReset = generation !== this.handshakeGeneration
+      }
+
+      const previous = this.prewarmSnapshot
+      const generation = this.handshakeGeneration
+      const health = await this.health()
+      const connectionChanged = connectionWasReset || generation !== this.handshakeGeneration
+      if (!health.safe) {
+        this.prewarmSnapshot = { health, sessionList: null, modelOptions: null, session: null, readyAt: Date.now() }
+        return this.prewarmSnapshot
+      }
+
+      let session = connectionChanged ? null : previous?.session || null
+      if (connectionChanged && previous?.session?.session_id) {
+        await this.closeSession(previous.session.session_id).catch(() => {})
+      }
+      const [sessionList, modelOptions, preparedSession] = await Promise.all([
+        this.sessions(),
+        this.models(),
+        createSession && !session ? this.createSession() : Promise.resolve(session),
+      ])
+      session = preparedSession || session
+      this.prewarmSnapshot = { health, sessionList, modelOptions, session, readyAt: Date.now() }
+      return this.prewarmSnapshot
+    }
+
+    this.prewarmPromise = warm()
+    try {
+      return await this.prewarmPromise
+    } finally {
+      this.prewarmPromise = null
+    }
+  }
+
+  consumePrewarmedSession() {
+    const session = this.prewarmSnapshot?.session || null
+    if (session) this.prewarmSnapshot = { ...this.prewarmSnapshot, session: null }
+    return session
+  }
 
   async streamEvents(sessionId, onEvent, { after = 0, onOpen, retryHandshake = true, signal } = {}) {
     if (!this.nonce) await this.handshake()

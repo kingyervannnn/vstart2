@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, Pencil, RotateCcw, Settings } from 'lucide-react'
 import { api } from './lib/api.js'
+import { getSharedAgentBridgeClient } from './lib/agentBridge.js'
 import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
@@ -123,11 +124,28 @@ export function App() {
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
+  const appReady = Boolean(bootstrap)
   const workspaceMailAccount = settings.mail?.workspaceAccounts?.[activeWorkspace?.id]
     || settings.mail?.defaultAccount
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+
+  useEffect(() => {
+    if (!appReady || agentMode || settings.agent?.enabled === false) return undefined
+    let active = true
+    const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
+    const warm = (force = false) => {
+      if (!active) return
+      void client.prewarm({ createSession: true, force }).catch(() => {})
+    }
+    warm()
+    const timer = window.setInterval(() => warm(true), 4 * 60 * 1_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [agentMode, appReady, settings.agent?.bridgeUrl, settings.agent?.enabled])
 
   useEffect(() => {
     let live = true

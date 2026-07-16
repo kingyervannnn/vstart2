@@ -5,6 +5,7 @@ import { getSharedAgentBridgeClient } from '../lib/agentBridge.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
 
 const modelId = (model) => typeof model === 'string' ? model : model?.id || model?.slug || model?.name || ''
+const CONNECTION_NOTICE_DELAY_MS = 320
 
 function capabilitiesFor(models, selection) {
   const [providerSlug, selectedModelId] = String(selection || '').split(':::')
@@ -67,6 +68,7 @@ export const AgentMode = forwardRef(function AgentMode({
   const copiedTimerRef = useRef(null)
   const [retryKey, setRetryKey] = useState(0)
   const [connection, setConnection] = useState({ state: 'connecting', message: 'Connecting to the local Agent Bridge…' })
+  const [connectionNoticeReady, setConnectionNoticeReady] = useState(false)
   const [messages, setMessages] = useState([])
   const [activities, setActivities] = useState([])
   const [approvals, setApprovals] = useState([])
@@ -91,6 +93,12 @@ export const AgentMode = forwardRef(function AgentMode({
   useEffect(() => {
     onStateChange?.({ running, ready: connection.state === 'ready', state: connection.state })
   }, [connection.state, onStateChange, running])
+
+  useEffect(() => {
+    if (connection.state !== 'connecting' || connectionNoticeReady) return undefined
+    const timer = window.setTimeout(() => setConnectionNoticeReady(true), CONNECTION_NOTICE_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [connection.state, connectionNoticeReady])
 
   useEffect(() => {
     const transcript = transcriptRef.current
@@ -151,8 +159,9 @@ export const AgentMode = forwardRef(function AgentMode({
       const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
       clientRef.current = client
       try {
-        if (!client.nonce) await client.handshake()
-        const health = await client.health()
+        const wantsNewSession = !targetSessionId || targetSessionId === 'new'
+        const prepared = await client.prewarm({ createSession: wantsNewSession })
+        const health = prepared.health
         if (cancelled) return
         if (!health.safe) {
           if (health.approvalsMode === 'off') {
@@ -164,11 +173,11 @@ export const AgentMode = forwardRef(function AgentMode({
         }
 
         const [session, sessionList, modelOptions] = await Promise.all([
-          targetSessionId && targetSessionId !== 'new'
-            ? client.resumeSession(targetSessionId)
-            : client.createSession(),
-          client.sessions(),
-          client.models(),
+          wantsNewSession
+            ? Promise.resolve(client.consumePrewarmedSession()).then((value) => value || client.createSession())
+            : client.resumeSession(targetSessionId),
+          prepared.sessionList ? Promise.resolve(prepared.sessionList) : client.sessions(),
+          prepared.modelOptions ? Promise.resolve(prepared.modelOptions) : client.models(),
         ])
         if (cancelled) return
         runtimeSessionRef.current = session.session_id
@@ -439,7 +448,7 @@ export const AgentMode = forwardRef(function AgentMode({
 
   return (
     <section className="agent-mode" aria-label="Agent Mode">
-      {connection.state !== 'ready' && <div className="agent-connection-strip" role="status"><LoaderCircle className="spin" /><span><strong>{connection.state === 'reconnecting' ? 'Reconnecting locally' : 'Connecting locally'}</strong><small>{connection.message}</small></span></div>}
+      {connection.state !== 'ready' && (connection.state !== 'connecting' || connectionNoticeReady) && <div className="agent-connection-strip" role="status"><LoaderCircle className="spin" /><span><strong>{connection.state === 'reconnecting' ? 'Reconnecting locally' : 'Connecting locally'}</strong><small>{connection.message}</small></span></div>}
       <header className="agent-toolbar">
         <div className="agent-session-picker">
           <Bot />
