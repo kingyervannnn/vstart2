@@ -6,7 +6,7 @@ import { getSharedAgentBridgeClient } from './lib/agentBridge.js'
 import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
-import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
+import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
 import { backgroundImageLayers, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
@@ -351,6 +351,10 @@ export function App() {
   const navigateView = useCallback((view, options = {}) => {
     navigate({ pathname: location.pathname, search: buildViewSearch(view) }, options)
   }, [location.pathname, navigate])
+
+  const toggleWidgetView = useCallback((kind) => {
+    navigateView(toggledServiceView(routedView, kind))
+  }, [navigateView, routedView])
 
   const openTextLinkInline = useCallback(({ url, title }) => {
     navigateView({ type: 'frame', query: '', result: { title: title || new URL(url).hostname, url }, fullScreen: false })
@@ -886,7 +890,7 @@ export function App() {
     >
       {viewVeil && <div className={`view-veil ${viewVeil}-veil`} aria-hidden="true" />}
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
+      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedInline ? (

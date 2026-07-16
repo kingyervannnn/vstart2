@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from '../src/lib/viewRoute.js'
+import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from '../src/lib/viewRoute.js'
 
 describe('URL-backed active views', () => {
   it('round-trips inline search and full-screen iframe state', () => {
@@ -13,6 +13,12 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch('?view=mail')).toEqual({ type: 'service', kind: 'mail' })
     expect(parseViewSearch('?view=weather')).toEqual({ type: 'service', kind: 'weather' })
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
+  })
+
+  it('closes the active widget and switches directly to a different widget', () => {
+    expect(toggledServiceView({ type: 'service', kind: 'mail' }, 'mail')).toEqual({ type: 'dial' })
+    expect(toggledServiceView({ type: 'service', kind: 'mail' }, 'music')).toEqual({ type: 'service', kind: 'music' })
+    expect(toggledServiceView({ type: 'dial' }, 'weather')).toEqual({ type: 'service', kind: 'weather' })
   })
 
   it('lets the new route replace stale iframe presentation state immediately', () => {

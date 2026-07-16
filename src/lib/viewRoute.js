@@ -54,6 +54,13 @@ export function buildViewSearch(view) {
   return `?${params.toString()}`
 }
 
+export function toggledServiceView(currentView, kind) {
+  if (!SERVICE_VIEWS.has(kind)) return { type: 'dial' }
+  return currentView?.type === 'service' && currentView.kind === kind
+    ? { type: 'dial' }
+    : { type: 'service', kind }
+}
+
 export function resolveInlinePresentation(view, fetched) {
   if (view?.type !== 'search' && view?.type !== 'frame') return null
   const matches = fetched?.query === view.query && fetched?.category === view.category
