@@ -708,7 +708,7 @@ export function App() {
     >
       {viewVeil && <div className={`view-veil ${viewVeil}-veil`} aria-hidden="true" />}
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
+      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {routedInline ? (
           <InlineResults
@@ -725,6 +725,8 @@ export function App() {
           <ServiceRailView
             key={`${routedView.kind}:${activeWorkspace.id}`}
             kind={routedView.kind}
+            musicSettings={settings.music}
+            onMusicSettingsPatch={(patch) => patchSettings({ music: patch })}
             initialMailAccount={workspaceMailAccount}
             openLinksInNewTab={settings.general?.openLinksInNewTab}
             onOpenInline={openTextLinkInline}
@@ -766,7 +768,7 @@ export function App() {
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
-        {!(routedView.type === 'service' && routedView.kind === 'mail') && <SearchDock
+        {!(routedView.type === 'service' && ['mail', 'music'].includes(routedView.kind)) && <SearchDock
           settings={settings}
           profile={profile}
           compact={compact}

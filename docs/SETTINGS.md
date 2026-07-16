@@ -21,7 +21,9 @@ The initial settings navigation contains:
 6. Appearance
 7. Backgrounds
 8. Widgets
-9. Data & System
+9. Music
+10. Mail
+11. Data & System
 
 Settings opens as a large modal/sheet over the page. It does not become another layout
 mode. On narrow viewports, navigation becomes a list/detail stack.
@@ -237,7 +239,8 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 - Weather: location, units, refresh behavior.
 - Notes: filter/default view and center/overlay behavior retained only where functional.
 - Email: account/filter/default mailbox behavior retained only where functional.
-- Music: enabled, backend reference if required, glass blur amount, transparency/outline.
+- Music: enabled and glass blur amount. Provider configuration lives on the dedicated
+  Music page.
 
 Clock, weather, notes, and email do not expose background/blur/card controls because their
 V Start 2 surfaces are always transparent. Music is the sole exception.
@@ -245,7 +248,28 @@ V Start 2 surfaces are always transparent. Music is the sole exception.
 All enabled widgets remain visible in Compact Mode. Compact Mode may use tighter widget
 geometry, but it does not replace the rail with launchers or remove widget content.
 
-## 11. Data & System
+## 11. Music
+
+- Select the active source used by the widget and expanded Music view.
+- Add, rename, enable/disable, test, or delete sources.
+- Store source name, adapter type, and API URL in PostgreSQL settings.
+- Seed YouTube Music Desktop at `http://127.0.0.1:26538`.
+- Keep the source selector on the widget so switching players does not require opening
+  Settings.
+
+The initial adapter supports live song state, play/pause, previous/next, shuffle, repeat,
+volume state, queue selection, queue insertion, and provider search. Future adapters use
+the same source registry and normalized V Start API rather than adding provider-specific
+logic to the widget.
+
+## 12. Mail
+
+- Select the default local inbox and workspace-specific inbox assignments.
+- Control background refresh cadence.
+- Keep mailbox content in the local mail bridge rather than copying messages into browser
+  storage or PostgreSQL.
+
+## 13. Data & System
 
 - Database connection health.
 - Service health: storage, Gmail, image search, notes, SearXNG, STT.
@@ -259,7 +283,7 @@ geometry, but it does not replace the rail with launchers or remove widget conte
 There is no "clear browser storage" action because V Start 2 owns no browser-persistent
 application state.
 
-## 12. Settings removed from V Start 1
+## 14. Settings removed from V Start 1
 
 The following categories do not migrate:
 

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CloudSun, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { musicApi } from '../lib/music.js'
 
 function ClockWidget({ compact }) {
   const [now, setNow] = useState(() => new Date())
@@ -65,13 +66,61 @@ function WidgetAccess({ icon: Icon, label, detail, onClick }) {
   )
 }
 
-export function WidgetRail({ compact, settings, onOpenWidget }) {
-  const [musicPlaying, setMusicPlaying] = useState(false)
-  const [shuffle, setShuffle] = useState(false)
-  const [repeat, setRepeat] = useState('off')
+function MusicWidgetArtwork({ src }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
+  return src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : <Music2 size={18} />
+}
+
+export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
+  const musicSources = useMemo(() => (settings.music?.sources || []).filter((source) => source.enabled !== false), [settings.music?.sources])
+  const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
+  const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
+  const [musicAction, setMusicAction] = useState('')
   const widgets = settings.widgets || {}
 
-  const cycleRepeat = () => setRepeat((value) => value === 'off' ? 'all' : value === 'all' ? 'one' : 'off')
+  const refreshMusic = useCallback(async (signal) => {
+    if (!activeMusicSource) {
+      setMusicState({ loading: false, error: 'No music source configured', data: null })
+      return
+    }
+    try {
+      const data = await musicApi.state(activeMusicSource.id, signal)
+      setMusicState({ loading: false, error: '', data })
+    } catch (error) {
+      if (error.name !== 'AbortError') setMusicState({ loading: false, error: error.message, data: null })
+    }
+  }, [activeMusicSource])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setMusicState((current) => ({ ...current, loading: true, error: '' }))
+    void refreshMusic(controller.signal)
+    const timer = window.setInterval(() => void refreshMusic(controller.signal), 3000)
+    return () => {
+      controller.abort()
+      window.clearInterval(timer)
+    }
+  }, [refreshMusic])
+
+  const controlMusic = async (action) => {
+    if (!activeMusicSource || musicAction) return
+    setMusicAction(action)
+    setMusicState((current) => {
+      if (!current.data) return current
+      if (action === 'togglePlay') return { ...current, data: { ...current.data, isPlaying: !current.data.isPlaying } }
+      if (action === 'shuffle') return { ...current, data: { ...current.data, shuffle: !current.data.shuffle } }
+      return current
+    })
+    try {
+      await musicApi.control(activeMusicSource.id, action)
+      window.setTimeout(() => void refreshMusic(), 160)
+    } catch (error) {
+      setMusicState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setMusicAction('')
+    }
+  }
 
   if (compact) {
     return (
@@ -94,17 +143,21 @@ export function WidgetRail({ compact, settings, onOpenWidget }) {
       </div>
       {widgets.music !== false && (
         <section className="music-widget" style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>
+          <label className="music-source-select"><span>Source</span><select value={activeMusicSource?.id || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length} aria-label="Music source">
+            {!musicSources.length && <option value="">No source</option>}
+            {musicSources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
+          </select></label>
           <button type="button" className="music-summary" onClick={() => onOpenWidget('music')} aria-label="Open music queue and search">
-            <Music2 size={18} />
-            <span><strong>Music</strong><small>No track selected</small></span>
+            <MusicWidgetArtwork src={musicState.data?.song?.imageSrc} />
+            <span><strong>{musicState.data?.song?.title || activeMusicSource?.name || 'Music'}</strong><small>{musicState.loading ? 'Connecting…' : musicState.error ? 'Source unavailable' : musicState.data?.song?.artist || 'No track selected'}</small></span>
             <ListMusic size={16} />
           </button>
           <div className="music-controls" aria-label="Music controls">
-            <button type="button" className={shuffle ? 'active' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle"><Shuffle /></button>
-            <button type="button" aria-label="Previous track"><SkipBack /></button>
-            <button type="button" className="primary" onClick={() => setMusicPlaying((value) => !value)} aria-label={musicPlaying ? 'Pause' : 'Play'}>{musicPlaying ? <Pause /> : <Play />}</button>
-            <button type="button" aria-label="Next track"><SkipForward /></button>
-            <button type="button" className={repeat !== 'off' ? 'active' : ''} onClick={cycleRepeat} aria-label={`Repeat ${repeat}`}><Repeat2 />{repeat === 'one' && <small>1</small>}</button>
+            <button type="button" className={musicState.data?.shuffle ? 'active' : ''} disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('shuffle')} aria-label="Shuffle"><Shuffle /></button>
+            <button type="button" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('previous')} aria-label="Previous track"><SkipBack /></button>
+            <button type="button" className="primary" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('togglePlay')} aria-label={musicState.data?.isPlaying ? 'Pause' : 'Play'}>{musicState.data?.isPlaying ? <Pause /> : <Play />}</button>
+            <button type="button" disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('next')} aria-label="Next track"><SkipForward /></button>
+            <button type="button" className={musicState.data?.repeatMode !== 'NONE' ? 'active' : ''} disabled={!musicState.data || Boolean(musicAction)} onClick={() => controlMusic('cycleRepeat')} aria-label={`Repeat ${String(musicState.data?.repeatMode || 'none').toLowerCase()}`}><Repeat2 />{musicState.data?.repeatMode === 'ONE' && <small>1</small>}</button>
           </div>
         </section>
       )}

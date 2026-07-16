@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Mail, Palette, PanelsTopLeft, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Database, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 import { mailBridge } from '../lib/mailBridge.js'
+import { musicApi } from '../lib/music.js'
 
 const PAGES = [
   ['general', 'General', SlidersHorizontal],
@@ -12,6 +13,7 @@ const PAGES = [
   ['appearance', 'Appearance', Palette],
   ['backgrounds', 'Backgrounds', Image],
   ['widgets', 'Widgets', PanelsTopLeft],
+  ['music', 'Music', Music2],
   ['mail', 'Mail', Mail],
   ['system', 'Data & System', Database],
 ]
@@ -31,11 +33,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
   const [backgroundError, setBackgroundError] = useState('')
   const [mailAccounts, setMailAccounts] = useState(() => mailBridge.peekAccounts())
   const [mailConnection, setMailConnection] = useState('checking')
+  const [newMusicSource, setNewMusicSource] = useState({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
+  const [musicChecks, setMusicChecks] = useState({})
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
   const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
   const searchAppearance = settings.search?.appearance || {}
   const searchBlur = Math.max(0, Math.min(40, Number(searchAppearance.blur) || 0))
+  const musicSources = settings.music?.sources || []
 
   useEffect(() => {
     let live = true
@@ -54,6 +59,35 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
     if (!workspaceName.trim()) return
     await onCreateWorkspace(workspaceName.trim())
     setWorkspaceName('')
+  }
+
+  const updateMusicSources = (sources, activeSourceId = settings.music?.activeSourceId) => {
+    const nextActiveId = sources.some((source) => source.id === activeSourceId && source.enabled !== false)
+      ? activeSourceId
+      : sources.find((source) => source.enabled !== false)?.id || sources[0]?.id || null
+    return onPatch({ music: { sources, activeSourceId: nextActiveId } })
+  }
+
+  const updateMusicSource = (sourceId, changes) => updateMusicSources(musicSources.map((source) => source.id === sourceId ? { ...source, ...changes } : source))
+
+  const addMusicSource = (event) => {
+    event.preventDefault()
+    const name = newMusicSource.name.trim()
+    const baseUrl = newMusicSource.baseUrl.trim()
+    if (!name || !baseUrl) return
+    const source = { id: `music-${crypto.randomUUID()}`, name, adapter: 'youtube-music-desktop', baseUrl, enabled: true }
+    void updateMusicSources([...musicSources, source], settings.music?.activeSourceId || source.id)
+    setNewMusicSource({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
+  }
+
+  const testMusicSource = async (source) => {
+    setMusicChecks((current) => ({ ...current, [source.id]: { state: 'checking', detail: 'Connecting…' } }))
+    try {
+      const result = await musicApi.state(source.id)
+      setMusicChecks((current) => ({ ...current, [source.id]: { state: 'connected', detail: result.song?.title || 'Connected' } }))
+    } catch (error) {
+      setMusicChecks((current) => ({ ...current, [source.id]: { state: 'error', detail: error.message } }))
+    }
   }
 
   return (
@@ -176,6 +210,36 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
               <h3>Widgets</h3>
               {['clock', 'weather', 'notes', 'email', 'music'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
               <label className="setting-field"><span>Music player blur</span><input type="range" min="0" max="40" value={settings.widgets?.musicBlur ?? 18} onChange={(event) => onPatch({ widgets: { musicBlur: Number(event.target.value) } })} /></label>
+            </>}
+            {page === 'music' && <>
+              <h3>Music</h3>
+              <p className="settings-intro">Connect multiple local players and choose the active source from either Settings or the widget. Source configuration is stored in PostgreSQL.</p>
+              <label className="setting-field"><span>Active source</span><select value={settings.music?.activeSourceId || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length}>
+                {!musicSources.length && <option value="">No sources configured</option>}
+                {musicSources.map((source) => <option key={source.id} value={source.id} disabled={source.enabled === false}>{source.name}{source.enabled === false ? ' (disabled)' : ''}</option>)}
+              </select></label>
+              <div className="music-source-settings">
+                {musicSources.map((source) => {
+                  const check = musicChecks[source.id]
+                  return <article key={source.id} className={source.id === settings.music?.activeSourceId ? 'active' : ''}>
+                    <div className="music-source-heading"><span><Music2 /><strong>{source.name}</strong><small>{source.adapter === 'youtube-music-desktop' ? 'YouTube Music Desktop API' : source.adapter}</small></span><div><button type="button" onClick={() => testMusicSource(source)} disabled={check?.state === 'checking'}><RefreshCw />{check?.state === 'checking' ? 'Testing…' : 'Test'}</button><button type="button" className="danger" onClick={() => updateMusicSources(musicSources.filter((item) => item.id !== source.id))} aria-label={`Delete ${source.name}`}><Trash2 /></button></div></div>
+                    <div className="music-source-fields">
+                      <label>Name<input defaultValue={source.name} onBlur={(event) => event.target.value.trim() && event.target.value.trim() !== source.name && updateMusicSource(source.id, { name: event.target.value.trim() })} /></label>
+                      <label>Provider<select value={source.adapter} onChange={(event) => updateMusicSource(source.id, { adapter: event.target.value })}><option value="youtube-music-desktop">YouTube Music Desktop</option>{source.adapter !== 'youtube-music-desktop' && <option value={source.adapter}>{source.adapter}</option>}</select></label>
+                      <label className="music-source-url">API URL<input type="url" defaultValue={source.baseUrl} onBlur={(event) => event.target.value.trim() && event.target.value.trim() !== source.baseUrl && updateMusicSource(source.id, { baseUrl: event.target.value.trim() })} placeholder="http://127.0.0.1:26538" /></label>
+                    </div>
+                    <Toggle label="Source enabled" checked={source.enabled !== false} onChange={(value) => updateMusicSource(source.id, { enabled: value })} />
+                    {check && <p className={`music-source-check ${check.state}`}>{check.detail}</p>}
+                  </article>
+                })}
+              </div>
+              <form className="add-music-source" onSubmit={addMusicSource}>
+                <h4><Plus /> Add music source</h4>
+                <label>Name<input value={newMusicSource.name} onChange={(event) => setNewMusicSource((current) => ({ ...current, name: event.target.value }))} /></label>
+                <label>API URL<input required type="url" value={newMusicSource.baseUrl} onChange={(event) => setNewMusicSource((current) => ({ ...current, baseUrl: event.target.value }))} /></label>
+                <button type="submit"><Plus /> Add source</button>
+              </form>
+              <div className="setting-note"><strong>YouTube Music is ready on port 26538.</strong><span>The server proxy translates loopback access correctly when V Start runs inside Docker. Future provider types can use this same source registry.</span></div>
             </>}
             {page === 'mail' && <>
               <h3>Mail</h3>

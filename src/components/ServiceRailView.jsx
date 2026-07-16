@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, Mail, Music2, NotebookPen, Paperclip, PenLine, RefreshCw, Reply, Search, Send, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, PenLine, Play, RefreshCw, Reply, Search, Send, Trash2, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
+import { musicApi } from '../lib/music.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
 
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7'
@@ -12,13 +13,118 @@ const SERVICE_META = {
   music: { label: 'Music', Icon: Music2 },
 }
 
-function MusicServiceView() {
+function MusicArtwork({ src, large = false }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
+  return src && !failed
+    ? <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
+    : <span className={large ? 'music-art-placeholder' : 'music-list-placeholder'}><Music2 /></span>
+}
+
+function MusicServiceView({ musicSettings, onSettingsPatch }) {
   const [query, setQuery] = useState('')
+  const [player, setPlayer] = useState({ loading: true, error: '', data: null })
+  const [queue, setQueue] = useState({ loading: true, error: '', items: [] })
+  const [search, setSearch] = useState({ loading: false, error: '', results: [] })
+  const [notice, setNotice] = useState('')
+  const sources = useMemo(() => (musicSettings?.sources || []).filter((source) => source.enabled !== false), [musicSettings?.sources])
+  const activeSource = sources.find((source) => source.id === musicSettings?.activeSourceId) || sources[0] || null
+
+  const loadPlayer = useCallback(async (signal) => {
+    if (!activeSource) {
+      setPlayer({ loading: false, error: 'No enabled music source is configured.', data: null })
+      return
+    }
+    try {
+      const data = await musicApi.state(activeSource.id, signal)
+      setPlayer({ loading: false, error: '', data })
+    } catch (error) {
+      if (error.name !== 'AbortError') setPlayer({ loading: false, error: error.message, data: null })
+    }
+  }, [activeSource])
+
+  const loadQueue = useCallback(async (signal) => {
+    if (!activeSource) {
+      setQueue({ loading: false, error: '', items: [] })
+      return
+    }
+    setQueue((current) => ({ ...current, loading: true, error: '' }))
+    try {
+      const data = await musicApi.queue(activeSource.id, signal)
+      setQueue({ loading: false, error: '', items: data.items || [] })
+    } catch (error) {
+      if (error.name !== 'AbortError') setQueue({ loading: false, error: error.message, items: [] })
+    }
+  }, [activeSource])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setPlayer({ loading: true, error: '', data: null })
+    setSearch({ loading: false, error: '', results: [] })
+    void loadPlayer(controller.signal)
+    void loadQueue(controller.signal)
+    const timer = window.setInterval(() => void loadPlayer(controller.signal), 3000)
+    return () => {
+      controller.abort()
+      window.clearInterval(timer)
+    }
+  }, [loadPlayer, loadQueue])
+
+  const chooseQueueItem = async (item) => {
+    if (!activeSource) return
+    try {
+      await musicApi.selectQueueItem(activeSource.id, item.index)
+      setNotice(`Playing ${item.title}`)
+      window.setTimeout(() => void loadPlayer(), 180)
+      window.setTimeout(() => void loadQueue(), 220)
+    } catch (error) {
+      setNotice(error.message)
+    }
+  }
+
+  const submitSearch = async (event) => {
+    event.preventDefault()
+    if (!activeSource || !query.trim()) return
+    const controller = new AbortController()
+    setSearch({ loading: true, error: '', results: [] })
+    try {
+      const data = await musicApi.search(activeSource.id, query.trim(), controller.signal)
+      setSearch({ loading: false, error: '', results: data.results || [] })
+    } catch (error) {
+      if (error.name !== 'AbortError') setSearch({ loading: false, error: error.message, results: [] })
+    }
+  }
+
+  const addResult = async (result, insertPosition) => {
+    if (!activeSource) return
+    try {
+      await musicApi.addQueueItem(activeSource.id, result.videoId, insertPosition)
+      setNotice(insertPosition === 'INSERT_AFTER_CURRENT_VIDEO' ? `${result.title} will play next` : `${result.title} added to queue`)
+      window.setTimeout(() => void loadQueue(), 180)
+    } catch (error) {
+      setNotice(error.message)
+    }
+  }
+
   return (
     <div className="music-service-view">
-      <label className="music-search-field"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search music when a provider is connected" /></label>
-      <section><h3><ListMusic /> Queue</h3><div className="service-state">The queue is ready for a music provider. Playback data will appear here once an API is connected.</div></section>
-      <section><h3><Search /> Search</h3><div className="service-state">{query ? `No provider is connected to search for “${query}” yet.` : 'Enter a title, artist, album, or playlist.'}</div></section>
+      <div className="music-service-toolbar"><label><span>Source</span><select value={activeSource?.id || ''} disabled={!sources.length} onChange={(event) => onSettingsPatch({ activeSourceId: event.target.value })}>{!sources.length && <option value="">No source</option>}{sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label><button type="button" onClick={() => { void loadPlayer(); void loadQueue() }} aria-label="Refresh music"><RefreshCw /></button></div>
+      {notice && <button type="button" className="music-notice" onClick={() => setNotice('')}>{notice}</button>}
+      <section className="music-now-playing">
+        <MusicArtwork src={player.data?.song?.imageSrc} large />
+        <div><small>{player.loading ? 'CONNECTING' : player.error ? 'SOURCE UNAVAILABLE' : player.data?.isPlaying ? 'NOW PLAYING' : 'PAUSED'}</small><strong>{player.data?.song?.title || activeSource?.name || 'Music'}</strong><span>{player.error || player.data?.song?.artist || 'No track selected'}</span>{player.data?.song?.songDuration > 0 && <progress max={player.data.song.songDuration} value={player.data.song.elapsedSeconds || 0} />}</div>
+      </section>
+      <div className="music-browser-grid">
+        <section><h3><ListMusic /> Queue <button type="button" onClick={() => loadQueue()} aria-label="Refresh queue"><RefreshCw /></button></h3>
+          {queue.loading && <div className="service-state">Reading queue…</div>}
+          {queue.error && <div className="service-state error">{queue.error}</div>}
+          {!queue.loading && !queue.error && <div className="music-item-list">{queue.items.map((item) => <button type="button" key={`${item.index}:${item.videoId || item.title}`} className={item.selected || item.videoId === player.data?.song?.videoId ? 'active' : ''} onClick={() => chooseQueueItem(item)}><MusicArtwork src={item.imageUrl} /><span><strong>{item.title}</strong><small>{item.detail || item.artist}</small></span><time>{item.duration}</time><Play /></button>)}{!queue.items.length && <div className="service-state">The active player queue is empty.</div>}</div>}
+        </section>
+        <section><h3><Search /> Search YouTube Music</h3><form className="music-search-field" onSubmit={submitSearch}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, artist, album, or playlist" /><button disabled={!query.trim() || search.loading}>{search.loading ? 'Searching…' : 'Search'}</button></form>
+          {search.error && <div className="service-state error">{search.error}</div>}
+          {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => addResult(result, 'INSERT_AFTER_CURRENT_VIDEO')} title="Play next"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
+        </section>
+      </div>
     </div>
   )
 }
@@ -468,7 +574,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   )
 }
 
-export function ServiceRailView({ kind, initialMailAccount, openLinksInNewTab, onOpenInline, onClose }) {
+export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMusicSettingsPatch, openLinksInNewTab, onOpenInline, onClose }) {
   const [state, setState] = useState({ loading: !['music', 'mail'].includes(kind), error: '', data: null })
 
   useEffect(() => {
@@ -508,7 +614,7 @@ export function ServiceRailView({ kind, initialMailAccount, openLinksInNewTab, o
         {!(state.data.notes || []).length && <div className="service-state">No notes found in the mounted vault.</div>}
       </div>}
       {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} />}
-      {!state.loading && !state.error && kind === 'music' && <MusicServiceView />}
+      {!state.loading && !state.error && kind === 'music' && <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} />}
     </section>
   )
 }

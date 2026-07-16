@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
 import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
+import { addMusicQueueItem, controlMusic, readMusicQueue, readMusicState, searchMusic, selectMusicQueueItem } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
@@ -96,6 +97,8 @@ const agentSessionUpdateSchema = z.object({
   version: z.number().int().positive(),
   mutationId: z.string().max(200).optional(),
 })
+
+const musicSourceId = z.string().trim().min(1).max(80).optional()
 
 function assertPlacementBounds(profileName, value) {
   const canvas = CANVASES[profileName]
@@ -215,6 +218,43 @@ async function handleRequest(request, response) {
   if (request.method === 'GET' && pathname === '/api/shortcut-metadata') {
     const destination = parse(httpUrl, url.searchParams.get('url') || '')
     return sendJson(response, 200, await predictShortcutTitle(destination))
+  }
+
+  if (request.method === 'GET' && pathname === '/api/music/state') {
+    const sourceId = parse(musicSourceId, url.searchParams.get('sourceId') || undefined)
+    return sendJson(response, 200, await readMusicState(pool, sourceId))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/control') {
+    const data = parse(z.object({
+      sourceId: musicSourceId,
+      action: z.enum(['previous', 'next', 'togglePlay', 'shuffle', 'cycleRepeat', 'toggleMute']),
+    }), await readJson(request))
+    return sendJson(response, 200, await controlMusic(pool, data.sourceId, data.action))
+  }
+
+  if (request.method === 'GET' && pathname === '/api/music/queue') {
+    const sourceId = parse(musicSourceId, url.searchParams.get('sourceId') || undefined)
+    return sendJson(response, 200, await readMusicQueue(pool, sourceId))
+  }
+
+  if (request.method === 'PATCH' && pathname === '/api/music/queue') {
+    const data = parse(z.object({ sourceId: musicSourceId, index: z.number().int().nonnegative() }), await readJson(request))
+    return sendJson(response, 200, await selectMusicQueueItem(pool, data.sourceId, data.index))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/queue') {
+    const data = parse(z.object({
+      sourceId: musicSourceId,
+      videoId: z.string().trim().min(1).max(100),
+      insertPosition: z.enum(['INSERT_AT_END', 'INSERT_AFTER_CURRENT_VIDEO']).default('INSERT_AT_END'),
+    }), await readJson(request))
+    return sendJson(response, 200, await addMusicQueueItem(pool, data.sourceId, data.videoId, data.insertPosition))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/search') {
+    const data = parse(z.object({ sourceId: musicSourceId, query: z.string().trim().min(1).max(300) }), await readJson(request))
+    return sendJson(response, 200, await searchMusic(pool, data.sourceId, data.query))
   }
 
   if (request.method === 'POST' && pathname === '/api/assets') {

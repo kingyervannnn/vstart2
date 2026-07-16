@@ -20,6 +20,7 @@ services:
       PORT: 3110
       DATABASE_URL: postgres://vstart2:${VSTART2_DB_PASSWORD:-vstart2-local-password}@db:5432/vstart2
       SEARXNG_URL: http://searxng:8080
+      MUSIC_LOOPBACK_HOST: host.docker.internal
     ports:
       - "3110:3110"
     depends_on:

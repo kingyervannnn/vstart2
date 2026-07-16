@@ -84,6 +84,13 @@ accounts and Keychain credentials through the native
 `npm run mail:bridge:manage -- install`.
 There is intentionally no AI service or AI-provider configuration.
 
+The Music widget is connected through a database-backed source registry. V Start seeds a
+YouTube Music Desktop source at `http://127.0.0.1:26538`; enable the YouTube Music
+Desktop API Server plugin on that port, then manage or test sources in Settings → Music.
+The widget exposes the active-source selector and live transport controls, while the Music
+view provides the current queue and provider search. Loopback traffic is proxied through
+the storage API so the Docker-hosted app can reach the macOS player.
+
 To migrate an empty V Start 2 database from a running V Start 1 stack, use
 `npm run migrate:v1`. The migration reads V1 through its state API and writes V2 in one
 PostgreSQL transaction. It preserves the source database and refuses to add duplicates
