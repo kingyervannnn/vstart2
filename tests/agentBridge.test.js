@@ -1,15 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { AgentBridgeClient, getSharedAgentBridgeClient, normalizeAgentBridgeUrl, readNdjsonStream } from '../src/lib/agentBridge.js'
+import { AgentBridgeClient, getSharedAgentBridgeClient, normalizeAgentBridgeUrl, readNdjsonStream, resolveAgentBridgeUrl } from '../src/lib/agentBridge.js'
 
 describe('Agent Bridge browser client', () => {
   it('accepts only plain HTTP loopback bridge origins', () => {
     expect(normalizeAgentBridgeUrl('http://127.0.0.1:3120/')).toBe('http://127.0.0.1:3120')
     expect(normalizeAgentBridgeUrl('http://localhost:3120')).toBe('http://localhost:3120')
+    expect(normalizeAgentBridgeUrl('/agent-bridge')).toBe('/agent-bridge')
     expect(() => normalizeAgentBridgeUrl('https://127.0.0.1:3120')).toThrow('local HTTP')
     expect(() => normalizeAgentBridgeUrl('http://192.168.1.20:3120')).toThrow('loopback')
     expect(() => normalizeAgentBridgeUrl('http://127.0.0.1:3120/rpc')).toThrow('path')
     expect(() => normalizeAgentBridgeUrl('http://user:pass@127.0.0.1:3120')).toThrow('credentials')
+    expect(() => normalizeAgentBridgeUrl('/rpc')).toThrow('path')
+  })
+
+  it('routes browser clients through the V Start origin while preserving native clients', () => {
+    expect(resolveAgentBridgeUrl('http://127.0.0.1:3120')).toBe('http://127.0.0.1:3120')
+    expect(resolveAgentBridgeUrl('http://127.0.0.1:3120', 'http://192.168.1.20:3000')).toBe('/agent-bridge')
+    expect(resolveAgentBridgeUrl('/agent-bridge', 'http://100.90.80.70:3000')).toBe('/agent-bridge')
   })
 
   it('keeps the nonce in memory and retries one expired handshake', async () => {

@@ -7,6 +7,8 @@ Keychain access, and macOS folder selection stay on the host.
 ## Safety boundary
 
 - Binds only to `127.0.0.1:3120`.
+- V Start's nginx layer exposes it at the same-origin `/agent-bridge` route for LAN and
+  Tailscale browsers; the native bridge port itself remains loopback-only.
 - Accepts the V Start origins on port `3000` and requires an expiring in-memory nonce.
 - Exposes typed V Start actions; there is no arbitrary RPC, CLI, executable, or shell route.
 - Accepts approval decisions only as `once` or `deny`; permanent approval is unavailable.

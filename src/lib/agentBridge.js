@@ -1,8 +1,11 @@
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:3120'
+const SAME_ORIGIN_BRIDGE_PATH = '/agent-bridge'
 const DEFAULT_PREWARM_MAX_AGE_MS = 5 * 60 * 1_000
 const sharedClients = new Map()
 
 export function normalizeAgentBridgeUrl(value = DEFAULT_BRIDGE_URL) {
+  if (value === SAME_ORIGIN_BRIDGE_PATH || value === `${SAME_ORIGIN_BRIDGE_PATH}/`) return SAME_ORIGIN_BRIDGE_PATH
+  if (String(value).startsWith('/')) throw new Error(`Agent Bridge path must be ${SAME_ORIGIN_BRIDGE_PATH}`)
   const url = new URL(value)
   if (url.protocol !== 'http:') throw new Error('Agent Bridge must use local HTTP')
   if (!['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('Agent Bridge must use a loopback host')
@@ -11,6 +14,12 @@ export function normalizeAgentBridgeUrl(value = DEFAULT_BRIDGE_URL) {
     throw new Error('Agent Bridge URL must not contain a path, query, or fragment')
   }
   return url.origin
+}
+
+export function resolveAgentBridgeUrl(value = DEFAULT_BRIDGE_URL, pageOrigin = globalThis.location?.origin || '') {
+  const normalized = normalizeAgentBridgeUrl(value)
+  if (!pageOrigin || normalized === SAME_ORIGIN_BRIDGE_PATH) return normalized
+  return SAME_ORIGIN_BRIDGE_PATH
 }
 
 export class AgentBridgeError extends Error {
@@ -45,7 +54,7 @@ export async function readNdjsonStream(stream, onEvent) {
 
 export class AgentBridgeClient {
   constructor({ baseUrl = DEFAULT_BRIDGE_URL, fetchImpl = fetch } = {}) {
-    this.baseUrl = normalizeAgentBridgeUrl(baseUrl)
+    this.baseUrl = resolveAgentBridgeUrl(baseUrl)
     this.fetchImpl = (...args) => fetchImpl(...args)
     this.nonce = ''
     this.handshakeGeneration = 0
@@ -197,7 +206,7 @@ export class AgentBridgeClient {
 }
 
 export function getSharedAgentBridgeClient({ baseUrl = DEFAULT_BRIDGE_URL } = {}) {
-  const normalized = normalizeAgentBridgeUrl(baseUrl)
+  const normalized = resolveAgentBridgeUrl(baseUrl)
   if (!sharedClients.has(normalized)) sharedClients.set(normalized, new AgentBridgeClient({ baseUrl: normalized }))
   return sharedClients.get(normalized)
 }

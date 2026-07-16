@@ -174,7 +174,7 @@ Add a database-backed `agent` settings object:
 ```json
 {
   "enabled": true,
-  "bridgeUrl": "http://127.0.0.1:3120",
+  "bridgeUrl": "/agent-bridge",
   "defaultReasoningEffort": "medium",
   "defaultFastMode": false,
   "showToolActivity": true,
@@ -183,8 +183,10 @@ Add a database-backed `agent` settings object:
 }
 ```
 
-`bridgeUrl` is configuration, not a credential. Production validation permits loopback
-hosts only. Provider keys and provider login controls are forbidden in V Start settings.
+`bridgeUrl` is configuration, not a credential. Production validation permits the
+same-origin `/agent-bridge` route or a native loopback host only. The same-origin route
+keeps phone and LAN access behind V Start while the native bridge remains bound to
+`127.0.0.1`. Provider keys and provider login controls are forbidden in V Start settings.
 
 ### 5.2 Workspace agent preferences
 

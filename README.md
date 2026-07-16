@@ -58,7 +58,9 @@ Useful stack commands:
 ```
 
 Agent Mode uses a separate native loopback bridge because Hermes and its local tools run
-on macOS, not inside Docker. Run it in the foreground with `npm run agent:bridge`, or see
+on macOS, not inside Docker. V Start proxies `/agent-bridge` to that loopback service, so
+the same Agent Mode is available from LAN or Tailscale clients without exposing port 3120.
+Run it in the foreground with `npm run agent:bridge`, or see
 [the Agent Bridge operator guide](agent-bridge/README.md) for the optional explicit
 `launchd` installation. Docker startup never installs the host service. When the active
 Hermes profile has approvals disabled, the bridge starts in a safety-locked state and V
@@ -74,7 +76,7 @@ Parallel host ports:
 | Image search | `3310` |
 | Notes | `3410` |
 | Speech to text | `8091` |
-| Agent bridge (optional native host service) | `3120` loopback only |
+| Agent bridge (optional native host service) | `/agent-bridge` via V Start; `3120` loopback only |
 | Mail bridge (native host service) | `3130` loopback only |
 
 Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
