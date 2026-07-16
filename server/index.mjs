@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
 import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
-import { addMusicQueueItem, controlMusic, readMusicQueue, readMusicState, searchMusic, selectMusicQueueItem } from './music.mjs'
+import { addMusicQueueItem, controlMusic, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
@@ -231,6 +231,16 @@ async function handleRequest(request, response) {
       action: z.enum(['previous', 'next', 'togglePlay', 'shuffle', 'cycleRepeat', 'toggleMute']),
     }), await readJson(request))
     return sendJson(response, 200, await controlMusic(pool, data.sourceId, data.action))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/seek') {
+    const data = parse(z.object({ sourceId: musicSourceId, seconds: z.number().finite().min(0).max(86_400) }), await readJson(request))
+    return sendJson(response, 200, await seekMusic(pool, data.sourceId, data.seconds))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/volume') {
+    const data = parse(z.object({ sourceId: musicSourceId, volume: z.number().finite().min(0).max(100) }), await readJson(request))
+    return sendJson(response, 200, await setMusicVolume(pool, data.sourceId, data.volume))
   }
 
   if (request.method === 'GET' && pathname === '/api/music/queue') {

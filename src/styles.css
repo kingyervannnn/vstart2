@@ -694,28 +694,47 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-detail-days strong { font-size: 12px; }
 .weather-high-low { flex-direction: row !important; align-items: baseline; gap: 8px !important; }
 .weather-sun { text-align: right; }
-.music-service-view { display: grid; gap: 16px; padding-top: 18px; }
-.music-service-toolbar { display: flex; align-items: flex-end; gap: 8px; }
-.music-service-toolbar label { min-width: 0; flex: 1; display: grid; gap: 5px; color: rgba(255,255,255,.5); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
-.music-service-toolbar select { width: 100%; height: 38px; border: 1px solid rgba(255,255,255,.14); border-radius: 11px; padding: 0 10px; color: inherit; background: rgba(255,255,255,.045); font-size: 10px; text-transform: none; }
-.music-service-toolbar > button, .music-service-view h3 button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; color: inherit; background: rgba(255,255,255,.04); cursor: pointer; }
-.music-service-toolbar svg, .music-service-view h3 button svg { width: 14px; }
+.music-service { padding-top: 0; }
+.music-service-view { display: grid; gap: 12px; padding-top: 0; }
+.music-unified-header { padding-top: 1px; }
+.music-header-source { width: clamp(112px, 14vw, 172px); height: 30px; flex: none; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 0 8px; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); }
+.music-header-source > span { opacity: .38; font-size: 7px; letter-spacing: .09em; text-transform: uppercase; }
+.music-header-source select { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 9px; cursor: pointer; }
+.music-header-source option { color: #111; }
+.music-header-search { min-width: 150px; height: 30px; flex: 1 1 270px; display: flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 0 5px 0 9px; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); }
+.music-header-search > svg { width: 13px; flex: none; opacity: .42; }
+.music-header-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 10px; }
+.music-header-search button { height: 24px; border: 0; border-radius: 7px; padding: 0 8px; color: inherit; background: rgba(255,255,255,.07); cursor: pointer; font-size: 8px; }
+.music-header-search button:disabled { opacity: .34; cursor: default; }
+.music-service-view h3 button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; color: inherit; background: rgba(255,255,255,.04); cursor: pointer; }
+.music-service-view h3 button svg { width: 14px; }
 .music-notice { border: 1px solid color-mix(in srgb, var(--app-accent) 28%, transparent); border-radius: 10px; padding: 8px 11px; color: inherit; background: color-mix(in srgb, var(--app-accent) 8%, transparent); cursor: pointer; font-size: 9px; text-align: left; }
-.music-service-view .music-now-playing { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 15px; padding: 12px; }
+.music-service-view .music-now-playing { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 15px; padding: 12px; }
 .music-now-playing > img, .music-art-placeholder { width: 76px; height: 76px; display: grid; place-items: center; border-radius: 13px; object-fit: cover; background: rgba(255,255,255,.06); }
 .music-art-placeholder svg { width: 25px; opacity: .4; }
-.music-now-playing > div { min-width: 0; display: grid; gap: 4px; }
+.music-now-playing-copy { min-width: 0; display: grid; gap: 4px; }
 .music-now-playing small { font-size: 7px; letter-spacing: .13em; opacity: .5; }
 .music-now-playing strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .music-now-playing span { overflow: hidden; font-size: 10px; opacity: .6; text-overflow: ellipsis; white-space: nowrap; }
-.music-now-playing progress { width: 100%; height: 3px; margin-top: 5px; accent-color: var(--app-accent); }
-.music-search-field { height: 46px; display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 0 7px 0 13px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.045); }
-.music-search-field svg { width: 16px; opacity: .55; }
-.music-search-field input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font-size: 12px; }
-.music-search-field button { border: 0; border-radius: 9px; padding: 8px 11px; color: inherit; background: rgba(255,255,255,.1); cursor: pointer; font-size: 9px; }
-.music-search-field button:disabled { opacity: .35; }
+.music-seek-control { min-width: 0; display: grid; grid-template-columns: auto minmax(70px, 1fr) auto; align-items: center; gap: 7px; margin-top: 4px; }
+.music-seek-control time { opacity: .42; font-size: 7px; font-variant-numeric: tabular-nums; }
+.music-seek-control input, .music-volume-control input { width: 100%; height: 12px; margin: 0; accent-color: var(--app-accent); cursor: pointer; }
+.music-seek-control progress { width: 100%; height: 3px; accent-color: var(--app-accent); }
+.music-player-controls { display: grid; justify-items: end; gap: 7px; }
+.music-transport-controls, .music-volume-control { display: flex; align-items: center; gap: 4px; }
+.music-transport-controls button, .music-volume-control button { position: relative; width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 50%; color: inherit; background: rgba(255,255,255,.055); cursor: pointer; }
+.music-transport-controls button:hover, .music-transport-controls button.active, .music-volume-control button:hover { color: var(--app-accent); background: rgba(255,255,255,.11); }
+.music-transport-controls button.primary { width: 34px; height: 34px; background: rgba(255,255,255,.13); }
+.music-transport-controls button:disabled, .music-volume-control button:disabled { opacity: .42; cursor: wait; }
+.music-transport-controls svg, .music-volume-control svg { width: 13px; }
+.music-transport-controls button.primary svg { width: 15px; }
+.music-transport-controls button small { position: absolute; right: 2px; bottom: 0; font-size: 6px; opacity: 1; }
+.music-volume-control { width: 164px; }
+.music-volume-control input { min-width: 60px; }
+.music-volume-control > small { width: 27px; opacity: .48; font-size: 7px; font-variant-numeric: tabular-nums; text-align: right; }
 .music-service-view section { border: 1px solid rgba(255,255,255,.1); border-radius: 15px; padding: 14px; background: rgba(255,255,255,.025); }
-.music-browser-grid { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.music-browser-grid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.music-browser-grid.with-search { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .music-service-view h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
 .music-service-view h3 svg { width: 16px; opacity: .62; }
 .music-service-view h3 button { width: 28px; height: 28px; margin-left: auto; border-radius: 9px; }
@@ -741,7 +760,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-search-results article button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 50%; color: inherit; background: rgba(255,255,255,.07); cursor: pointer; }
 .music-search-results article button:hover { color: var(--app-accent); background: rgba(255,255,255,.12); }
 .music-search-results article button svg { width: 13px; }
-@media (max-width: 900px) { .music-browser-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .music-browser-grid.with-search { grid-template-columns: 1fr; }
+  .music-service-view .music-now-playing { grid-template-columns: 64px minmax(0, 1fr); }
+  .music-now-playing > img, .music-art-placeholder { width: 64px; height: 64px; }
+  .music-player-controls { grid-column: 1 / -1; grid-template-columns: 1fr auto; justify-items: start; }
+}
 
 .page-controls { position: absolute; z-index: 70; right: 18px; bottom: 18px; display: flex; gap: 8px; }
 .page-controls button { width: 35px; height: 35px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 60%, transparent); background: transparent; cursor: pointer; }

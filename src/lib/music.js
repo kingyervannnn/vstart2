@@ -13,6 +13,8 @@ const sourceQuery = (sourceId) => sourceId ? `?sourceId=${encodeURIComponent(sou
 export const musicApi = {
   state: (sourceId, signal) => request(`/api/music/state${sourceQuery(sourceId)}`, { signal }),
   control: (sourceId, action) => request('/api/music/control', { method: 'POST', body: JSON.stringify({ sourceId, action }) }),
+  seek: (sourceId, seconds) => request('/api/music/seek', { method: 'POST', body: JSON.stringify({ sourceId, seconds }) }),
+  volume: (sourceId, volume) => request('/api/music/volume', { method: 'POST', body: JSON.stringify({ sourceId, volume }) }),
   queue: (sourceId, signal) => request(`/api/music/queue${sourceQuery(sourceId)}`, { signal }),
   selectQueueItem: (sourceId, index) => request('/api/music/queue', { method: 'PATCH', body: JSON.stringify({ sourceId, index }) }),
   addQueueItem: (sourceId, videoId, insertPosition = 'INSERT_AT_END') => request('/api/music/queue', { method: 'POST', body: JSON.stringify({ sourceId, videoId, insertPosition }) }),

@@ -53,6 +53,29 @@ function musicSettings(document) {
   }
 }
 
+function adapterCapabilities(source) {
+  if (source.adapter === 'youtube-music-desktop') {
+    return {
+      playback: true,
+      seek: true,
+      volume: true,
+      mute: true,
+      queue: true,
+      search: true,
+      playlists: false,
+    }
+  }
+  return {
+    playback: false,
+    seek: false,
+    volume: false,
+    mute: false,
+    queue: false,
+    search: false,
+    playlists: false,
+  }
+}
+
 export async function resolveMusicSource(client, requestedId) {
   const result = await client.query("SELECT document FROM app_settings WHERE id = 'default'")
   const { sources, activeSourceId } = musicSettings(result.rows[0]?.document)
@@ -148,6 +171,7 @@ export async function readMusicState(client, sourceId) {
     providerRequest(source, '/api/v1/repeat-mode').catch(() => null),
     providerRequest(source, '/api/v1/volume').catch(() => null),
   ])
+  const supported = adapterCapabilities(source)
   return {
     sourceId: source.id,
     sourceName: source.name,
@@ -157,6 +181,12 @@ export async function readMusicState(client, sourceId) {
     repeatMode: repeat?.mode || 'NONE',
     volume: volume?.state ?? null,
     isMuted: volume?.isMuted ?? false,
+    capabilities: {
+      ...supported,
+      seek: supported.seek && Number(song?.songDuration) > 0,
+      volume: supported.volume && Number.isFinite(Number(volume?.state)),
+      mute: supported.mute && typeof volume?.isMuted === 'boolean',
+    },
   }
 }
 
@@ -169,6 +199,20 @@ export async function controlMusic(client, sourceId, action) {
     await providerRequest(source, routes[action], { method: 'POST' })
   }
   return { ok: true, sourceId: source.id }
+}
+
+export async function seekMusic(client, sourceId, seconds) {
+  const source = await resolveMusicSource(client, sourceId)
+  if (!adapterCapabilities(source).seek) throw new HttpError(400, source.name + ' does not support seeking')
+  await providerRequest(source, '/api/v1/seek-to', { method: 'POST', body: JSON.stringify({ seconds }) })
+  return { ok: true, sourceId: source.id, seconds }
+}
+
+export async function setMusicVolume(client, sourceId, volume) {
+  const source = await resolveMusicSource(client, sourceId)
+  if (!adapterCapabilities(source).volume) throw new HttpError(400, source.name + ' does not support volume control')
+  await providerRequest(source, '/api/v1/volume', { method: 'POST', body: JSON.stringify({ volume }) })
+  return { ok: true, sourceId: source.id, volume }
 }
 
 export async function readMusicQueue(client, sourceId) {

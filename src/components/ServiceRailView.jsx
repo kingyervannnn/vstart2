@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, PenLine, Play, Plus, RefreshCw, Reply, Save, Search, Send, Trash2, X } from 'lucide-react'
+import { ArrowLeft, CloudSun, FileText, Forward, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
@@ -20,12 +20,20 @@ function MusicArtwork({ src, large = false }) {
     : <span className={large ? 'music-art-placeholder' : 'music-list-placeholder'}><Music2 /></span>
 }
 
-function MusicServiceView({ musicSettings, onSettingsPatch }) {
+function musicTime(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0))
+  return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
+}
+
+function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
   const [query, setQuery] = useState('')
   const [player, setPlayer] = useState({ loading: true, error: '', data: null })
   const [queue, setQueue] = useState({ loading: true, error: '', items: [] })
   const [search, setSearch] = useState({ loading: false, error: '', results: [] })
   const [notice, setNotice] = useState('')
+  const [playerAction, setPlayerAction] = useState('')
+  const [seekDraft, setSeekDraft] = useState(null)
+  const [volumeDraft, setVolumeDraft] = useState(null)
   const sources = useMemo(() => (musicSettings?.sources || []).filter((source) => source.enabled !== false), [musicSettings?.sources])
   const activeSource = sources.find((source) => source.id === musicSettings?.activeSourceId) || sources[0] || null
 
@@ -60,6 +68,8 @@ function MusicServiceView({ musicSettings, onSettingsPatch }) {
     const controller = new AbortController()
     setPlayer({ loading: true, error: '', data: null })
     setSearch({ loading: false, error: '', results: [] })
+    setSeekDraft(null)
+    setVolumeDraft(null)
     void loadPlayer(controller.signal)
     void loadQueue(controller.signal)
     const timer = window.setInterval(() => void loadPlayer(controller.signal), 3000)
@@ -68,6 +78,65 @@ function MusicServiceView({ musicSettings, onSettingsPatch }) {
       window.clearInterval(timer)
     }
   }, [loadPlayer, loadQueue])
+
+  const refreshMusic = () => {
+    void loadPlayer()
+    if (capabilities.queue === true) void loadQueue()
+  }
+
+  const controlPlayer = async (action) => {
+    if (!activeSource || playerAction) return
+    setPlayerAction(action)
+    setPlayer((current) => {
+      if (!current.data) return current
+      if (action === 'togglePlay') return { ...current, data: { ...current.data, isPlaying: !current.data.isPlaying } }
+      if (action === 'toggleMute') return { ...current, data: { ...current.data, isMuted: !current.data.isMuted } }
+      if (action === 'shuffle') return { ...current, data: { ...current.data, shuffle: !current.data.shuffle } }
+      return current
+    })
+    try {
+      await musicApi.control(activeSource.id, action)
+      await new Promise((resolve) => window.setTimeout(resolve, 120))
+      await loadPlayer()
+    } catch (error) {
+      setNotice(error.message)
+      await loadPlayer()
+    } finally {
+      setPlayerAction('')
+    }
+  }
+
+  const commitSeek = async (value) => {
+    if (!activeSource || playerAction) return
+    const seconds = Math.max(0, Number(value) || 0)
+    setSeekDraft(seconds)
+    setPlayerAction('seek')
+    try {
+      await musicApi.seek(activeSource.id, seconds)
+      setPlayer((current) => current.data ? { ...current, data: { ...current.data, song: { ...current.data.song, elapsedSeconds: seconds } } } : current)
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setSeekDraft(null)
+      setPlayerAction('')
+    }
+  }
+
+  const commitVolume = async (value) => {
+    if (!activeSource || playerAction) return
+    const volume = Math.max(0, Math.min(100, Number(value) || 0))
+    setVolumeDraft(volume)
+    setPlayerAction('volume')
+    try {
+      await musicApi.volume(activeSource.id, volume)
+      setPlayer((current) => current.data ? { ...current, data: { ...current.data, volume, isMuted: volume === 0 } } : current)
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setVolumeDraft(null)
+      setPlayerAction('')
+    }
+  }
 
   const chooseQueueItem = async (item) => {
     if (!activeSource) return
@@ -105,24 +174,52 @@ function MusicServiceView({ musicSettings, onSettingsPatch }) {
     }
   }
 
+  const capabilities = player.data?.capabilities || (activeSource?.adapter === 'youtube-music-desktop' ? { queue: true, search: true } : {})
+  const song = player.data?.song
+  const elapsed = seekDraft ?? song?.elapsedSeconds ?? 0
+  const volume = volumeDraft ?? player.data?.volume ?? 0
+
   return (
     <div className="music-service-view">
-      <div className="music-service-toolbar"><label><span>Source</span><select value={activeSource?.id || ''} disabled={!sources.length} onChange={(event) => onSettingsPatch({ activeSourceId: event.target.value })}>{!sources.length && <option value="">No source</option>}{sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label><button type="button" onClick={() => { void loadPlayer(); void loadQueue() }} aria-label="Refresh music"><RefreshCw /></button></div>
+      <header className="mail-unified-header music-unified-header">
+        <div className="mail-brand"><Music2 /><h2>Music</h2></div>
+        <label className="music-header-source"><span>Source</span><select aria-label="Music source" value={activeSource?.id || ''} disabled={!sources.length} onChange={(event) => onSettingsPatch({ activeSourceId: event.target.value })}>{!sources.length && <option value="">No source</option>}{sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select></label>
+        {capabilities.search === true && <form className="music-header-search" onSubmit={submitSearch}><Search /><input aria-label="Search music" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs, artists, or albums…" /><button disabled={!query.trim() || search.loading}>{search.loading ? 'Searching…' : 'Search'}</button></form>}
+        <div className="mail-toolbar-actions"><button type="button" onClick={refreshMusic} aria-label="Refresh music"><RefreshCw /></button></div>
+        <button type="button" className="mail-close" onClick={onClose} aria-label="Close music"><X /></button>
+      </header>
       {notice && <button type="button" className="music-notice" onClick={() => setNotice('')}>{notice}</button>}
       <section className="music-now-playing">
-        <MusicArtwork src={player.data?.song?.imageSrc} large />
-        <div><small>{player.loading ? 'CONNECTING' : player.error ? 'SOURCE UNAVAILABLE' : player.data?.isPlaying ? 'NOW PLAYING' : 'PAUSED'}</small><strong>{player.data?.song?.title || activeSource?.name || 'Music'}</strong><span>{player.error || player.data?.song?.artist || 'No track selected'}</span>{player.data?.song?.songDuration > 0 && <progress max={player.data.song.songDuration} value={player.data.song.elapsedSeconds || 0} />}</div>
+        <MusicArtwork src={song?.imageSrc} large />
+        <div className="music-now-playing-copy">
+          <small>{player.loading ? 'CONNECTING' : player.error ? 'SOURCE UNAVAILABLE' : player.data?.isPlaying ? 'NOW PLAYING' : 'PAUSED'}</small>
+          <strong>{song?.title || activeSource?.name || 'Music'}</strong>
+          <span>{player.error || song?.artist || 'No track selected'}</span>
+          {song?.songDuration > 0 && <div className="music-seek-control"><time>{musicTime(elapsed)}</time>{capabilities.seek
+            ? <input type="range" min="0" max={song.songDuration} step="1" value={elapsed} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Song position" />
+            : <progress max={song.songDuration} value={elapsed} />}<time>{musicTime(song.songDuration)}</time></div>}
+        </div>
+        <div className="music-player-controls">
+          {capabilities.playback && <div className="music-transport-controls">
+            <button type="button" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('previous')} aria-label="Previous track"><SkipBack /></button>
+            <button type="button" className="primary" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('togglePlay')} aria-label={player.data?.isPlaying ? 'Pause' : 'Play'}>{player.data?.isPlaying ? <Pause /> : <Play />}</button>
+            <button type="button" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('next')} aria-label="Next track"><SkipForward /></button>
+            {capabilities.queue && <button type="button" className={player.data?.shuffle ? 'active' : ''} disabled={Boolean(playerAction)} onClick={() => void controlPlayer('shuffle')} aria-label="Shuffle"><Shuffle /></button>}
+            <button type="button" className={player.data?.repeatMode !== 'NONE' ? 'active' : ''} disabled={Boolean(playerAction)} onClick={() => void controlPlayer('cycleRepeat')} aria-label={'Repeat ' + String(player.data?.repeatMode || 'none').toLowerCase()}><Repeat2 />{player.data?.repeatMode === 'ONE' && <small>1</small>}</button>
+          </div>}
+          {capabilities.volume && <div className="music-volume-control">{capabilities.mute && <button type="button" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('toggleMute')} aria-label={player.data?.isMuted ? 'Unmute' : 'Mute'}>{player.data?.isMuted ? <VolumeX /> : <Volume2 />}</button>}<input type="range" min="0" max="100" step="1" value={volume} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Volume" /><small>{Math.round(volume)}%</small></div>}
+        </div>
       </section>
-      <div className="music-browser-grid">
-        <section><h3><ListMusic /> Queue <button type="button" onClick={() => loadQueue()} aria-label="Refresh queue"><RefreshCw /></button></h3>
+      <div className={'music-browser-grid ' + (query || search.loading || search.results.length || search.error ? 'with-search' : '')}>
+        {capabilities.queue === true && <section><h3><ListMusic /> Queue <button type="button" onClick={() => loadQueue()} aria-label="Refresh queue"><RefreshCw /></button></h3>
           {queue.loading && <div className="service-state">Reading queue…</div>}
           {queue.error && <div className="service-state error">{queue.error}</div>}
           {!queue.loading && !queue.error && <div className="music-item-list">{queue.items.map((item) => <button type="button" key={`${item.index}:${item.videoId || item.title}`} className={item.selected || item.videoId === player.data?.song?.videoId ? 'active' : ''} onClick={() => chooseQueueItem(item)}><MusicArtwork src={item.imageUrl} /><span><strong>{item.title}</strong><small>{item.detail || item.artist}</small></span><time>{item.duration}</time><Play /></button>)}{!queue.items.length && <div className="service-state">The active player queue is empty.</div>}</div>}
-        </section>
-        <section><h3><Search /> Search YouTube Music</h3><form className="music-search-field" onSubmit={submitSearch}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, artist, album, or playlist" /><button disabled={!query.trim() || search.loading}>{search.loading ? 'Searching…' : 'Search'}</button></form>
+        </section>}
+        {capabilities.search === true && (query || search.loading || search.results.length || search.error) && <section><h3><Search /> Search results</h3>
           {search.error && <div className="service-state error">{search.error}</div>}
           {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => addResult(result, 'INSERT_AFTER_CURRENT_VIDEO')} title="Play next"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
-        </section>
+        </section>}
       </div>
     </div>
   )
@@ -728,13 +825,19 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
       </section>
     )
   }
+  if (kind === 'music') {
+    return (
+      <section className="service-rail-view music-service" aria-label="Music">
+        <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} onClose={onClose} />
+      </section>
+    )
+  }
   return (
     <section className={`service-rail-view ${kind}-service`} aria-label={meta.label}>
       <header><div><Icon /><span><small>WIDGET VIEW</small><h2>{meta.label}</h2></span></div><button type="button" onClick={onClose} aria-label={`Close ${kind}`}><X /></button></header>
       {state.loading && <div className="service-state">Connecting to the V Start 2 service…</div>}
       {state.error && <div className="service-state error">{state.error}</div>}
       {!state.loading && !state.error && kind === 'weather' && <WeatherServiceView data={state.data} location={weatherLocation} celsius={weatherCelsius} />}
-      {!state.loading && !state.error && kind === 'music' && <MusicServiceView musicSettings={musicSettings} onSettingsPatch={onMusicSettingsPatch} />}
     </section>
   )
 }

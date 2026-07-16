@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { normalizeQueue, normalizeSearch, readMusicState } from './music.mjs'
+import { normalizeQueue, normalizeSearch, readMusicState, seekMusic, setMusicVolume } from './music.mjs'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -49,6 +49,23 @@ describe('music adapter', () => {
             : { state: 55, isMuted: false }
       return new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } })
     }))
-    await expect(readMusicState(client)).resolves.toMatchObject({ isPlaying: true, shuffle: true, repeatMode: 'ALL', volume: 55 })
+    await expect(readMusicState(client)).resolves.toMatchObject({
+      isPlaying: true,
+      shuffle: true,
+      repeatMode: 'ALL',
+      volume: 55,
+      capabilities: { playback: true, seek: false, volume: true, mute: true, queue: true, search: true, playlists: false },
+    })
+  })
+
+  it('forwards supported seek and volume values to the active source', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+
+    await seekMusic(client, 'ytm', 94)
+    await setMusicVolume(client, 'ytm', 37)
+
+    expect(fetch).toHaveBeenNthCalledWith(1, new URL('http://127.0.0.1:26538/api/v1/seek-to'), expect.objectContaining({ method: 'POST', body: JSON.stringify({ seconds: 94 }) }))
+    expect(fetch).toHaveBeenNthCalledWith(2, new URL('http://127.0.0.1:26538/api/v1/volume'), expect.objectContaining({ method: 'POST', body: JSON.stringify({ volume: 37 }) }))
   })
 })
