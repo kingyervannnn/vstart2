@@ -42,14 +42,15 @@ export async function uploadImageForLens(attachment, fetchImpl = fetch) {
     throw new Error(result?.error || result?.message || 'The image search service could not upload this image.')
   }
   if (result.needsPublicUrl || result.public !== true || !/^https?:\/\//i.test(result.url || '')) {
-    throw new Error('Google Lens needs public image hosting. Add IMGBB_API_KEY to the image-search service.')
+    throw new Error('Visual search needs public image hosting. Check the image-search service and try again.')
   }
   return result.url
 }
 
-export function googleLensUrl(imageUrl, query = '') {
-  const target = new URL('https://lens.google.com/uploadbyurl')
+export function visualSearchUrl(imageUrl, query = '') {
+  const target = new URL('https://yandex.com/images/search')
+  target.searchParams.set('rpt', 'imageview')
   target.searchParams.set('url', imageUrl)
-  if (query.trim()) target.searchParams.set('q', query.trim())
+  if (query.trim()) target.searchParams.set('text', query.trim())
   return target.toString()
 }

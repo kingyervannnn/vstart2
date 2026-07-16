@@ -868,9 +868,11 @@ async function handleRequest(request, response) {
   if (request.method === 'GET' && pathname === '/api/search') {
     const query = url.searchParams.get('q')?.trim()
     if (!query) throw new HttpError(400, 'Search query is required')
+    const category = url.searchParams.get('category') === 'images' ? 'images' : 'general'
     const endpoint = new URL('/search', process.env.SEARXNG_URL || 'http://127.0.0.1:8181')
     endpoint.searchParams.set('q', query)
     endpoint.searchParams.set('format', 'json')
+    if (category === 'images') endpoint.searchParams.set('categories', 'images')
     try {
       const upstream = await fetch(endpoint, {
         signal: AbortSignal.timeout(8000),
@@ -887,6 +889,11 @@ async function handleRequest(request, response) {
         url: item.url,
         content: item.content || '',
         engine: item.engine || item.engines?.[0] || '',
+        ...(category === 'images' ? {
+          thumbnailUrl: item.thumbnail_src || item.thumbnail || item.img_src || '',
+          imageUrl: item.img_src || item.thumbnail_src || item.thumbnail || '',
+          source: item.source || '',
+        } : {}),
       }))
       const failedEngines = (payload.unresponsive_engines || []).map((value) => String(value?.[0] || '')).filter(Boolean)
       if (!results.length && failedEngines.length) {
@@ -895,7 +902,7 @@ async function handleRequest(request, response) {
           details: `SearXNG providers unavailable: ${failedEngines.join(', ')}`,
         })
       }
-      return sendJson(response, 200, { query, results })
+      return sendJson(response, 200, { query, category, results })
     } catch (error) {
       return sendJson(response, 503, { error: 'Inline search is temporarily unavailable', details: error.message })
     }

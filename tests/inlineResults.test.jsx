@@ -66,4 +66,31 @@ describe('inline results actions', () => {
     const external = screen.getByRole('link', { name: /Example result/ })
     expect(external.getAttribute('target')).toBe('_blank')
   })
+
+  it('renders SearXNG image results as a native thumbnail grid', () => {
+    const imageResults = [{ ...results[0], thumbnailUrl: 'https://images.example/thumb.jpg', imageUrl: 'https://images.example/full.jpg' }]
+    const { container } = render(<InlineResults query="mountain" category="images" results={imageResults} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByText('SEARXNG IMAGES')).toBeTruthy()
+    expect(container.querySelector('.inline-image-results')).toBeTruthy()
+    expect(screen.getByRole('img').getAttribute('src')).toBe('https://images.example/thumb.jpg')
+  })
+
+  it('shows an explicit visual-search fallback instead of a blank iframe without frame assist', async () => {
+    const visualResult = { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview&url=https%3A%2F%2Fimages.example%2Fphoto.png' }
+    render(<InlineResults query="Visual search" results={[]} loading={false} error="" initialFrame={visualResult} workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+
+    expect(await screen.findByText('Visual results cannot be embedded yet')).toBeTruthy()
+    expect(screen.queryByTitle('Visual search results')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Open results' }).getAttribute('href')).toBe(visualResult.url)
+  })
+
+  it('embeds visual search when the extension activates frame assist', async () => {
+    activateFrameAssist.mockResolvedValue({ installed: true, ok: true, ruleId: 42 })
+    const visualResult = { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview&url=https%3A%2F%2Fimages.example%2Fphoto.png' }
+    render(<InlineResults query="Visual search" results={[]} loading={false} error="" initialFrame={visualResult} workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+
+    expect((await screen.findByTitle('Visual search results')).getAttribute('src')).toBe(visualResult.url)
+    expect(screen.getByText('Assist active')).toBeTruthy()
+  })
 })

@@ -2,7 +2,9 @@ use_default_settings:
   engines:
     keep_only:
       - bing
+      - bing images
       - google
+      - google images
       - wikipedia
 engines:
   - name: bing

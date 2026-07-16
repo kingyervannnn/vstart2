@@ -2,10 +2,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  googleLensUrl,
   prepareImageAttachment,
   uploadImageForLens,
   validateImageFile,
+  visualSearchUrl,
 } from './imageAttachment.js'
 
 describe('search image attachments', () => {
@@ -23,7 +23,7 @@ describe('search image attachments', () => {
     expect(() => validateImageFile({ name: 'huge.png', type: 'image/png', size: 8 * 1024 * 1024 + 1 })).toThrow('smaller than 8 MB')
   })
 
-  it('uploads through the image service and builds a Google Lens URL with context', async () => {
+  it('uploads through the image service and builds a working reverse-image URL with context', async () => {
     const file = new File(['image'], 'sample.png', { type: 'image/png' })
     const attachment = { file, name: file.name }
     const fetchImpl = vi.fn().mockResolvedValue({
@@ -32,12 +32,13 @@ describe('search image attachments', () => {
     })
 
     const publicUrl = await uploadImageForLens(attachment, fetchImpl)
-    const target = new URL(googleLensUrl(publicUrl, 'find this chair'))
+    const target = new URL(visualSearchUrl(publicUrl, 'find this chair'))
 
     expect(fetchImpl).toHaveBeenCalledWith('/image-search/upload-for-lens', expect.objectContaining({ method: 'POST', body: expect.any(FormData) }))
-    expect(target.origin + target.pathname).toBe('https://lens.google.com/uploadbyurl')
+    expect(target.origin + target.pathname).toBe('https://yandex.com/images/search')
+    expect(target.searchParams.get('rpt')).toBe('imageview')
     expect(target.searchParams.get('url')).toBe('https://i.example/sample.png')
-    expect(target.searchParams.get('q')).toBe('find this chair')
+    expect(target.searchParams.get('text')).toBe('find this chair')
   })
 
   it('explains when public visual-search hosting is unavailable', async () => {
@@ -47,6 +48,6 @@ describe('search image attachments', () => {
       json: async () => ({ success: true, needsPublicUrl: true, url: '/lens-image/local.png' }),
     })
 
-    await expect(uploadImageForLens({ file, name: file.name }, fetchImpl)).rejects.toThrow('IMGBB_API_KEY')
+    await expect(uploadImageForLens({ file, name: file.name }, fetchImpl)).rejects.toThrow('public image hosting')
   })
 })

@@ -1,0 +1,87 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { SearchDock } from '../src/components/SearchDock.jsx'
+
+const props = {
+  settings: {
+    general: { openLinksInNewTab: true },
+    search: { engine: 'google', dock: { wide: { x: 0.5, y: 0.82, width: 0.58 } }, appearance: {} },
+  },
+  profile: 'wide',
+  compact: false,
+  editMode: false,
+  workspaces: [{ id: 'home', name: 'Home' }],
+  activeWorkspaceId: 'home',
+  onWorkspaceSelect: vi.fn(),
+  onWorkspaceContextMenu: vi.fn(),
+  onGeometryCommit: vi.fn(),
+  onWorkspaceOffsetCommit: vi.fn(),
+  onInlineResults: vi.fn(),
+  onInlineImageSearch: vi.fn(),
+  onAgentToggle: vi.fn(),
+}
+
+function dropImage(container) {
+  const image = new File([new Uint8Array([1, 2, 3])], 'reference.png', { type: 'image/png' })
+  fireEvent.drop(container.querySelector('form'), { dataTransfer: { types: ['Files'], files: [image] } })
+}
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+})
+
+describe('Search dock visual search', () => {
+  it('opens a visible preparation page and forwards the completed external search', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, public: true, url: 'https://images.example/reference.png' }),
+    }))
+    const pendingWindow = { location: { href: '' }, close: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(pendingWindow)
+    const { container } = render(<SearchDock {...props} />)
+
+    dropImage(container)
+    await screen.findByRole('button', { name: 'Remove attached image' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
+
+    await waitFor(() => expect(pendingWindow.location.href).toContain('https://yandex.com/images/search'))
+    expect(open).toHaveBeenCalledWith('/visual-search-loading.html', '_blank')
+    expect(new URL(pendingWindow.location.href).searchParams.get('url')).toBe('https://images.example/reference.png')
+  })
+
+  it('routes an inline image search without leaving the start page', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const onInlineImageSearch = vi.fn()
+    const { container } = render(<SearchDock {...props} onInlineImageSearch={onInlineImageSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle inline results' }))
+    dropImage(container)
+    await screen.findByRole('button', { name: 'Remove attached image' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'red mountain bicycle' } })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
+
+    await waitFor(() => expect(onInlineImageSearch).toHaveBeenCalledWith({ query: 'red mountain bicycle', category: 'images' }))
+    expect(fetch).not.toHaveBeenCalled()
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('explains that SearXNG inline image results need a text query', async () => {
+    const onInlineImageSearch = vi.fn()
+    const { container } = render(<SearchDock {...props} onInlineImageSearch={onInlineImageSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle inline results' }))
+    dropImage(container)
+    await screen.findByRole('button', { name: 'Remove attached image' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
+
+    expect(await screen.findByText(/Inline image search uses SearXNG/)).toBeTruthy()
+    expect(onInlineImageSearch).not.toHaveBeenCalled()
+  })
+})

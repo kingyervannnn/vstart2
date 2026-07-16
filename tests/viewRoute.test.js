@@ -3,8 +3,9 @@ import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from '../
 
 describe('URL-backed active views', () => {
   it('round-trips inline search and full-screen iframe state', () => {
-    expect(parseViewSearch(buildViewSearch({ type: 'search', query: 'open ai', fullScreen: true }))).toEqual({ type: 'search', query: 'open ai', fullScreen: true })
-    expect(parseViewSearch(buildViewSearch({ type: 'frame', query: 'open ai', result: { title: 'OpenAI', url: 'https://openai.com' }, fullScreen: true }))).toEqual({ type: 'frame', query: 'open ai', result: { title: 'OpenAI', url: 'https://openai.com/' }, fullScreen: true })
+    expect(parseViewSearch(buildViewSearch({ type: 'search', query: 'open ai', fullScreen: true }))).toEqual({ type: 'search', query: 'open ai', category: 'general', fullScreen: true })
+    expect(parseViewSearch(buildViewSearch({ type: 'frame', query: 'open ai', result: { title: 'OpenAI', url: 'https://openai.com' }, fullScreen: true }))).toEqual({ type: 'frame', query: 'open ai', category: 'general', result: { title: 'OpenAI', url: 'https://openai.com/' }, fullScreen: true })
+    expect(parseViewSearch(buildViewSearch({ type: 'search', query: 'mountains', category: 'images' }))).toEqual({ type: 'search', query: 'mountains', category: 'images', fullScreen: false })
   })
 
   it('restores services and rejects unsafe frame URLs', () => {

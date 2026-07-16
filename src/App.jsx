@@ -99,9 +99,9 @@ export function App() {
     }
     if (routedView.type === 'search' || routedView.type === 'frame') {
       const initialFrame = routedView.type === 'frame' ? routedView.result : null
-      setInlineResults({ query: routedView.query, results: [], loading: Boolean(routedView.query), error: '', initialFrame, initialFullScreen: routedView.fullScreen })
+      setInlineResults({ query: routedView.query, category: routedView.category, results: [], loading: Boolean(routedView.query), error: '', initialFrame, initialFullScreen: routedView.fullScreen })
       if (routedView.query) {
-        void api.search(routedView.query).then((result) => {
+        void api.search(routedView.query, routedView.category).then((result) => {
           if (live) setInlineResults((current) => current ? { ...current, results: result.results, loading: false, error: '' } : current)
         }).catch((error) => {
           if (live) setInlineResults((current) => current ? { ...current, results: [], loading: false, error: error.message } : current)
@@ -556,13 +556,8 @@ export function App() {
     }
   }
 
-  const runInlineSearch = (query) => navigateView({ type: 'search', query })
-  const runInlineImageSearch = ({ query, url }) => navigateView({
-    type: 'frame',
-    query,
-    result: { title: 'Google Lens results', url },
-    fullScreen: false,
-  })
+  const runInlineSearch = (query) => navigateView({ type: 'search', query, category: 'general' })
+  const runInlineImageSearch = ({ query }) => navigateView({ type: 'search', query, category: 'images' })
 
   const createWorkspace = async (nameOrValues) => {
     const values = typeof nameOrValues === 'string' ? { name: nameOrValues } : nameOrValues

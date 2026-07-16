@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
-import { googleLensUrl, prepareImageAttachment, uploadImageForLens } from '../lib/imageAttachment.js'
+import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
@@ -363,16 +363,24 @@ export function SearchDock({
       }
       return
     }
+    if (imageAttachment && inline) {
+      if (!value) {
+        setImageError('Add a few words describing the image. Inline image search uses SearXNG; external visual search can inspect the image itself.')
+        return
+      }
+      onInlineImageSearch?.({ query: value, category: 'images' })
+      setQuery('')
+      setImageAttachment(null)
+      return
+    }
     if (imageAttachment) {
       const opensNewTab = settings.general?.openLinksInNewTab !== false
-      const pendingWindow = !inline && opensNewTab ? window.open('about:blank', '_blank') : null
+      const pendingWindow = opensNewTab ? window.open('/visual-search-loading.html', '_blank') : null
       setImageBusy(true)
       try {
         const publicUrl = await uploadImageForLens(imageAttachment)
-        const target = googleLensUrl(publicUrl, value)
-        if (inline) {
-          onInlineImageSearch?.({ query: value || 'Visual search', url: target })
-        } else if (opensNewTab) {
+        const target = visualSearchUrl(publicUrl, value)
+        if (opensNewTab) {
           if (pendingWindow) pendingWindow.location.href = target
           else window.open(target, '_blank')
         } else {
@@ -549,7 +557,7 @@ export function SearchDock({
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
-            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
+            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Describe the image for SearXNG…' : 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
