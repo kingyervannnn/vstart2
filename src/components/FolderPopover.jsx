@@ -1,12 +1,41 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
+import { folderPopoverPosition } from '../lib/folderPopover.js'
 
-export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, labelOpensInline, spotlightItemId, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
+export function FolderPopover({ folder, children, placements, profile, anchorRect, editMode, openInNewTab, labelOpensInline, spotlightItemId, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
   const canvasRef = useRef(null)
+  const popoverRef = useRef(null)
   const dragRef = useRef(null)
   const [preview, setPreview] = useState(null)
+  const [widePosition, setWidePosition] = useState(null)
+
+  useLayoutEffect(() => {
+    if (!folder || profile === 'compact') {
+      setWidePosition(null)
+      return undefined
+    }
+    const update = () => {
+      const popover = popoverRef.current?.getBoundingClientRect()
+      const tile = [...document.querySelectorAll('[data-shortcut-item-id]')].find((node) => node.dataset.shortcutItemId === folder.id)
+      const anchor = anchorRect || tile?.getBoundingClientRect()
+      if (!popover || !anchor) return setWidePosition(null)
+      const viewport = {
+        width: window.visualViewport?.width || document.documentElement.clientWidth,
+        height: window.visualViewport?.height || document.documentElement.clientHeight,
+      }
+      setWidePosition(folderPopoverPosition(anchor, viewport, popover))
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', update)
+    }
+  }, [anchorRect, folder, profile])
+
   if (!folder) return null
   const childPlacements = placements.filter((value) => value.containerKey === folder.id && value.profile === profile)
   const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
@@ -43,8 +72,8 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
   }
 
   return createPortal(
-    <div className="folder-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="folder-popover" role="dialog" aria-modal="true" aria-label={folder.title}>
+    <div className={`folder-backdrop ${profile === 'compact' ? 'folder-backdrop-centered' : 'folder-backdrop-anchored'}`} onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section ref={popoverRef} className="folder-popover" style={widePosition || undefined} role="dialog" aria-modal="true" aria-label={folder.title}>
         <header><FolderOpen /><h2>{folder.title}</h2><button type="button" className="folder-add-shortcut" onClick={() => onCreate(null)} aria-label="Add shortcut" title="Add shortcut"><Plus /></button>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
         <div
           ref={canvasRef}

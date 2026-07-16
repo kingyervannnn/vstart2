@@ -621,7 +621,7 @@ export function SearchDock({
         {shortcutPanelVisible && <li className="search-suggestion-heading" role="presentation"><span>{shortcutSearch.shortcutOnly ? 'SHORTCUTS ONLY' : 'SHORTCUTS'}</span>{shortcutResults.length > visibleShortcutResults.length && <small>{shortcutResults.length} matches</small>}</li>}
         {visibleShortcutResults.map((result) => <li className="shortcut-suggestion" key={result.item.id}>
           <button className="shortcut-suggestion-primary" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => openShortcutMatch(result)}>
-            <span className="shortcut-suggestion-icon"><ShortcutIcon item={result.item} /></span>
+            <span className="shortcut-suggestion-icon"><span className="shortcut-icon-shell"><ShortcutIcon item={result.item} /></span></span>
             <span className="shortcut-suggestion-copy"><strong>{result.item.title}</strong><small>{result.folder ? `${result.folder.title} · ` : ''}{result.workspace?.name || 'Unknown workspace'}</small></span>
           </button>
           <button className="shortcut-suggestion-locate" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => locateShortcutMatch(result)} aria-label={`Locate ${result.item.title} in ${result.workspace?.name || 'workspace'}`} title="Locate shortcut"><LocateFixed /></button>

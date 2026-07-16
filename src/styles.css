@@ -949,6 +949,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .app-context-menu .workspace-icon-grid button svg { width: 16px; height: 16px; }
 
 .modal-backdrop, .settings-backdrop, .folder-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(4,7,12,.48); backdrop-filter: blur(11px); }
+.folder-backdrop-anchored .folder-popover { position: fixed; }
 .shortcut-dialog { width: min(470px, 100%); padding: 21px; border: 1px solid rgba(255,255,255,.2); border-radius: 22px; color: #f6f8ff; background: rgba(16,21,31,.9); box-shadow: 0 28px 80px rgba(0,0,0,.4); }
 .shortcut-dialog header, .shortcut-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .shortcut-dialog h2 { margin: 0; font-size: 19px; }

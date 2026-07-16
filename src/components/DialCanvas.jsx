@@ -123,6 +123,7 @@ export function DialCanvas({
         return (
           <div
             key={item.id}
+            data-shortcut-item-id={item.id}
             className={`shortcut-tile ${item.kind} ${preview?.itemId === item.id ? 'dragging' : ''} ${preview?.itemId === item.id && preview.invalid ? 'invalid' : ''} ${target ? 'drop-target' : ''} ${filterActive ? filterMatch ? 'shortcut-filter-match' : 'shortcut-filter-dimmed' : ''} ${spotlightItemId === item.id ? 'shortcut-spotlight' : ''}`}
             style={placementStyle(current, profile)}
             role="link"
@@ -138,13 +139,13 @@ export function DialCanvas({
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !editMode) item.kind === 'folder' ? onOpenFolder(item) : window.open(item.url, openInNewTab ? '_blank' : '_self')
+              if (event.key === 'Enter' && !editMode) item.kind === 'folder' ? onOpenFolder(item, event.currentTarget) : window.open(item.url, openInNewTab ? '_blank' : '_self')
               if (event.key === 'Enter' && editMode) onEdit(item)
               handleKeyboardMove(event, item, stored)
             }}
             onClick={(event) => {
               if (editMode || dragRef.current) return
-              if (item.kind === 'folder') onOpenFolder(item)
+              if (item.kind === 'folder') onOpenFolder(item, event.currentTarget)
               else window.open(item.url, openInNewTab ? '_blank' : '_self')
               event.preventDefault()
             }}

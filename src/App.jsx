@@ -65,6 +65,7 @@ export function App() {
   const [workspaceDialog, setWorkspaceDialog] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const [folderId, setFolderId] = useState(null)
+  const [folderAnchor, setFolderAnchor] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCount, setSavingCount] = useState(0)
   const [toast, setToast] = useState(null)
@@ -109,6 +110,7 @@ export function App() {
     return () => clearTimeout(timer)
   }, [toast])
   useEffect(() => () => window.clearTimeout(shortcutSpotlightTimerRef.current), [])
+  useEffect(() => { if (!folderId) setFolderAnchor(null) }, [folderId])
 
   const routedView = useMemo(() => parseViewSearch(location.search), [location.search])
 
@@ -241,6 +243,7 @@ export function App() {
     const workspace = workspaces.find((candidate) => candidate.id === item?.workspaceId)
     if (!workspace || !item) return
     setInlineResults(null)
+    setFolderAnchor(null)
     setFolderId(item.parentFolderId || null)
     setShortcutFilter(null)
     setShortcutSpotlightId(item.id)
@@ -946,7 +949,11 @@ export function App() {
             onCreateAt={(point) => setDialog({ item: null, point })}
             onMove={moveItem}
             onDropOnItem={dropOnItem}
-            onOpenFolder={(item) => setFolderId(item.id)}
+            onOpenFolder={(item, element) => {
+              const rect = element?.getBoundingClientRect()
+              setFolderAnchor(rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height } : null)
+              setFolderId(item.id)
+            }}
             onOpenInline={openShortcutInline}
             onEdit={(item) => setDialog({ item, point: null })}
             onBlankContextMenu={({ x, y, point }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null }) }}
@@ -1006,6 +1013,7 @@ export function App() {
         children={folderChildren}
         placements={bootstrap.placements}
         profile={profile}
+        anchorRect={folderAnchor}
         editMode={editMode}
         openInNewTab={settings.general?.openLinksInNewTab !== false}
         labelOpensInline={settings.speedDial?.labelOpensInline === true}

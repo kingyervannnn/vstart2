@@ -52,6 +52,7 @@ describe('Search dock shortcut search', () => {
 
     const suggestions = await screen.findByRole('listbox', { name: 'Search suggestions' })
     const matches = within(suggestions).getAllByRole('button', { name: /mail/i })
+    expect(suggestions.querySelector('.shortcut-suggestion-icon > .shortcut-icon-shell')).toBeTruthy()
     fireEvent.click(matches[0])
 
     expect(onOpenShortcut).toHaveBeenCalledWith(items[0])
