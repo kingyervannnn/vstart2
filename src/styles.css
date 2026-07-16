@@ -288,15 +288,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .workspace-switcher .workspace-offset-handle:hover { transform: translateY(-50%) scale(1.06); }
 .workspace-offset-handle svg { width: 13px; height: 13px; }
 
-.search-dock { position: relative; isolation: isolate; order: 1; height: 52px; display: flex; align-items: center; gap: 3px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(39, 43, 49, .24); box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13); backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); -webkit-backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); cursor: grab; transition: border-color 260ms ease, box-shadow 620ms cubic-bezier(.16,1,.3,1); }
-.search-dock::after { content: ""; position: absolute; z-index: -1; left: 10%; right: 10%; bottom: -13px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--app-accent) 74%, transparent); filter: blur(15px); opacity: 0; transform: translateY(-5px) scaleX(.86); pointer-events: none; transition: opacity 760ms cubic-bezier(.22,.61,.36,1), transform 760ms cubic-bezier(.16,1,.3,1); will-change: opacity, transform; }
+.search-dock { position: relative; isolation: isolate; order: 1; height: 52px; display: flex; align-items: center; gap: 3px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(39, 43, 49, .24); box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 18px 26px -13px color-mix(in srgb, var(--app-accent) 0%, transparent); backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); -webkit-backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); cursor: grab; transition: border-color 260ms ease, box-shadow 620ms cubic-bezier(.16,1,.3,1); }
 .search-dock.no-outline { border-color: transparent; }
 .search-dock.search-glow-bottom.glow-trigger-always,
 .search-dock.search-glow-bottom.glow-trigger-focus:focus-within,
-.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13); }
-.search-dock.search-glow-bottom.glow-trigger-always::after,
-.search-dock.search-glow-bottom.glow-trigger-focus:focus-within::after,
-.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within::after { opacity: .76; transform: translateY(0) scaleX(1); transition-duration: 430ms; }
+.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 19px 27px -10px color-mix(in srgb, var(--app-accent) 66%, transparent); }
 .search-dock.search-glow-full.glow-trigger-always,
 .search-dock.search-glow-full.glow-trigger-focus:focus-within,
 .search-dock.search-glow-full.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 0 30px -3px color-mix(in srgb, var(--app-accent) 52%, transparent); }
