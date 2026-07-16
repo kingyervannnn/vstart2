@@ -77,14 +77,16 @@ Parallel host ports:
 | Notes | `3410` |
 | Speech to text | `8091` |
 | Agent bridge (optional native host service) | `/agent-bridge` via V Start; `3120` loopback only |
-| Mail bridge (native host service) | `3130` loopback only |
+| Mail bridge (native host service) | `/mail-bridge` via V Start; `3130` loopback only |
 | Environment bridge (native host service) | `/environment-bridge` via V Start; `3140` loopback only |
 
 Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
 untracked `.env` file before stack startup. Mail uses the existing local `mailctl`
 accounts and Keychain credentials through the native
 [Mail Bridge](mail-bridge/README.md); install it with
-`npm run mail:bridge:manage -- install`.
+`npm run mail:bridge:manage -- install`. V Start proxies `/mail-bridge` to that loopback
+service, so Mail is available from LAN and Tailscale clients without exposing credentials
+or port 3130.
 There is intentionally no AI service or AI-provider configuration.
 
 The Environment widget uses the existing `room-light` CLI through a narrow native

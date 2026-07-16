@@ -26,6 +26,7 @@ describe('mailBridge cache', () => {
     expect(mailBridge.peekInbox({ account: 'all' }).messages.map((message) => message.id)).toEqual(['personal-1', 'work-1'])
     expect(mailBridge.peekInbox({ account: 'work' }).messages).toHaveLength(1)
     expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls.every(([url]) => url.startsWith('/mail-bridge/v1/'))).toBe(true)
   })
 
   it('serves a warm inbox without another request', async () => {

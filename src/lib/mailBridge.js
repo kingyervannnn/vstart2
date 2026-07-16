@@ -1,4 +1,7 @@
-const MAIL_BRIDGE_URL = 'http://127.0.0.1:3130/v1'
+// Keep native mailctl and its credentials on macOS loopback. Browser clients,
+// including phones connected through Tailscale, reach it through V Start's
+// same-origin nginx route instead of treating 127.0.0.1 as the client device.
+const MAIL_BRIDGE_URL = '/mail-bridge/v1'
 const DEFAULT_QUERY = 'in:inbox'
 const DEFAULT_MAX_AGE_MS = 45_000
 const cache = {

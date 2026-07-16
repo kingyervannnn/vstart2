@@ -9,4 +9,7 @@ npm run mail:bridge:manage -- install
 npm run mail:bridge:manage -- status
 ```
 
-The bridge binds only to `127.0.0.1:3130` and accepts browser requests only from V Start on `localhost:3000` or `127.0.0.1:3000`.
+The bridge binds only to `127.0.0.1:3130`. V Start exposes its typed API through the same-origin
+`/mail-bridge/` reverse proxy, so LAN and Tailscale clients can use Mail without exposing port 3130.
+The proxy supplies the bridge's allowlisted loopback Host and Origin; direct remote requests to the
+native bridge remain unavailable.
