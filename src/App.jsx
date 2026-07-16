@@ -203,7 +203,8 @@ export function App() {
     const warmMail = async ({ forceInbox = false } = {}) => {
       const snapshot = await mailBridge.preload({ force: forceInbox })
       if (!live) return
-      await Promise.all((snapshot.accounts || []).map((account) => mailBridge.contacts({ account: account.alias, max: 80 }).catch(() => null)))
+      const unavailableAccounts = new Set(snapshot.unavailableAccounts || [])
+      await Promise.all((snapshot.accounts || []).filter((account) => !unavailableAccounts.has(account.alias)).map((account) => mailBridge.contacts({ account: account.alias, max: 80 }).catch(() => null)))
     }
     void warmMail().catch(() => {})
     const refreshSeconds = Number(settings.mail?.refreshSeconds ?? 60)

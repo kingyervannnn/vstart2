@@ -6,6 +6,10 @@ function response(payload) {
   return Promise.resolve({ ok: true, status: 200, json: async () => payload })
 }
 
+function errorResponse(message) {
+  return Promise.resolve({ ok: false, status: 502, json: async () => ({ error: { message } }) })
+}
+
 afterEach(() => {
   mailBridge.clearCache()
   vi.unstubAllGlobals()
@@ -40,6 +44,24 @@ describe('mailBridge cache', () => {
 
     expect(result.fromCache).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps healthy accounts warm when another account needs reauthorization', async () => {
+    const fetchMock = vi.fn((url) => {
+      if (url.endsWith('/accounts')) return response({ accounts: [{ alias: 'work' }, { alias: 'personal' }] })
+      if (url.includes('account=work')) return response({ messages: [{ id: 'work-1', account: 'work', date: '2026-07-15T10:00:00Z' }] })
+      if (url.includes('account=personal')) return errorResponse('The local mail service could not complete the request')
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const warmed = await mailBridge.preload()
+    const inbox = await mailBridge.loadInbox({ account: 'all' })
+
+    expect(warmed.unavailableAccounts).toEqual(['personal'])
+    expect(inbox.fromCache).toBe(true)
+    expect(inbox.messages.map((message) => message.id)).toEqual(['work-1'])
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
   it('caches contact suggestions per account', async () => {

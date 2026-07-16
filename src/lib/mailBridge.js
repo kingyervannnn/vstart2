@@ -34,8 +34,8 @@ function timestamp(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function rememberInbox(account, query, messages) {
-  const snapshot = { messages, updatedAt: Date.now() }
+function rememberInbox(account, query, messages, unavailableAccounts = []) {
+  const snapshot = { messages, unavailableAccounts, updatedAt: Date.now() }
   cache.inboxes.set(inboxKey(account, query), snapshot)
   return snapshot
 }
@@ -46,6 +46,7 @@ function peekInbox({ account = 'all', query = DEFAULT_QUERY, max = 30 } = {}) {
   return {
     accounts: cache.accounts,
     messages: inbox.messages.slice(0, max),
+    unavailableAccounts: inbox.unavailableAccounts || [],
     updatedAt: inbox.updatedAt,
   }
 }
@@ -61,6 +62,13 @@ async function loadAccounts({ force = false, signal } = {}) {
 async function loadInbox({ account = 'all', query = DEFAULT_QUERY, max = 30, force = false, maxAgeMs = DEFAULT_MAX_AGE_MS, signal } = {}) {
   const cached = peekInbox({ account, query, max })
   if (!force && cached && Date.now() - cached.updatedAt <= maxAgeMs) return { ...cached, fromCache: true }
+  if (!force && cache.preloadPromise) {
+    try { await cache.preloadPromise } catch {
+      // Fall through to a direct request when no account could be warmed.
+    }
+    const warmed = peekInbox({ account, query, max })
+    if (warmed && Date.now() - warmed.updatedAt <= maxAgeMs) return { ...warmed, fromCache: true }
+  }
   const accountData = await loadAccounts({ signal })
   const params = new URLSearchParams({ account, query, max: String(max) })
   const payload = await mailRequest(`/messages?${params}`, { signal })
@@ -74,16 +82,20 @@ async function preload({ force = false, query = DEFAULT_QUERY, maxPerAccount = 3
   if (cache.preloadPromise) return cache.preloadPromise
   cache.preloadPromise = (async () => {
     const accountData = await loadAccounts({ force })
-    const batches = await Promise.all((accountData.accounts || []).map(async (account) => {
+    const accounts = accountData.accounts || []
+    const settled = await Promise.allSettled(accounts.map(async (account) => {
       const params = new URLSearchParams({ account: account.alias, query, max: String(maxPerAccount) })
       const payload = await mailRequest(`/messages?${params}`)
       const messages = payload.messages || []
       rememberInbox(account.alias, query, messages)
       return messages
     }))
-    const combined = batches.flat().sort((left, right) => timestamp(right.date) - timestamp(left.date))
-    const inbox = rememberInbox('all', query, combined)
-    return { accounts: accountData.accounts || [], messages: inbox.messages.slice(0, maxPerAccount), updatedAt: inbox.updatedAt }
+    const availableBatches = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value)
+    const unavailableAccounts = settled.flatMap((result, index) => result.status === 'rejected' ? [accounts[index].alias] : [])
+    if (accounts.length && !availableBatches.length) throw settled.find((result) => result.status === 'rejected').reason
+    const combined = availableBatches.flat().sort((left, right) => timestamp(right.date) - timestamp(left.date))
+    const inbox = rememberInbox('all', query, combined, unavailableAccounts)
+    return { accounts, messages: inbox.messages.slice(0, maxPerAccount), unavailableAccounts, updatedAt: inbox.updatedAt }
   })().finally(() => { cache.preloadPromise = null })
   return cache.preloadPromise
 }
