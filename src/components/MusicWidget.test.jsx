@@ -30,6 +30,17 @@ afterEach(() => {
 })
 
 describe('music widget', () => {
+  it('defaults to a borderless bottom-glow treatment', () => {
+    const { container } = render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
+    expect(container.querySelector('.music-widget')).toHaveClass('music-glow-bottom', 'glow-trigger-connected', 'music-no-outline')
+  })
+
+  it('applies explicit glow and outline settings', () => {
+    const styledSettings = { ...settings, widgets: { ...settings.widgets, musicGlowStyle: 'full', musicGlowTrigger: 'playing', musicOutline: true } }
+    const { container } = render(<WidgetRail compact={false} settings={styledSettings} onOpenWidget={() => {}} onPatch={() => {}} />)
+    expect(container.querySelector('.music-widget')).toHaveClass('music-glow-full', 'glow-trigger-playing', 'music-outline')
+  })
+
   it('renders live playback data and sends transport controls to the active source', async () => {
     render(<WidgetRail compact={false} settings={settings} onOpenWidget={() => {}} onPatch={() => {}} />)
 

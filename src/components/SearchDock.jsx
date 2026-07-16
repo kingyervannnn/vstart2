@@ -45,6 +45,12 @@ export function SearchDock({
   const configuredWidth = configured.width
   const configuredWorkspaceOffset = Number(settings.search?.workspaceOffset?.[profile]) || 0
   const searchAppearance = settings.search?.appearance || {}
+  const searchGlowStyle = ['off', 'bottom', 'full'].includes(searchAppearance.glowStyle)
+    ? searchAppearance.glowStyle
+    : searchAppearance.outerGlow ? 'full' : 'bottom'
+  const searchGlowTrigger = ['always', 'focus', 'typing'].includes(searchAppearance.glowTrigger)
+    ? searchAppearance.glowTrigger
+    : searchAppearance.glowOnFocus === false ? 'always' : 'typing'
   const [geometry, setGeometry] = useState({ x: configuredX, y: configuredY, width: configuredWidth })
   const [query, setQuery] = useState('')
   const [inline, setInline] = useState(false)
@@ -313,7 +319,7 @@ export function SearchDock({
     >
       {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />}
       <form
-        className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} ${searchAppearance.outerGlow ? 'search-outer-glow' : ''} ${searchAppearance.glowOnFocus !== false ? 'glow-on-focus' : ''}`}
+        className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() ? 'has-query' : ''}`}
         style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
         onSubmit={submit}
       >

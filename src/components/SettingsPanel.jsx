@@ -18,6 +18,24 @@ const PAGES = [
   ['system', 'Data & System', Database],
 ]
 
+const GLOW_OPTIONS = [
+  ['off', 'Off'],
+  ['bottom', 'Bottom glow'],
+  ['full', 'Full glow'],
+]
+
+const SEARCH_GLOW_TRIGGERS = [
+  ['always', 'Always'],
+  ['focus', 'While focused'],
+  ['typing', 'While typing'],
+]
+
+const MUSIC_GLOW_TRIGGERS = [
+  ['always', 'Always'],
+  ['connected', 'When connected'],
+  ['playing', 'While playing'],
+]
+
 function Toggle({ label, detail, checked, onChange }) {
   return (
     <label className="setting-row">
@@ -40,6 +58,18 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
   const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
   const searchAppearance = settings.search?.appearance || {}
   const searchBlur = Math.max(0, Math.min(40, Number(searchAppearance.blur) || 0))
+  const searchGlowStyle = GLOW_OPTIONS.some(([value]) => value === searchAppearance.glowStyle)
+    ? searchAppearance.glowStyle
+    : searchAppearance.outerGlow ? 'full' : 'bottom'
+  const searchGlowTrigger = SEARCH_GLOW_TRIGGERS.some(([value]) => value === searchAppearance.glowTrigger)
+    ? searchAppearance.glowTrigger
+    : searchAppearance.glowOnFocus === false ? 'always' : 'typing'
+  const musicGlowStyle = GLOW_OPTIONS.some(([value]) => value === settings.widgets?.musicGlowStyle)
+    ? settings.widgets.musicGlowStyle
+    : 'bottom'
+  const musicGlowTrigger = MUSIC_GLOW_TRIGGERS.some(([value]) => value === settings.widgets?.musicGlowTrigger)
+    ? settings.widgets.musicGlowTrigger
+    : 'connected'
   const musicSources = settings.music?.sources || []
 
   useEffect(() => {
@@ -152,8 +182,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
               <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
               <Toggle label="Image search" checked={settings.search?.imageSearchEnabled !== false} onChange={(value) => onPatch({ search: { imageSearchEnabled: value } })} />
               <Toggle label="Search bar outline" checked={searchAppearance.outline !== false} onChange={(value) => onPatch({ search: { appearance: { outline: value } } })} />
-              <Toggle label="Outer glow" detail="Adds an accent-colored halo around the search bar." checked={searchAppearance.outerGlow} onChange={(value) => onPatch({ search: { appearance: { outerGlow: value } } })} />
-              {searchAppearance.outerGlow && <Toggle label="Glow only while focused" checked={searchAppearance.glowOnFocus !== false} onChange={(value) => onPatch({ search: { appearance: { glowOnFocus: value } } })} />}
+              <label className="setting-field"><span>Search bar glow</span><select value={searchGlowStyle} onChange={(event) => onPatch({ search: { appearance: { glowStyle: event.target.value } } })}>{GLOW_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              {searchGlowStyle !== 'off' && <label className="setting-field"><span>Show search glow</span><select value={searchGlowTrigger} onChange={(event) => onPatch({ search: { appearance: { glowTrigger: event.target.value } } })}>{SEARCH_GLOW_TRIGGERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
               <label className="setting-field range-setting"><span>Search bar blur <output aria-hidden="true">{searchBlur}px</output></span><input type="range" min="0" max="40" step="1" value={searchBlur} aria-label="Search bar blur" onChange={(event) => onPatch({ search: { appearance: { blur: Number(event.target.value) } } })} /></label>
               <p className="field-help">In edit mode, drag the handle beside the workspace buttons to set their horizontal relationship to the search bar.</p>
               <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search</span></div>
@@ -209,6 +239,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, activeBa
             {page === 'widgets' && <>
               <h3>Widgets</h3>
               {['clock', 'weather', 'notes', 'email', 'music'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              <label className="setting-field"><span>Music player glow</span><select value={musicGlowStyle} onChange={(event) => onPatch({ widgets: { musicGlowStyle: event.target.value } })}>{GLOW_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              {musicGlowStyle !== 'off' && <label className="setting-field"><span>Show music glow</span><select value={musicGlowTrigger} onChange={(event) => onPatch({ widgets: { musicGlowTrigger: event.target.value } })}>{MUSIC_GLOW_TRIGGERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+              <Toggle label="Music player outline" detail="Off by default for a lighter floating treatment." checked={settings.widgets?.musicOutline === true} onChange={(value) => onPatch({ widgets: { musicOutline: value } })} />
               <label className="setting-field"><span>Music player blur</span><input type="range" min="0" max="40" value={settings.widgets?.musicBlur ?? 18} onChange={(event) => onPatch({ widgets: { musicBlur: Number(event.target.value) } })} /></label>
             </>}
             {page === 'music' && <>

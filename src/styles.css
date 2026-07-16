@@ -121,17 +121,27 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .widget-inline-panel li { max-width: 100%; overflow: hidden; font-size: 10px; opacity: .72; white-space: nowrap; text-overflow: ellipsis; }
 
 .music-widget {
+  position: relative;
   display: grid;
   gap: 8px;
   max-width: 300px;
   margin-top: 18px;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, .2);
+  border: 1px solid transparent;
   border-radius: 16px;
   background: rgba(14, 20, 31, .18);
+  box-shadow: 0 12px 28px rgba(6, 9, 15, .1);
   backdrop-filter: blur(var(--music-blur));
   -webkit-backdrop-filter: blur(var(--music-blur));
+  transition: border-color 160ms ease, box-shadow 200ms ease;
 }
+.music-widget.music-outline { border-color: rgba(255, 255, 255, .2); }
+.music-widget.music-glow-bottom.glow-trigger-always,
+.music-widget.music-glow-bottom.glow-trigger-connected.music-connected,
+.music-widget.music-glow-bottom.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 24px 30px -19px color-mix(in srgb, var(--app-accent) 66%, transparent); }
+.music-widget.music-glow-full.glow-trigger-always,
+.music-widget.music-glow-full.glow-trigger-connected.music-connected,
+.music-widget.music-glow-full.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 0 30px -5px color-mix(in srgb, var(--app-accent) 55%, transparent); }
 .music-source-select { min-width: 0; display: flex; align-items: center; gap: 7px; color: color-mix(in srgb, var(--app-text) 52%, transparent); font-size: 7px; letter-spacing: .12em; text-transform: uppercase; }
 .music-source-select select { min-width: 0; flex: 1; height: 23px; border: 0; outline: 0; color: color-mix(in srgb, var(--app-text) 74%, transparent); background: transparent; font: inherit; letter-spacing: .04em; text-transform: none; cursor: pointer; }
 .music-summary { width: 100%; min-width: 0; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
@@ -274,7 +284,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .search-dock { height: 52px; display: flex; align-items: center; gap: 3px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(39, 43, 49, .24); box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13); backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); -webkit-backdrop-filter: blur(var(--search-blur, 19px)) saturate(1.25); cursor: grab; transition: border-color 160ms, box-shadow 180ms; }
 .search-dock.no-outline { border-color: transparent; }
-.search-dock.search-outer-glow:not(.glow-on-focus), .search-dock.search-outer-glow.glow-on-focus:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 0 28px color-mix(in srgb, var(--app-accent) 48%, transparent); }
+.search-dock.search-glow-bottom.glow-trigger-always,
+.search-dock.search-glow-bottom.glow-trigger-focus:focus-within,
+.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 24px 30px -18px color-mix(in srgb, var(--app-accent) 68%, transparent); }
+.search-dock.search-glow-full.glow-trigger-always,
+.search-dock.search-glow-full.glow-trigger-focus:focus-within,
+.search-dock.search-glow-full.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 0 30px -3px color-mix(in srgb, var(--app-accent) 52%, transparent); }
 .search-dock.inline-mode { border-color: color-mix(in srgb, var(--app-accent) 62%, white 10%); }
 .search-dock.agent-dock-active { height: auto; min-height: 52px; align-items: flex-end; box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 38%, transparent), 0 0 24px color-mix(in srgb, var(--app-accent) 18%, transparent), 0 12px 36px rgba(8,11,16,.2); cursor: default; }
 .search-dock > button { width: 33px; height: 33px; flex: none; display: grid; place-items: center; border: 0; border-radius: 10px; color: color-mix(in srgb, var(--app-text) 60%, transparent); background: transparent; cursor: pointer; }

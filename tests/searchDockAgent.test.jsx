@@ -46,4 +46,14 @@ describe('Assistant composer', () => {
     expect(screen.getByRole('textbox', { name: 'Message Hermes' }).value).toBe('Revise this message')
     expect(onDraftConsumed).toHaveBeenCalled()
   })
+
+  it('exposes glow shape, trigger, and active typing state to styling', () => {
+    const { container } = render(<SearchDock {...baseProps} />)
+    const dock = container.querySelector('.search-dock')
+    expect(dock.classList.contains('search-glow-bottom')).toBe(true)
+    expect(dock.classList.contains('glow-trigger-typing')).toBe(true)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message Hermes' }), { target: { value: 'Glow now' } })
+    expect(dock.classList.contains('has-query')).toBe(true)
+  })
 })

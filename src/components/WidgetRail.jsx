@@ -78,6 +78,8 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
   const [musicAction, setMusicAction] = useState('')
   const widgets = settings.widgets || {}
+  const musicGlowStyle = ['off', 'bottom', 'full'].includes(widgets.musicGlowStyle) ? widgets.musicGlowStyle : 'bottom'
+  const musicGlowTrigger = ['always', 'connected', 'playing'].includes(widgets.musicGlowTrigger) ? widgets.musicGlowTrigger : 'connected'
 
   const refreshMusic = useCallback(async (signal) => {
     if (!activeMusicSource) {
@@ -142,7 +144,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}
       </div>
       {widgets.music !== false && (
-        <section className="music-widget" style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>
+        <section className={`music-widget music-glow-${musicGlowStyle} glow-trigger-${musicGlowTrigger} ${musicState.data && !musicState.error ? 'music-connected' : ''} ${musicState.data?.isPlaying ? 'music-playing' : ''} ${widgets.musicOutline === true ? 'music-outline' : 'music-no-outline'}`} style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>
           <label className="music-source-select"><span>Source</span><select value={activeMusicSource?.id || ''} onChange={(event) => onPatch({ music: { activeSourceId: event.target.value } })} disabled={!musicSources.length} aria-label="Music source">
             {!musicSources.length && <option value="">No source</option>}
             {musicSources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
