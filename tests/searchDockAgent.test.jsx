@@ -27,6 +27,8 @@ describe('Assistant composer', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined })
   })
 
   it('is fixed-purpose, expandable, voice-enabled, and hides workspace controls', async () => {
@@ -76,5 +78,51 @@ describe('Assistant composer', () => {
       'Analyze this image.',
       expect.objectContaining({ name: 'reference.png', mimeType: 'image/png', data: 'AQID' }),
     ))
+  })
+
+  it('drives the recording waveform from live microphone samples', async () => {
+    const stopTrack = vi.fn()
+    const stream = { getTracks: () => [{ stop: stopTrack }] }
+    const getUserMedia = vi.fn().mockResolvedValue(stream)
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
+
+    class FakeMediaRecorder {
+      constructor() {
+        this.state = 'inactive'
+        this.mimeType = 'audio/webm'
+      }
+
+      start() { this.state = 'recording' }
+      stop() { this.state = 'inactive'; this.onstop?.() }
+    }
+
+    const getByteTimeDomainData = vi.fn((samples) => {
+      samples.fill(128)
+      samples[Math.floor(samples.length / 2)] = 170
+    })
+    const analyser = { frequencyBinCount: 128, disconnect: vi.fn(), getByteTimeDomainData }
+    const source = { connect: vi.fn(), disconnect: vi.fn() }
+    class FakeAudioContext {
+      constructor() { this.state = 'running' }
+      createMediaStreamSource() { return source }
+      createAnalyser() { return analyser }
+      close() { return Promise.resolve() }
+    }
+    let animationFrame
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder)
+    vi.stubGlobal('AudioContext', FakeAudioContext)
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback) => { animationFrame = callback; return 1 }))
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { container } = render(<SearchDock {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Voice message' }))
+
+    await screen.findByRole('status', { name: 'Live microphone waveform' })
+    animationFrame(32)
+
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true })
+    expect(source.connect).toHaveBeenCalledWith(analyser)
+    expect(getByteTimeDomainData).toHaveBeenCalled()
+    expect(container.querySelectorAll('.voice-waveform i')).toHaveLength(28)
   })
 })

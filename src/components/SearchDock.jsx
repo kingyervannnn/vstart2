@@ -3,12 +3,20 @@ import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square, X
 import { api } from '../lib/api.js'
 import { googleLensUrl, prepareImageAttachment, uploadImageForLens } from '../lib/imageAttachment.js'
 import { clampDockGeometry, shouldDropSuggestionsUp } from '../lib/searchDock.js'
+import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
 
 const ENGINES = {
   google: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`,
   duckduckgo: (query) => `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
   brave: (query) => `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
+}
+
+function VoiceWaveform({ levels }) {
+  return <div className="voice-waveform" role="status" aria-label="Live microphone waveform">
+    <span className="voice-waveform-line" aria-hidden="true" />
+    {levels.map((level, index) => <i key={index} style={{ '--voice-level': level }} aria-hidden="true" />)}
+  </div>
 }
 
 export function SearchDock({
@@ -40,7 +48,12 @@ export function SearchDock({
   const workspaceDragRef = useRef(null)
   const geometryRef = useRef(null)
   const mediaRef = useRef(null)
+  const mediaStreamRef = useRef(null)
   const chunksRef = useRef([])
+  const audioContextRef = useRef(null)
+  const audioSourceRef = useRef(null)
+  const audioAnalyserRef = useRef(null)
+  const voiceFrameRef = useRef(null)
   const configured = settings.search?.dock?.[profile] || { x: 0.5, y: 0.82, width: 0.58 }
   const configuredX = configured.x
   const configuredY = configured.y
@@ -69,7 +82,61 @@ export function SearchDock({
   const [imageDragActive, setImageDragActive] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   const [imageError, setImageError] = useState('')
+  const [voiceLevels, setVoiceLevels] = useState(quietVoiceWaveform)
   const imageDragDepthRef = useRef(0)
+
+  const stopVoiceAnalysis = useCallback((reset = true) => {
+    if (voiceFrameRef.current) cancelAnimationFrame(voiceFrameRef.current)
+    voiceFrameRef.current = null
+    audioSourceRef.current?.disconnect()
+    audioAnalyserRef.current?.disconnect()
+    audioSourceRef.current = null
+    audioAnalyserRef.current = null
+    const context = audioContextRef.current
+    audioContextRef.current = null
+    if (context && context.state !== 'closed') void context.close().catch(() => {})
+    if (reset) setVoiceLevels(quietVoiceWaveform())
+  }, [])
+
+  const startVoiceAnalysis = useCallback((stream) => {
+    stopVoiceAnalysis(false)
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    try {
+      const context = new AudioContext()
+      const source = context.createMediaStreamSource(stream)
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.7
+      source.connect(analyser)
+      audioContextRef.current = context
+      audioSourceRef.current = source
+      audioAnalyserRef.current = analyser
+      if (context.state === 'suspended') void context.resume()
+      const samples = new Uint8Array(analyser.frequencyBinCount)
+      let lastSampledAt = 0
+      const sample = (timestamp = 0) => {
+        if (timestamp - lastSampledAt >= 30) {
+          analyser.getByteTimeDomainData(samples)
+          setVoiceLevels((current) => deriveVoiceWaveform(samples, current))
+          lastSampledAt = timestamp
+        }
+        voiceFrameRef.current = requestAnimationFrame(sample)
+      }
+      voiceFrameRef.current = requestAnimationFrame(sample)
+    } catch {
+      stopVoiceAnalysis(false)
+    }
+  }, [stopVoiceAnalysis])
+
+  useEffect(() => () => {
+    if (mediaRef.current?.state === 'recording') {
+      mediaRef.current.onstop = null
+      mediaRef.current.stop()
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    stopVoiceAnalysis(false)
+  }, [stopVoiceAnalysis])
 
   const resizeAgentComposer = useCallback((target) => {
     const element = target || inputRef.current
@@ -381,29 +448,41 @@ export function SearchDock({
       mediaRef.current?.stop()
       return
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const recorder = new MediaRecorder(stream)
-    chunksRef.current = []
-    recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data)
-    recorder.onstop = async () => {
-      setRecording(false)
-      stream.getTracks().forEach((track) => track.stop())
-      setTranscribing(true)
-      try {
-        const form = new FormData()
-        form.append('audio_file', new Blob(chunksRef.current, { type: recorder.mimeType }), 'voice.webm')
-        const response = await fetch('/stt/asr?task=transcribe&output=json', { method: 'POST', body: form })
-        if (!response.ok) throw new Error('Transcription failed')
-        const result = await response.json()
-        setQuery(result.text || '')
-        inputRef.current?.focus()
-      } finally {
-        setTranscribing(false)
+    setImageError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      mediaStreamRef.current = stream
+      chunksRef.current = []
+      recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data)
+      recorder.onstop = async () => {
+        setRecording(false)
+        stopVoiceAnalysis()
+        stream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        setTranscribing(true)
+        try {
+          const form = new FormData()
+          form.append('audio_file', new Blob(chunksRef.current, { type: recorder.mimeType }), 'voice.webm')
+          const response = await fetch('/stt/asr?task=transcribe&output=json', { method: 'POST', body: form })
+          if (!response.ok) throw new Error('Transcription failed')
+          const result = await response.json()
+          setQuery(result.text || '')
+          inputRef.current?.focus()
+        } catch (error) {
+          setImageError(error.message || 'Voice transcription failed.')
+        } finally {
+          setTranscribing(false)
+        }
       }
+      mediaRef.current = recorder
+      startVoiceAnalysis(stream)
+      recorder.start()
+      setRecording(true)
+    } catch (error) {
+      stopVoiceAnalysis()
+      setImageError(error?.name === 'NotAllowedError' ? 'Microphone access was not allowed.' : 'The microphone is unavailable.')
     }
-    mediaRef.current = recorder
-    recorder.start()
-    setRecording(true)
   }
 
   return (
@@ -430,7 +509,9 @@ export function SearchDock({
         {agentMode ? <>
           <button type="button" className="active" onClick={onAgentToggle} aria-label="Close Agent Mode" aria-pressed={true}><Sparkles size={18} /></button>
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
-          <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />
+          {recording
+            ? <VoiceWaveform levels={voiceLevels} />
+            : <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />}
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
@@ -438,7 +519,9 @@ export function SearchDock({
         </> : <>
           <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
-          <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />
+          {recording
+            ? <VoiceWaveform levels={voiceLevels} />
+            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
