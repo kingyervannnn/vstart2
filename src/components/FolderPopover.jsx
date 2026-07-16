@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
@@ -113,12 +113,16 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
 }
 
 export function ShortcutIcon({ item }) {
-  const source = item.iconAssetId
-    ? `/api/assets/${item.iconAssetId}`
-    : item.iconOverrideUrl || item.faviconUrl || null
-  const [failedSource, setFailedSource] = useState(null)
-  if (source && source !== failedSource) {
-    return <img src={source} alt="" draggable="false" loading="eager" referrerPolicy="no-referrer" onError={() => setFailedSource(source)} />
+  const sources = [...new Set([
+    item.iconOverrideUrl || null,
+    item.iconAssetId ? `/api/assets/${item.iconAssetId}` : null,
+    item.faviconUrl || null,
+  ].filter(Boolean))]
+  const [failedSources, setFailedSources] = useState(() => new Set())
+  useEffect(() => setFailedSources(new Set()), [item.faviconUrl, item.iconAssetId, item.iconOverrideUrl])
+  const source = sources.find((candidate) => !failedSources.has(candidate))
+  if (source) {
+    return <img src={source} alt="" draggable="false" loading="eager" referrerPolicy="no-referrer" onError={() => setFailedSources((current) => new Set([...current, source]))} />
   }
   const letter = (item.title || '?').trim().charAt(0).toUpperCase()
   return <span className="generated-icon" aria-hidden="true">{letter}</span>

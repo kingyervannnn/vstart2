@@ -56,7 +56,7 @@ export function ShortcutDialog({ item, kind = 'shortcut', point, onClose, onSubm
           <>
             <label>Destination URL<input value={url} onChange={(event) => setUrl(event.target.value)} required type="url" /></label>
             <label>Shortcut image URL <span>(optional)</span><input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} type="url" placeholder="https://example.com/icon.png" /></label>
-            <p className="field-help">Overrides normal icon retrieval from the destination URL.</p>
+            <p className="field-help">Paste a direct image URL, or a webpage URL to use that page’s icon. This overrides retrieval from the destination URL.</p>
             <label>Upload custom icon <span>(optional, highest priority)</span><input className="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={chooseIcon} /></label>
             {iconData && <p className="field-help selected-file">Custom icon selected.</p>}
           </>

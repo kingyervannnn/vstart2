@@ -4,7 +4,28 @@ import net from 'node:net'
 import { HttpError } from './http.mjs'
 
 const MAX_ICON_BYTES = 768 * 1024
-const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'])
+const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'])
+
+function detectedImageMime(content, declaredMime) {
+  if (ALLOWED_MIME.has(declaredMime)) return declaredMime
+  if (content.length >= 8 && content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
+  if (content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff) return 'image/jpeg'
+  if (['GIF87a', 'GIF89a'].includes(content.subarray(0, 6).toString('ascii'))) return 'image/gif'
+  if (content.subarray(0, 4).toString('ascii') === 'RIFF' && content.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp'
+  if (content.length >= 4 && content[0] === 0 && content[1] === 0 && content[2] === 1 && content[3] === 0) return 'image/x-icon'
+  if (content.subarray(4, 12).toString('ascii').startsWith('ftypavi')) return 'image/avif'
+  const text = content.subarray(0, Math.min(content.length, 512)).toString('utf8').trimStart().toLowerCase()
+  if (text.startsWith('<svg') || (text.startsWith('<?xml') && text.includes('<svg'))) return 'image/svg+xml'
+  return null
+}
+
+function faviconCandidates(value) {
+  const url = new URL(value)
+  return [
+    new URL('/favicon.ico', url).toString(),
+    `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url.toString())}&sz=128`,
+  ]
+}
 
 function isPrivateV4(address) {
   const parts = address.split('.').map(Number)
@@ -61,10 +82,11 @@ async function fetchPublicImage(source) {
     if (!response.ok) throw new Error(`Icon source returned ${response.status}`)
     const declaredLength = Number(response.headers.get('content-length') || 0)
     if (declaredLength > MAX_ICON_BYTES) throw new Error('Icon is too large')
-    const mimeType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
-    if (!ALLOWED_MIME.has(mimeType)) throw new Error('Icon source did not return a supported image')
     const content = Buffer.from(await response.arrayBuffer())
     if (!content.length || content.length > MAX_ICON_BYTES) throw new Error('Icon is empty or too large')
+    const declaredMime = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+    const mimeType = detectedImageMime(content, declaredMime)
+    if (!mimeType) throw new Error('Icon source did not return a supported image')
     return { sourceUrl: url.toString(), mimeType, content }
   }
   throw new Error('Too many icon redirects')
@@ -91,14 +113,17 @@ export async function resolveShortcutIcon(client, destinationUrl, overrideUrl) {
     } catch (error) {
       warning = `Shortcut image URL could not be used: ${error.message}`
     }
+    for (const candidate of faviconCandidates(overrideUrl)) {
+      try {
+        const image = await fetchPublicImage(candidate)
+        return { iconAssetId: await saveIcon(client, image), faviconUrl: image.sourceUrl, warning: null }
+      } catch {
+        // A direct image may still be usable by the browser even when the archival fetch fails.
+      }
+    }
   }
 
-  const destination = new URL(destinationUrl)
-  const candidates = [
-    new URL('/favicon.ico', destination).toString(),
-    `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(destination.toString())}&sz=128`,
-  ]
-  for (const candidate of candidates) {
+  for (const candidate of faviconCandidates(destinationUrl)) {
     try {
       const image = await fetchPublicImage(candidate)
       return { iconAssetId: await saveIcon(client, image), faviconUrl: image.sourceUrl, warning }
