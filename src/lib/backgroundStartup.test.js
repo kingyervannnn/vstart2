@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { backgroundImageLayers, bootstrapBackgroundId, preloadBootstrapBackground, startupBackgroundUrl } from './backgroundStartup.js'
+import { backgroundImageLayers, bootstrapBackgroundId, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './backgroundStartup.js'
 
 const bootstrap = {
   settings: { document: { backgrounds: { workspaceSpecific: true, globalAssetId: 'global' } } },
@@ -32,5 +32,18 @@ describe('background startup', () => {
     await expect(preloadBootstrapBackground(bootstrap, '/w/work', FakeImage, 50)).resolves.toBe('work-background')
     expect(timeoutSpy).toHaveBeenCalled()
     timeoutSpy.mockRestore()
+  })
+
+  it('can preload a newly selected background before a crossfade', async () => {
+    const loaded = []
+    class FakeImage {
+      set src(value) {
+        loaded.push(value)
+        this.onload()
+      }
+    }
+
+    await expect(preloadBackgroundAsset('next-background', FakeImage)).resolves.toBe('next-background')
+    expect(loaded).toEqual(['/api/assets/next-background/preview'])
   })
 })

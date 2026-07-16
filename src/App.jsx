@@ -8,7 +8,7 @@ import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/c
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
-import { backgroundImageLayers, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
+import { backgroundImageLayers, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
@@ -28,6 +28,7 @@ import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
+const BACKGROUND_FADE_MS = 900
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const MAX_BACKGROUND_BYTES = 300 * 1024 * 1024
 
@@ -76,7 +77,10 @@ export function App() {
   const [shortcutFilter, setShortcutFilter] = useState(null)
   const [shortcutSpotlightId, setShortcutSpotlightId] = useState('')
   const [adaptiveGlow, setAdaptiveGlow] = useState({ backgroundId: null, color: '' })
+  const [backgroundLayers, setBackgroundLayers] = useState({ currentId: undefined, previousId: undefined })
   const activeRef = useRef(null)
+  const displayedBackgroundRef = useRef(undefined)
+  const backgroundFadeTimerRef = useRef(null)
   const agentRef = useRef(null)
   const shortcutSpotlightTimerRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
@@ -167,6 +171,29 @@ export function App() {
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+
+  useEffect(() => {
+    const nextId = backgroundId || null
+    if (displayedBackgroundRef.current === nextId) return undefined
+    let live = true
+    const commit = () => {
+      if (!live) return
+      const previousId = displayedBackgroundRef.current
+      displayedBackgroundRef.current = nextId
+      window.clearTimeout(backgroundFadeTimerRef.current)
+      setBackgroundLayers({ currentId: nextId, previousId })
+      if (previousId !== undefined) {
+        backgroundFadeTimerRef.current = window.setTimeout(() => {
+          setBackgroundLayers((current) => current.currentId === nextId ? { ...current, previousId: undefined } : current)
+        }, BACKGROUND_FADE_MS + 80)
+      }
+    }
+    if (displayedBackgroundRef.current === undefined || !nextId) commit()
+    else void preloadBackgroundAsset(nextId).then(commit)
+    return () => { live = false }
+  }, [backgroundId])
+
+  useEffect(() => () => window.clearTimeout(backgroundFadeTimerRef.current), [])
 
   useEffect(() => {
     if (!glowSettings.adaptToBackground || !backgroundId) return undefined
@@ -873,9 +900,17 @@ export function App() {
     '--header-scroll-duration': `${headerScrollDuration(settings.appearance?.headerScrollSpeed)}s`,
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
   }
-  const backgroundStyle = {
+  const displayedBackgroundId = backgroundLayers.currentId === undefined ? backgroundId || null : backgroundLayers.currentId
+  const backgroundBaseStyle = {
     '--app-background-scale': backgroundZoomScale(settings.backgrounds?.zoomPercent),
-    ...(backgroundId ? { '--app-background-image': backgroundImageLayers(backgroundId) } : {}),
+  }
+  const currentBackgroundStyle = {
+    ...backgroundBaseStyle,
+    ...(displayedBackgroundId ? { '--app-background-image': backgroundImageLayers(displayedBackgroundId) } : {}),
+  }
+  const previousBackgroundStyle = backgroundLayers.previousId === undefined ? null : {
+    ...backgroundBaseStyle,
+    ...(backgroundLayers.previousId ? { '--app-background-image': backgroundImageLayers(backgroundLayers.previousId) } : {}),
   }
   const showCompactInnerRing = compact
     && settings.general?.innerOutline
@@ -884,7 +919,8 @@ export function App() {
     && !agentMode
 
   return (<>
-    <div className="app-background-layer" style={backgroundStyle} aria-hidden="true" />
+    {previousBackgroundStyle && <div className="app-background-layer background-previous" style={previousBackgroundStyle} aria-hidden="true" />}
+    <div key={displayedBackgroundId || 'default'} className={`app-background-layer background-current ${previousBackgroundStyle ? 'background-fading-in' : ''}`} style={currentBackgroundStyle} aria-hidden="true" />
     <main
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}

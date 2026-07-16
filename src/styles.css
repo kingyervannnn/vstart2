@@ -43,6 +43,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transform-origin: center;
   transition: transform 180ms ease;
 }
+.app-background-layer.background-previous { z-index: 0; }
+.app-background-layer.background-current { z-index: 0; }
+.app-background-layer.background-fading-in { animation: background-crossfade 900ms cubic-bezier(.22, .8, .22, 1) both; }
+@keyframes background-crossfade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-background-layer.background-fading-in { animation: none; }
+}
 
 .vstart-app::before {
   content: "";

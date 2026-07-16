@@ -21,8 +21,7 @@ export function startupBackgroundUrl(pathname = '/') {
   return `/api/backgrounds/startup?path=${encodeURIComponent(pathname)}`
 }
 
-export function preloadBootstrapBackground(bootstrap, pathname, ImageClass = globalThis.Image, timeoutMs = 1200) {
-  const assetId = bootstrapBackgroundId(bootstrap, pathname)
+export function preloadBackgroundAsset(assetId, ImageClass = globalThis.Image, timeoutMs = 1200) {
   if (!assetId || typeof ImageClass !== 'function') return Promise.resolve(assetId)
   return new Promise((resolve) => {
     let settled = false
@@ -40,4 +39,9 @@ export function preloadBootstrapBackground(bootstrap, pathname, ImageClass = glo
     timer = setTimeout(finish, timeoutMs)
     image.src = `/api/assets/${assetId}/preview`
   })
+}
+
+export function preloadBootstrapBackground(bootstrap, pathname, ImageClass = globalThis.Image, timeoutMs = 1200) {
+  const assetId = bootstrapBackgroundId(bootstrap, pathname)
+  return preloadBackgroundAsset(assetId, ImageClass, timeoutMs)
 }
