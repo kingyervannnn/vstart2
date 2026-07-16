@@ -49,7 +49,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .vstart-app.mirrored { flex-direction: row-reverse; }
 
 .compact-mode .dial-rail { width: 100%; flex-basis: 100%; }
-.compact-mode .search-dock-wrap:not(.agent-composer-wrap) { transform: translate(-50%, calc(-50% + 12px)); }
+.compact-mode .search-dock-wrap:not(.agent-composer-wrap) { transform: translate(-50%, calc(-50% + 20px)); }
 
 .widget-rail {
   flex: 0 0 var(--widget-rail-width);
