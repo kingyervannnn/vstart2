@@ -53,6 +53,19 @@ export const api = {
   moveContainer: (id, values) => mutation(`/api/items/${id}/container`, 'PUT', values, 'container'),
   mergeFolder: (sourceId, targetId, title = 'New Folder') => mutation('/api/folders/merge', 'POST', { sourceId, targetId, title }, 'folder-merge'),
   uploadAsset: (kind, mimeType, data, originalName, collectionName) => mutation('/api/assets', 'POST', { kind, mimeType, data, originalName, collectionName }, 'asset-create'),
+  uploadBackground: (file, mimeType, collectionName) => {
+    const id = mutationId('background-upload')
+    return request('/api/backgrounds', {
+      method: 'POST',
+      headers: {
+        'content-type': mimeType,
+        'idempotency-key': id,
+        'x-background-name': encodeURIComponent(file.name),
+        ...(collectionName ? { 'x-background-collection': encodeURIComponent(collectionName) } : {}),
+      },
+      body: file,
+    })
+  },
   deleteBackground: (id) => mutation(`/api/assets/${id}`, 'DELETE', {}, 'background-delete'),
   search: (query, category = 'general') => request(`/api/search?q=${encodeURIComponent(query)}&category=${category === 'images' ? 'images' : 'general'}`),
   suggestions: (query) => request(`/api/suggestions?q=${encodeURIComponent(query)}`),

@@ -277,9 +277,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   const pendingDelete = pendingBackgroundDeleteId === asset.id
                   return <article key={asset.id} className={`background-card ${activeBackgroundId === asset.id ? 'active' : ''}`}>
                     <button type="button" className="background-card-select" onClick={() => onSelectBackground(asset.id)} aria-pressed={activeBackgroundId === asset.id} title={asset.originalName || 'Background'}>
-                      {asset.byteLength <= 8 * 1024 * 1024
-                        ? <img src={`/api/assets/${asset.id}`} alt="" loading="lazy" />
-                        : <span className="background-large-preview">{asset.mimeType === 'image/gif' ? 'Animated GIF' : 'Large image'}</span>}
+                      <img src={`/api/assets/${asset.id}/preview`} alt="" loading="lazy" decoding="async" />
                       <span>{asset.originalName || 'Background'}</span>
                       <small>{collections[0]?.name || `${Math.max(1, Math.round(asset.byteLength / 1024))} KiB`}</small>
                     </button>
@@ -302,7 +300,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   catch (error) { setBackgroundError(error.message) }
                   event.target.value = ''
                 }} /></label>
-                <label className="background-upload"><FolderUp /><strong>Import image folder</strong><span>Keeps the folder as a rotation collection.</span><input type="file" multiple webkitdirectory="" directory="" disabled={saving} onChange={async (event) => {
+                <label className="background-upload"><FolderUp /><strong>Import image folder</strong><span>No combined folder limit; each image may be up to 300 MB.</span><input type="file" multiple webkitdirectory="" directory="" disabled={saving} onChange={async (event) => {
                   setBackgroundError('')
                   const files = Array.from(event.target.files || [])
                   const collectionName = files[0]?.webkitRelativePath?.split('/')[0] || 'Imported backgrounds'

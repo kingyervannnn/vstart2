@@ -25,23 +25,12 @@ import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const MAX_BACKGROUND_BYTES = 300 * 1024 * 1024
 
 function backgroundMimeType(file) {
   if (BACKGROUND_MIME_TYPES.has(file.type)) return file.type
   const extension = file.name.split('.').pop()?.toLowerCase()
   return ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' })[extension] || ''
-}
-
-function readBackgroundFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const value = String(reader.result || '')
-      resolve(value.slice(value.indexOf(',') + 1))
-    }
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
-    reader.readAsDataURL(file)
-  })
 }
 
 function LoadingShell({ error, onRetry }) {
@@ -755,13 +744,13 @@ export function App() {
   const uploadBackgrounds = async (files, collectionName = null) => {
     const images = Array.from(files || []).filter((file) => backgroundMimeType(file))
     if (!images.length) throw new Error('That selection does not contain a supported image.')
-    const oversized = images.find((file) => file.size > 20 * 1024 * 1024)
-    if (oversized) throw new Error(`${oversized.name} is larger than 20 MB.`)
+    const oversized = images.find((file) => file.size > MAX_BACKGROUND_BYTES)
+    if (oversized) throw new Error(`${oversized.name} is larger than 300 MB. Folder imports have no combined size limit, but individual images must remain below 300 MB.`)
     setSavingCount((value) => value + 1)
     try {
       const assetIds = []
       for (const file of images) {
-        const asset = await api.uploadAsset('background', backgroundMimeType(file), await readBackgroundFile(file), file.name, collectionName || undefined)
+        const asset = await api.uploadBackground(file, backgroundMimeType(file), collectionName || undefined)
         assetIds.push(asset.assetId)
       }
       const uniqueAssetIds = [...new Set(assetIds)]

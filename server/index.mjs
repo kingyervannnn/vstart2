@@ -2,12 +2,13 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
-import { handleError, HttpError, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
+import { handleError, HttpError, readBuffer, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
 import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
 import { addMusicQueueItem, controlMusic, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
+import { BACKGROUND_MIME_TYPES, createBackgroundPreview, ensureBackgroundPreview, MAX_BACKGROUND_BYTES, storeBackgroundAsset, warmBackgroundPreviews } from './backgrounds.mjs'
 
 const PORT = Number(process.env.PORT || 3110)
 const CANVASES = {
@@ -99,6 +100,17 @@ const agentSessionUpdateSchema = z.object({
 })
 
 const musicSourceId = z.string().trim().min(1).max(80).optional()
+
+function requestHeader(request, name) {
+  const value = request.headers[name]
+  return Array.isArray(value) ? value[0] : value
+}
+
+function decodedUploadHeader(request, name) {
+  const value = requestHeader(request, name)
+  if (!value) return undefined
+  try { return decodeURIComponent(value) } catch { throw new HttpError(400, `Invalid ${name} header`) }
+}
 
 function removeBackgroundReferences(document, assetId, removedCollectionIds = []) {
   const next = structuredClone(document || {})
@@ -286,6 +298,27 @@ async function handleRequest(request, response) {
     return sendJson(response, 200, await searchMusic(pool, data.sourceId, data.query))
   }
 
+  if (request.method === 'POST' && pathname === '/api/backgrounds') {
+    const mimeType = String(requestHeader(request, 'content-type') || '').split(';')[0].trim().toLowerCase()
+    const data = parse(z.object({
+      mimeType: z.enum([...BACKGROUND_MIME_TYPES]),
+      originalName: z.string().trim().min(1).max(255),
+      collectionName: z.string().trim().min(1).max(160).optional(),
+    }), {
+      mimeType,
+      originalName: decodedUploadHeader(request, 'x-background-name'),
+      collectionName: decodedUploadHeader(request, 'x-background-collection'),
+    })
+    const content = await readBuffer(request, MAX_BACKGROUND_BYTES)
+    if (!content.length) throw new HttpError(400, 'Background file is empty')
+    const preview = await createBackgroundPreview(content)
+    if (!preview) throw new HttpError(400, 'That file is not a readable PNG, JPEG, WebP, or GIF image')
+    return mutate(request, response, 'asset.create:background', {}, async (client) => {
+      const assetId = await storeBackgroundAsset(client, { content, ...data, preview })
+      return { status: 201, body: { assetId } }
+    })
+  }
+
   if (request.method === 'POST' && pathname === '/api/assets') {
     const body = await readJson(request, 28 * 1024 * 1024)
     const data = parse(z.object({
@@ -300,6 +333,12 @@ async function handleRequest(request, response) {
       const content = Buffer.from(data.data, 'base64')
       const maxBytes = data.kind === 'background' ? 20 * 1024 * 1024 : 768 * 1024
       if (!content.length || content.length > maxBytes) throw new HttpError(400, `Asset must be smaller than ${Math.round(maxBytes / 1024 / 1024)} MB`)
+      if (data.kind === 'background') {
+        const preview = await createBackgroundPreview(content)
+        if (!preview) throw new HttpError(400, 'That file is not a readable PNG, JPEG, WebP, or GIF image')
+        const assetId = await storeBackgroundAsset(client, { content, ...data, preview })
+        return { status: 201, body: { assetId } }
+      }
       const sha256 = crypto.createHash('sha256').update(content).digest('hex')
       const id = crypto.randomUUID()
       const asset = await client.query(`
@@ -309,21 +348,23 @@ async function handleRequest(request, response) {
           SET original_name = COALESCE(assets.original_name, EXCLUDED.original_name)
         RETURNING id
       `, [id, data.kind, data.mimeType, sha256, content.length, content, data.originalName || null])
-      if (data.kind === 'background' && data.collectionName) {
-        const collection = await client.query(`
-          INSERT INTO background_collections(id, name)
-          VALUES ($1, $2)
-          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-          RETURNING id
-        `, [crypto.randomUUID(), data.collectionName])
-        await client.query(`
-          INSERT INTO background_collection_assets(collection_id, asset_id)
-          VALUES ($1, $2)
-          ON CONFLICT DO NOTHING
-        `, [collection.rows[0].id, asset.rows[0].id])
-      }
       return { status: 201, body: { assetId: asset.rows[0].id } }
     })
+  }
+
+  const previewMatch = routeMatch(pathname, /^\/api\/assets\/([0-9a-f-]+)\/preview$/)
+  if (request.method === 'GET' && previewMatch) {
+    const preview = await ensureBackgroundPreview(pool, previewMatch[0])
+    if (!preview) throw new HttpError(404, 'Background preview is unavailable')
+    const etag = crypto.createHash('sha256').update(preview.content).digest('hex')
+    response.writeHead(200, {
+      'content-type': preview.mimeType,
+      'content-length': preview.content.length,
+      etag: `"${etag}"`,
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+    })
+    return response.end(preview.content)
   }
 
   let match = routeMatch(pathname, /^\/api\/assets\/([0-9a-f-]+)$/)
@@ -997,6 +1038,9 @@ async function start() {
     handleRequest(request, response).catch((error) => handleError(response, error))
   })
   server.listen(PORT, '0.0.0.0', () => console.log(`[api] listening on ${PORT}`))
+  void warmBackgroundPreviews(pool).then((count) => {
+    if (count) console.log(`[backgrounds] generated ${count} missing preview${count === 1 ? '' : 's'}`)
+  }).catch((error) => console.error('[backgrounds] preview warmup failed', error))
 
   const shutdown = async () => {
     server.close()

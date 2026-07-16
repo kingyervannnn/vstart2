@@ -38,6 +38,30 @@ export async function readJson(request, maxBytes = 1_048_576) {
   }
 }
 
+export async function readBuffer(request, maxBytes) {
+  const declaredLength = Number(request.headers['content-length'] || 0)
+  if (declaredLength > maxBytes) throw new HttpError(413, `Individual backgrounds must be smaller than ${Math.round(maxBytes / 1024 / 1024)} MB`)
+  if (declaredLength > 0) {
+    const content = Buffer.allocUnsafe(declaredLength)
+    let offset = 0
+    for await (const chunk of request) {
+      offset += chunk.length
+      if (offset > maxBytes || offset > declaredLength) throw new HttpError(413, 'Request body is too large')
+      chunk.copy(content, offset - chunk.length)
+    }
+    return content.subarray(0, offset)
+  }
+
+  let size = 0
+  const chunks = []
+  for await (const chunk of request) {
+    size += chunk.length
+    if (size > maxBytes) throw new HttpError(413, `Individual backgrounds must be smaller than ${Math.round(maxBytes / 1024 / 1024)} MB`)
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks, size)
+}
+
 export function routeMatch(pathname, pattern) {
   const match = pathname.match(pattern)
   return match ? match.slice(1).map(decodeURIComponent) : null

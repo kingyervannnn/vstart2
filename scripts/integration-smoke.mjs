@@ -66,6 +66,10 @@ assert.ok(backgroundCollection?.assetIds.includes(background.body.assetId), 'fol
 const backgroundContent = await fetch(`${base}/assets/${background.body.assetId}`)
 assert.equal(backgroundContent.status, 200)
 assert.equal(backgroundContent.headers.get('content-type'), 'image/png')
+const backgroundPreview = await fetch(`${base}/assets/${background.body.assetId}/preview`)
+assert.equal(backgroundPreview.status, 200)
+assert.equal(backgroundPreview.headers.get('content-type'), 'image/webp')
+assert.ok(Number(backgroundPreview.headers.get('content-length')) < 100_000, 'background previews stay lightweight')
 const selectedBackground = await mutation('/settings', 'PATCH', {
   version: backgroundBootstrap.settings.version,
   patch: {
@@ -82,6 +86,27 @@ assert.ok(!backgroundDeleted.body.bootstrap.backgroundAssets.some((asset) => ass
 assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.globalAssetId, null, 'deleting the selected background clears its active reference')
 assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.rotation.workspacePools[initial.workspaces[0].id], undefined, 'deleting a background clears empty workspace rotation pools')
 assert.ok(!backgroundDeleted.body.bootstrap.backgroundCollections.some((collection) => collection.id === backgroundCollection.id), 'empty imported folders are removed')
+
+const largeBackgroundContent = Buffer.concat([Buffer.from(tinyPng, 'base64'), Buffer.alloc(20 * 1024 * 1024)])
+const largeBackgroundMutationId = `${runId}:large-background-create`
+const largeBackgroundResponse = await fetch(`${base}/backgrounds`, {
+  method: 'POST',
+  headers: {
+    'content-type': 'image/png',
+    'content-length': String(largeBackgroundContent.length),
+    'idempotency-key': largeBackgroundMutationId,
+    'x-background-name': encodeURIComponent('Large integration background.png'),
+    'x-background-collection': encodeURIComponent(`Large folder ${runId}`),
+  },
+  body: largeBackgroundContent,
+})
+const largeBackground = await largeBackgroundResponse.json()
+assert.equal(largeBackgroundResponse.status, 201, 'individual backgrounds larger than the old 20 MB ceiling upload successfully')
+const largeBackgroundPreview = await fetch(`${base}/assets/${largeBackground.assetId}/preview`)
+assert.equal(largeBackgroundPreview.status, 200)
+assert.equal(largeBackgroundPreview.headers.get('content-type'), 'image/webp')
+const largeBackgroundDeleted = await mutation(`/assets/${largeBackground.assetId}`, 'DELETE', {}, `${runId}:large-background-delete`)
+assert.equal(largeBackgroundDeleted.response.status, 200)
 const createdWorkspace = await mutation('/workspaces', 'POST', { name: `Smoke ${runId}`, icon: 'Briefcase' }, `${runId}:workspace-a`)
 assert.equal(createdWorkspace.response.status, 201)
 const workspace = createdWorkspace.body.bootstrap.workspaces.find((value) => value.id === createdWorkspace.body.workspaceId)
