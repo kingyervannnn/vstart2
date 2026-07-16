@@ -13,6 +13,8 @@ export function DialCanvas({
   showFolderLabels,
   labelOpensInline,
   openInNewTab,
+  shortcutFilter,
+  spotlightItemId,
   onCreateAt,
   onMove,
   onDropOnItem,
@@ -29,6 +31,9 @@ export function DialCanvas({
   const rootPlacements = placements.filter((value) => value.workspaceId === workspace.id && value.containerKey === 'root' && value.profile === profile)
   const placementByItem = new Map(rootPlacements.map((value) => [value.itemId, value]))
   const childrenByFolder = new Map()
+  const filteredItemIds = new Set(shortcutFilter?.itemIds || [])
+  const filteredFolderIds = new Set(shortcutFilter?.folderIds || [])
+  const filterActive = Boolean(shortcutFilter?.query)
   for (const item of items) {
     if (!item.parentFolderId) continue
     const children = childrenByFolder.get(item.parentFolderId) || []
@@ -114,10 +119,11 @@ export function DialCanvas({
         if (!stored) return null
         const current = preview?.itemId === item.id ? preview.value : stored
         const target = preview?.targetId === item.id
+        const filterMatch = item.kind === 'folder' ? filteredFolderIds.has(item.id) : filteredItemIds.has(item.id)
         return (
           <div
             key={item.id}
-            className={`shortcut-tile ${item.kind} ${preview?.itemId === item.id ? 'dragging' : ''} ${preview?.itemId === item.id && preview.invalid ? 'invalid' : ''} ${target ? 'drop-target' : ''}`}
+            className={`shortcut-tile ${item.kind} ${preview?.itemId === item.id ? 'dragging' : ''} ${preview?.itemId === item.id && preview.invalid ? 'invalid' : ''} ${target ? 'drop-target' : ''} ${filterActive ? filterMatch ? 'shortcut-filter-match' : 'shortcut-filter-dimmed' : ''} ${spotlightItemId === item.id ? 'shortcut-spotlight' : ''}`}
             style={placementStyle(current, profile)}
             role="link"
             tabIndex={0}

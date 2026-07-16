@@ -24,3 +24,54 @@ export function shouldHideWorkspaceSwitcher(side, suggestionsDropUp, suggestions
   if (!suggestionsVisible) return false
   return (side === 'top' && suggestionsDropUp) || (side === 'bottom' && !suggestionsDropUp)
 }
+
+const normalizeSearchText = (value) => String(value || '').trim().toLocaleLowerCase()
+
+export function parseShortcutSearch(value) {
+  const text = String(value || '').trimStart()
+  const shortcutOnly = text.startsWith('@')
+  return {
+    shortcutOnly,
+    query: (shortcutOnly ? text.slice(1) : text).trim(),
+  }
+}
+
+function shortcutMatchScore(item, folder, query) {
+  if (!query) return 0
+  const title = normalizeSearchText(item.title)
+  const folderTitle = normalizeSearchText(folder?.title)
+  const url = normalizeSearchText(item.url)
+  if (title === query) return 0
+  if (title.startsWith(query)) return 10
+  if (title.split(/\s+/).some((word) => word.startsWith(query))) return 20
+  if (title.includes(query)) return 30
+  if (folderTitle.includes(query)) return 40
+  if (url.includes(query)) return 50
+  return null
+}
+
+export function findShortcutMatches({ items = [], workspaces = [], activeWorkspaceId = '', query = '' } = {}) {
+  const normalizedQuery = normalizeSearchText(query)
+  const folders = new Map(items.filter((item) => item.kind === 'folder').map((folder) => [folder.id, folder]))
+  const workspaceById = new Map(workspaces.map((workspace) => [workspace.id, workspace]))
+  return items
+    .filter((item) => item.kind === 'shortcut' && item.url)
+    .map((item) => {
+      const folder = item.parentFolderId ? folders.get(item.parentFolderId) || null : null
+      const score = shortcutMatchScore(item, folder, normalizedQuery)
+      return score === null ? null : {
+        item,
+        folder,
+        workspace: workspaceById.get(item.workspaceId) || null,
+        score,
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) => {
+      const leftCurrent = left.item.workspaceId === activeWorkspaceId ? 0 : 1
+      const rightCurrent = right.item.workspaceId === activeWorkspaceId ? 0 : 1
+      return leftCurrent - rightCurrent
+        || left.score - right.score
+        || left.item.title.localeCompare(right.item.title)
+    })
+}

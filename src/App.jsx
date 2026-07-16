@@ -59,8 +59,11 @@ export function App() {
   const [inlineResults, setInlineResults] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const [agentDraft, setAgentDraft] = useState(null)
+  const [shortcutFilter, setShortcutFilter] = useState(null)
+  const [shortcutSpotlightId, setShortcutSpotlightId] = useState('')
   const activeRef = useRef(null)
   const agentRef = useRef(null)
+  const shortcutSpotlightTimerRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
   const wheelRef = useRef({ total: 0, cooldown: false, timer: null })
 
@@ -89,6 +92,7 @@ export function App() {
     const timer = setTimeout(() => setToast(null), 4200)
     return () => clearTimeout(timer)
   }, [toast])
+  useEffect(() => () => window.clearTimeout(shortcutSpotlightTimerRef.current), [])
 
   const routedView = useMemo(() => parseViewSearch(location.search), [location.search])
 
@@ -182,6 +186,23 @@ export function App() {
   const selectWorkspace = useCallback((workspace) => {
     if (workspace) navigate({ pathname: agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`, search: agentMode ? '' : location.search })
   }, [agentMode, location.search, navigate])
+
+  const openShortcutFromSearch = useCallback((item) => {
+    if (!item?.url) return
+    window.open(item.url, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
+  }, [settings.general?.openLinksInNewTab])
+
+  const locateShortcutFromSearch = useCallback((item) => {
+    const workspace = workspaces.find((candidate) => candidate.id === item?.workspaceId)
+    if (!workspace || !item) return
+    setInlineResults(null)
+    setFolderId(item.parentFolderId || null)
+    setShortcutFilter(null)
+    setShortcutSpotlightId(item.id)
+    window.clearTimeout(shortcutSpotlightTimerRef.current)
+    shortcutSpotlightTimerRef.current = window.setTimeout(() => setShortcutSpotlightId(''), 2600)
+    navigate(`/w/${workspace.slug}`)
+  }, [navigate, workspaces])
 
   const cycleWorkspace = useCallback((delta) => {
     if (!activeWorkspace || workspaces.length < 2) return
@@ -789,6 +810,8 @@ export function App() {
             showFolderLabels={settings.speedDial?.showFolderLabels !== false}
             labelOpensInline={settings.speedDial?.labelOpensInline === true}
             openInNewTab={settings.general?.openLinksInNewTab !== false}
+            shortcutFilter={shortcutFilter}
+            spotlightItemId={shortcutSpotlightId}
             onCreateAt={(point) => setDialog({ item: null, point })}
             onMove={moveItem}
             onDropOnItem={dropOnItem}
@@ -805,6 +828,7 @@ export function App() {
           compact={compact}
           editMode={editMode}
           workspaces={workspaces}
+          items={bootstrap.items}
           activeWorkspaceId={activeWorkspace.id}
           onWorkspaceSelect={selectWorkspace}
           onWorkspaceContextMenu={(payload) => { setContextMenu(null); setWorkspaceMenu(payload) }}
@@ -812,6 +836,9 @@ export function App() {
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
           onInlineImageSearch={runInlineImageSearch}
+          onOpenShortcut={openShortcutFromSearch}
+          onLocateShortcut={locateShortcutFromSearch}
+          onShortcutFilterChange={setShortcutFilter}
           restoredQuery={routedInline?.query || ''}
           draftRequest={agentDraft}
           onDraftConsumed={() => setAgentDraft(null)}
@@ -852,6 +879,7 @@ export function App() {
         editMode={editMode}
         openInNewTab={settings.general?.openLinksInNewTab !== false}
         labelOpensInline={settings.speedDial?.labelOpensInline === true}
+        spotlightItemId={shortcutSpotlightId}
         onClose={() => setFolderId(null)}
         onCreate={(point) => { setFolderId(null); setDialog({ item: null, point, parentFolderId: currentFolder.id }) }}
         onBlankContextMenu={({ x, y, point, folder }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point, item: null, folder }) }}

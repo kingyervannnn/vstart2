@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
 
-export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, labelOpensInline, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
+export function FolderPopover({ folder, children, placements, profile, editMode, openInNewTab, labelOpensInline, spotlightItemId, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
   const canvasRef = useRef(null)
   const dragRef = useRef(null)
   const [preview, setPreview] = useState(null)
@@ -63,7 +63,7 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
             return (
               <div
                 key={child.id}
-                className={`folder-child ${preview?.itemId === child.id ? 'dragging' : ''} ${preview?.itemId === child.id && preview.invalid ? 'invalid' : ''}`}
+                className={`folder-child ${preview?.itemId === child.id ? 'dragging' : ''} ${preview?.itemId === child.id && preview.invalid ? 'invalid' : ''} ${spotlightItemId === child.id ? 'shortcut-spotlight' : ''}`}
                 style={placementStyle(current, profile)}
                 role="link"
                 tabIndex={0}

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
-import { clampDockGeometry, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
+import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
+import { ShortcutIcon } from './FolderPopover.jsx'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
 
 const ENGINES = {
@@ -25,6 +26,7 @@ export function SearchDock({
   compact,
   editMode,
   workspaces,
+  items = [],
   activeWorkspaceId,
   onWorkspaceSelect,
   onWorkspaceContextMenu,
@@ -32,6 +34,9 @@ export function SearchDock({
   onWorkspaceLayoutCommit,
   onInlineResults,
   onInlineImageSearch,
+  onOpenShortcut,
+  onLocateShortcut,
+  onShortcutFilterChange,
   restoredQuery = '',
   draftRequest = null,
   onDraftConsumed,
@@ -86,6 +91,14 @@ export function SearchDock({
   const [imageError, setImageError] = useState('')
   const [voiceLevels, setVoiceLevels] = useState(quietVoiceWaveform)
   const imageDragDepthRef = useRef(0)
+  const shortcutSearch = parseShortcutSearch(query)
+  const shortcutSearchActive = shortcutSearch.shortcutOnly || shortcutSearch.query.length >= 2
+  const shortcutResults = useMemo(() => shortcutSearchActive
+    ? findShortcutMatches({ items, workspaces, activeWorkspaceId, query: shortcutSearch.query })
+    : [], [activeWorkspaceId, items, shortcutSearch.query, shortcutSearchActive, workspaces])
+  const visibleShortcutResults = shortcutResults.slice(0, shortcutSearch.shortcutOnly ? 8 : 5)
+  const shortcutPanelVisible = !agentMode && suggestionsOpen && (shortcutSearch.shortcutOnly || visibleShortcutResults.length > 0)
+  const suggestionRowCount = suggestions.length + visibleShortcutResults.length + (shortcutPanelVisible ? 1 : 0)
 
   const stopVoiceAnalysis = useCallback((reset = true) => {
     if (voiceFrameRef.current) cancelAnimationFrame(voiceFrameRef.current)
@@ -208,6 +221,10 @@ export function SearchDock({
       setSuggestionsOpen(false)
       return undefined
     }
+    if (shortcutSearch.shortcutOnly) {
+      setSuggestions([])
+      return undefined
+    }
     const value = query.trim()
     if (value.length < 2) {
       setSuggestions([])
@@ -217,17 +234,32 @@ export function SearchDock({
       api.suggestions(value).then((result) => setSuggestions(result.suggestions || [])).catch(() => setSuggestions([]))
     }, 140)
     return () => clearTimeout(timer)
-  }, [agentMode, query])
+  }, [agentMode, query, shortcutSearch.shortcutOnly])
+
+  useEffect(() => {
+    if (agentMode || !shortcutSearch.shortcutOnly) {
+      onShortcutFilterChange?.(null)
+      return
+    }
+    const currentMatches = shortcutResults.filter((result) => result.item.workspaceId === activeWorkspaceId)
+    onShortcutFilterChange?.({
+      query: shortcutSearch.query,
+      itemIds: currentMatches.map((result) => result.item.id),
+      folderIds: [...new Set(currentMatches.map((result) => result.folder?.id).filter(Boolean))],
+    })
+  }, [activeWorkspaceId, agentMode, onShortcutFilterChange, shortcutResults, shortcutSearch.query, shortcutSearch.shortcutOnly])
+
+  useEffect(() => () => onShortcutFilterChange?.(null), [onShortcutFilterChange])
 
   useEffect(() => {
     const updateDirection = () => {
       const bounds = dockRef.current?.getBoundingClientRect()
-      setSuggestionsDropUp(shouldDropSuggestionsUp(bounds, window.innerHeight, suggestions.length))
+      setSuggestionsDropUp(shouldDropSuggestionsUp(bounds, window.innerHeight, suggestionRowCount))
     }
     updateDirection()
     window.addEventListener('resize', updateDirection)
     return () => window.removeEventListener('resize', updateDirection)
-  }, [geometry, suggestions.length, suggestionsOpen])
+  }, [geometry, suggestionRowCount, suggestionsOpen])
 
   const beginInteraction = (event, kind) => {
     if (kind === 'resize' && !editMode) return
@@ -336,12 +368,32 @@ export function SearchDock({
     }
   }, [endWorkspaceMove, moveWorkspace, workspaceMoving])
 
+  const openShortcutMatch = (result) => {
+    if (!result) return
+    setQuery('')
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    onOpenShortcut?.(result.item)
+  }
+
+  const locateShortcutMatch = (result) => {
+    if (!result) return
+    setQuery('')
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    onLocateShortcut?.(result.item)
+  }
+
   const submit = async (event, selectedQuery = null) => {
     event?.preventDefault()
     const value = String(selectedQuery ?? query).trim()
     if ((!value && !imageAttachment) || imageBusy) return
     setSuggestionsOpen(false)
     setImageError('')
+    if (!agentMode && shortcutSearch.shortcutOnly && !imageAttachment) {
+      openShortcutMatch(shortcutResults[0])
+      return
+    }
     if (agentMode) {
       if (!agentReady || (agentRunning && imageAttachment)) return
       const text = value || 'Analyze this image.'
@@ -521,7 +573,7 @@ export function SearchDock({
   }
 
   const effectiveWorkspaceSide = compact ? 'top' : workspaceSide
-  const suggestionsVisible = !agentMode && suggestionsOpen && suggestions.length > 0
+  const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible)
   const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
   const clearVisible = query.length > 0 && !recording
 
@@ -571,7 +623,17 @@ export function SearchDock({
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
       {suggestionsVisible && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
-        {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); void submit(null, suggestion) }}>{suggestion}</button></li>)}
+        {shortcutPanelVisible && <li className="search-suggestion-heading" role="presentation"><span>{shortcutSearch.shortcutOnly ? 'SHORTCUTS ONLY' : 'SHORTCUTS'}</span>{shortcutResults.length > visibleShortcutResults.length && <small>{shortcutResults.length} matches</small>}</li>}
+        {visibleShortcutResults.map((result) => <li className="shortcut-suggestion" key={result.item.id}>
+          <button className="shortcut-suggestion-primary" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => openShortcutMatch(result)}>
+            <span className="shortcut-suggestion-icon"><ShortcutIcon item={result.item} /></span>
+            <span className="shortcut-suggestion-copy"><strong>{result.item.title}</strong><small>{result.folder ? `${result.folder.title} · ` : ''}{result.workspace?.name || 'Unknown workspace'}</small></span>
+          </button>
+          <button className="shortcut-suggestion-locate" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => locateShortcutMatch(result)} aria-label={`Locate ${result.item.title} in ${result.workspace?.name || 'workspace'}`} title="Locate shortcut"><LocateFixed /></button>
+        </li>)}
+        {shortcutSearch.shortcutOnly && !visibleShortcutResults.length && <li className="shortcut-suggestion-empty" role="status">No matching shortcuts</li>}
+        {!!suggestions.length && !!visibleShortcutResults.length && <li className="search-suggestion-heading" role="presentation"><span>WEB SUGGESTIONS</span></li>}
+        {suggestions.map((suggestion) => <li key={suggestion}><button className="web-suggestion" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); void submit(null, suggestion) }}>{suggestion}</button></li>)}
       </ul>}
       {editMode && !agentMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>
