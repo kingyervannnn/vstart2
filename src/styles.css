@@ -1058,7 +1058,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.startup-shell { position: fixed; inset: 0; background: #080a0f; }
+.startup-shell { position: fixed; inset: 0; background-color: #080a0f; background-size: cover; background-position: center; }
 .loading-shell { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #eef2ff; background: radial-gradient(circle at 50% 35%, #283751, #0a0d14 58%); text-align: center; animation: loading-shell-enter 160ms ease-out both; }
 .loading-mark { width: 58px; height: 58px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 18px; background: rgba(255,255,255,.06); font-weight: 800; }
 .loading-shell h1 { margin: 9px 0 0; font-size: 24px; }

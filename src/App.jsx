@@ -8,6 +8,7 @@ import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/c
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
+import { backgroundImageLayers, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
@@ -86,7 +87,9 @@ export function App() {
   const load = useCallback(async () => {
     setLoadError('')
     try {
-      applyBootstrap(await api.bootstrap())
+      const next = await api.bootstrap()
+      await preloadBootstrapBackground(next, window.location.pathname)
+      applyBootstrap(next)
     } catch (error) {
       setLoadError(error.message)
     }
@@ -847,7 +850,7 @@ export function App() {
 
   if (!bootstrap) {
     if (loadError || showLoadingShell) return <LoadingShell error={loadError} onRetry={load} />
-    return <main className="startup-shell" aria-label="Starting V Start 2" aria-busy="true" />
+    return <main className="startup-shell" style={{ backgroundImage: `url(${startupBackgroundUrl(location.pathname)})` }} aria-label="Starting V Start 2" aria-busy="true" />
   }
 
   const currentFolder = bootstrap.items.find((item) => item.id === folderId && item.kind === 'folder')
@@ -858,7 +861,7 @@ export function App() {
     '--app-glow': adaptiveGlowColor || manualGlowColor,
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
-    ...(backgroundId ? { '--app-background-image': `url(/api/assets/${backgroundId})` } : {}),
+    ...(backgroundId ? { '--app-background-image': backgroundImageLayers(backgroundId) } : {}),
   }
   const showCompactInnerRing = compact
     && settings.general?.innerOutline

@@ -319,6 +319,33 @@ async function handleRequest(request, response) {
     })
   }
 
+  if (request.method === 'GET' && pathname === '/api/backgrounds/startup') {
+    const requestedPath = url.searchParams.get('path') || '/'
+    const settingsResult = await pool.query("SELECT document FROM app_settings WHERE id = 'default'")
+    const backgrounds = settingsResult.rows[0]?.document?.backgrounds || {}
+    let assetId = backgrounds.globalAssetId || null
+    if (backgrounds.workspaceSpecific) {
+      const slugMatch = requestedPath.match(/^\/w\/([^/]+)/)
+      const slug = slugMatch ? decodeURIComponent(slugMatch[1]) : null
+      const workspaceResult = slug
+        ? await pool.query('SELECT background_asset_id FROM workspaces WHERE slug = $1', [slug])
+        : await pool.query(`
+            SELECT w.background_asset_id
+            FROM workspaces w
+            LEFT JOIN app_state s ON s.key = 'last_active_workspace_id' AND s.value #>> '{}' = w.id::text
+            ORDER BY (s.key IS NOT NULL) DESC, w.sort_order
+            LIMIT 1
+          `)
+      assetId = workspaceResult.rows[0]?.background_asset_id || assetId
+    }
+    if (!assetId) return sendEmpty(response)
+    response.writeHead(302, {
+      location: `/api/assets/${assetId}/preview`,
+      'cache-control': 'no-store',
+    })
+    return response.end()
+  }
+
   if (request.method === 'POST' && pathname === '/api/assets') {
     const body = await readJson(request, 28 * 1024 * 1024)
     const data = parse(z.object({

@@ -86,6 +86,22 @@ assert.ok(!backgroundDeleted.body.bootstrap.backgroundAssets.some((asset) => ass
 assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.globalAssetId, null, 'deleting the selected background clears its active reference')
 assert.equal(backgroundDeleted.body.bootstrap.settings.document.backgrounds.rotation.workspacePools[initial.workspaces[0].id], undefined, 'deleting a background clears empty workspace rotation pools')
 assert.ok(!backgroundDeleted.body.bootstrap.backgroundCollections.some((collection) => collection.id === backgroundCollection.id), 'empty imported folders are removed')
+const restoredBackgroundSettings = await mutation('/settings', 'PATCH', {
+  version: backgroundDeleted.body.bootstrap.settings.version,
+  patch: { backgrounds: initial.settings.document.backgrounds },
+}, `${runId}:background-settings-restore`)
+assert.equal(restoredBackgroundSettings.response.status, 200)
+assert.equal(restoredBackgroundSettings.body.bootstrap.settings.document.backgrounds.globalAssetId, initial.settings.document.backgrounds.globalAssetId, 'background smoke tests restore the user selection')
+const restoredBackgroundId = initial.settings.document.backgrounds.workspaceSpecific
+  ? initial.workspaces[0].backgroundAssetId || initial.settings.document.backgrounds.globalAssetId
+  : initial.settings.document.backgrounds.globalAssetId
+const startupBackground = await fetch(`${base}/backgrounds/startup?path=${encodeURIComponent(`/w/${initial.workspaces[0].slug}`)}`, { redirect: 'manual' })
+if (restoredBackgroundId) {
+  assert.equal(startupBackground.status, 302)
+  assert.equal(startupBackground.headers.get('location'), `/api/assets/${restoredBackgroundId}/preview`, 'startup shell resolves the database-selected background')
+} else {
+  assert.equal(startupBackground.status, 204)
+}
 
 const largeBackgroundContent = Buffer.concat([Buffer.from(tinyPng, 'base64'), Buffer.alloc(20 * 1024 * 1024)])
 const largeBackgroundMutationId = `${runId}:large-background-create`
