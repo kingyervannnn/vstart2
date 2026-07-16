@@ -170,7 +170,7 @@ export function InlineResults({ query, category = 'general', results, loading, e
 
   return (
     <section className={`inline-results${fullScreen ? ' full-screen' : ''}`} aria-label="Inline search results">
-      <header>
+      <header className="inline-results-toolbar">
         <div><small>{category === 'images' ? 'SEARXNG IMAGES' : 'INLINE RESULTS'}</small><h2>{query}</h2></div>
         <div className="inline-results-header-actions">
           <button type="button" onClick={toggleFullScreen} aria-label={fullScreen ? 'Exit full screen' : 'Open full screen'} title={fullScreen ? 'Exit full screen' : 'Open full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>

@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bot, Check, CircleStop, Copy, FolderOpen, LoaderCircle, Pencil, Pin, Plus, RefreshCw, ShieldAlert, Wrench, X } from 'lucide-react'
+import { AlertTriangle, Bot, Check, CircleStop, Copy, FolderOpen, LoaderCircle, Pencil, Pin, Plus, RefreshCw, Settings, ShieldAlert, Wrench, X } from 'lucide-react'
 
 import { getSharedAgentBridgeClient } from '../lib/agentBridge.js'
 import { LinkifiedText } from './LinkifiedText.jsx'
@@ -52,6 +52,7 @@ export const AgentMode = forwardRef(function AgentMode({
   onStateChange,
   onEditMessage,
   onOpenInline,
+  onOpenSettings,
   onClose,
 }, ref) {
   const clientRef = useRef(null)
@@ -436,6 +437,7 @@ export const AgentMode = forwardRef(function AgentMode({
     return (
       <section className={`agent-mode agent-${connection.state}`} aria-label="Agent Mode">
         <div className="agent-state-card">
+          <button type="button" className="agent-state-settings" onClick={onOpenSettings} aria-label="Open settings" title="Open settings"><Settings /></button>
           <button type="button" className="agent-state-exit" onClick={onClose} aria-label="Exit Agent Mode" title="Exit Agent Mode"><X /></button>
           <Icon />
           <small>HERMES AGENT MODE</small>
@@ -502,7 +504,10 @@ export const AgentMode = forwardRef(function AgentMode({
           <span>{connection.health?.profile || 'Hermes'}</span>
           {settings.agent?.showUsage && usage && <span>{usage.total || 0} tokens</span>}
           {controlError && <span className="agent-control-error" title={controlError}>{controlError}</span>}
-          {running && <button type="button" onClick={() => void clientRef.current?.interrupt(runtimeSessionRef.current)}><CircleStop /> Stop</button>}
+          <div className="agent-status-actions">
+            {running && <button type="button" className="agent-stop" onClick={() => void clientRef.current?.interrupt(runtimeSessionRef.current)}><CircleStop /> Stop</button>}
+            <button type="button" className="agent-settings" onClick={onOpenSettings} aria-label="Open settings" title="Open settings"><Settings /></button>
+          </div>
         </div>
       </footer>
     </section>

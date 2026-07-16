@@ -920,6 +920,7 @@ export function App() {
             onStateChange={setAgentUi}
             onEditMessage={(text) => setAgentDraft({ id: crypto.randomUUID(), text })}
             onOpenInline={openTextLinkInline}
+            onOpenSettings={() => setSettingsOpen(true)}
             onClose={toggleAgentMode}
           />
         ) : (
@@ -972,9 +973,9 @@ export function App() {
           onAgentSubmit={(value, attachment) => agentRef.current?.submit(value, attachment)}
           onAgentStop={() => agentRef.current?.stop()}
         />}
-        <div className="page-controls">
+        {!agentMode && <div className="page-controls">
           <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><Settings /></button>
-        </div>
+        </div>}
       </section>
 
       {dialog && <ShortcutDialog item={dialog.item} kind={dialog.kind} point={dialog.point} onClose={() => setDialog(null)} onSubmit={saveDialog} onDelete={deleteItem} onDuplicate={duplicateItem} busy={busy} />}
