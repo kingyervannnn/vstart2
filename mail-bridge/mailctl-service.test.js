@@ -12,11 +12,12 @@ describe('MailctlService', () => {
     const run = vi.fn(async (_path, args) => {
       if (args[0] === 'accounts') return { stdout: accounts }
       const account = args[args.indexOf('--account') + 1]
-      return { stdout: JSON.stringify({ messages: [{ id: `${account}-1`, date: account === 'work' ? '2026-01-01' : '2026-02-01', subject: account }] }) }
+      return { stdout: JSON.stringify({ messages: [{ id: `${account}-1`, date: account === 'work' ? '2026-01-01' : '2026-02-01', subject: account, labelIds: account === 'personal' ? ['INBOX', 'STARRED'] : ['INBOX'] }] }) }
     })
     const service = new MailctlService({ mailctlPath: '/fake/mailctl', run })
     const messages = await service.messages({ account: 'all', max: 10 })
     expect(messages.map((message) => message.account)).toEqual(['personal', 'work'])
+    expect(messages.map((message) => message.starred)).toEqual([true, false])
     expect(run).toHaveBeenCalledTimes(3)
   })
 
@@ -55,6 +56,17 @@ describe('MailctlService', () => {
     await expect(service.trashMessage({ account: 'work', messageId: 'message-1', confirmTrash: false })).rejects.toBeInstanceOf(MailBridgeError)
     await service.trashMessage({ account: 'work', messageId: 'message-1', confirmTrash: true })
     expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['trash', '--account', 'work', '--id', 'message-1', '--yes'], expect.any(Object))
+  })
+
+  it('favorites and unfavorites through the narrow mailctl commands', async () => {
+    const run = vi.fn(async (_path, args) => args[0] === 'accounts'
+      ? { stdout: accounts }
+      : { stdout: JSON.stringify({ message: { id: 'message-1', labelIds: args[0] === 'star' ? ['STARRED'] : [] } }) })
+    const service = new MailctlService({ mailctlPath: '/fake/mailctl', run })
+    expect(await service.starMessage({ account: 'work', messageId: 'message-1', starred: true })).toMatchObject({ account: 'work', id: 'message-1', starred: true })
+    expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['star', '--account', 'work', '--id', 'message-1', '--yes'], expect.any(Object))
+    await service.starMessage({ account: 'work', messageId: 'message-1', starred: false })
+    expect(run).toHaveBeenLastCalledWith('/fake/mailctl', ['unstar', '--account', 'work', '--id', 'message-1', '--yes'], expect.any(Object))
   })
 
   it('builds ranked contact suggestions from Sent recipients and Inbox senders', async () => {

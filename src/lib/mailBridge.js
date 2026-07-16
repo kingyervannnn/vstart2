@@ -125,6 +125,12 @@ function removeCachedMessage(account, id) {
   }
 }
 
+function updateCachedMessage(account, id, patch) {
+  for (const inbox of cache.inboxes.values()) {
+    inbox.messages = inbox.messages.map((message) => message.account === account && message.id === id ? { ...message, ...patch } : message)
+  }
+}
+
 export const mailBridge = {
   health: (options) => mailRequest('/health', options),
   accounts: loadAccounts,
@@ -135,12 +141,14 @@ export const mailBridge = {
   contacts: loadContacts,
   clearCache,
   removeCachedMessage,
+  updateCachedMessage,
   messages: ({ account = 'all', query = 'in:inbox', max = 30, signal } = {}) => {
     const params = new URLSearchParams({ account, query, max: String(max) })
     return mailRequest(`/messages?${params}`, { signal })
   },
   message: (account, id, options) => mailRequest(`/messages/${encodeURIComponent(account)}/${encodeURIComponent(id)}`, options),
   trashMessage: (account, id, options) => mailRequest(`/messages/${encodeURIComponent(account)}/${encodeURIComponent(id)}/trash`, { ...options, method: 'POST', body: { confirmTrash: true } }),
+  starMessage: (account, id, starred, options) => mailRequest(`/messages/${encodeURIComponent(account)}/${encodeURIComponent(id)}/star`, { ...options, method: 'POST', body: { starred } }),
   drafts: (account, options) => mailRequest(`/drafts?${new URLSearchParams({ account, max: '30' })}`, options),
   createDraft: (draft, options) => mailRequest('/drafts', { ...options, method: 'POST', body: draft }),
   sendDraft: (account, draftId, options) => mailRequest(`/drafts/${encodeURIComponent(account)}/${encodeURIComponent(draftId)}/send`, { ...options, method: 'POST', body: { confirmSend: true } }),

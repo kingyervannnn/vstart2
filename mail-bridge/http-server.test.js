@@ -20,6 +20,7 @@ describe('MailBridgeHttpServer', () => {
       createDraft: vi.fn(async () => ({ draftId: 'draft-1' })),
       sendDraft: vi.fn(async () => ({ id: 'sent-1' })),
       trashMessage: vi.fn(async () => ({ id: 'message-1' })),
+      starMessage: vi.fn(async () => ({ id: 'message-1', starred: true })),
       contacts: vi.fn(async () => []),
       message: vi.fn(async () => ({ id: 'message-1' })),
     }
@@ -61,6 +62,21 @@ describe('MailBridgeHttpServer', () => {
     })
     expect(response.status).toBe(200)
     expect(service.trashMessage).toHaveBeenCalledWith({ account: 'work', messageId: 'message-1', confirmTrash: true })
+  })
+
+  it('passes a typed favorite state to the star service', async () => {
+    const service = {
+      starMessage: vi.fn(async () => ({ id: 'message-1', starred: true })),
+    }
+    server = new MailBridgeHttpServer({ service, port: 0 })
+    await server.start()
+    const response = await fetch(`http://127.0.0.1:${server.address.port}/v1/messages/work/message-1/star`, {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ starred: true }),
+    })
+    expect(response.status).toBe(200)
+    expect(service.starMessage).toHaveBeenCalledWith({ account: 'work', messageId: 'message-1', starred: true })
   })
 
   it('returns contact suggestions for the requested local account', async () => {

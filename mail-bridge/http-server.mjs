@@ -105,6 +105,16 @@ export class MailBridgeHttpServer {
         }) })
         return
       }
+      const starMatch = url.pathname.match(/^\/v1\/messages\/([^/]+)\/([^/]+)\/star$/)
+      if (request.method === 'POST' && starMatch) {
+        const body = await this.#readJson(request)
+        this.#send(response, 200, { message: await this.service.starMessage({
+          account: decodeURIComponent(starMatch[1]),
+          messageId: decodeURIComponent(starMatch[2]),
+          starred: body.starred,
+        }) })
+        return
+      }
       throw new MailBridgeError(404, 'route_not_found', 'Route not found')
     } catch (error) {
       const status = error instanceof MailBridgeError ? error.status : 500

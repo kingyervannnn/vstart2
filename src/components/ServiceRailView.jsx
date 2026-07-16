@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, Lightbulb, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, CloudSun, FileText, Forward, Lightbulb, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Star, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
@@ -525,7 +525,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   const initialSnapshot = mailBridge.peekInbox({ account: initialAccount, query: 'in:inbox', max: 30 })
   const [accounts, setAccounts] = useState(initialSnapshot?.accounts || mailBridge.peekAccounts())
   const [account, setAccount] = useState(initialAccount)
-  const [queryInput, setQueryInput] = useState('in:inbox')
+  const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('in:inbox')
   const [messages, setMessages] = useState(initialSnapshot?.messages || [])
   const [selected, setSelected] = useState(null)
@@ -535,6 +535,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   const [notice, setNotice] = useState('')
   const [state, setState] = useState({ loading: !initialSnapshot, refreshing: false, error: '' })
   const [actionMessageId, setActionMessageId] = useState('')
+  const [starActionKey, setStarActionKey] = useState('')
   const [trashTarget, setTrashTarget] = useState(null)
   const [headerHidden, setHeaderHidden] = useState(false)
   const headerRef = useRef(null)
@@ -663,6 +664,27 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     }
   }
 
+  const toggleFavorite = async (message) => {
+    const key = `${message.account}:${message.id}`
+    if (starActionKey) return
+    const starred = message.starred !== true
+    const applyFavorite = (value) => {
+      setMessages((current) => current.map((item) => item.account === message.account && item.id === message.id ? { ...item, starred: value } : item))
+      setSelected((current) => current?.account === message.account && current?.id === message.id ? { ...current, starred: value } : current)
+      mailBridge.updateCachedMessage(message.account, message.id, { starred: value })
+    }
+    setStarActionKey(key)
+    applyFavorite(starred)
+    try {
+      await mailBridge.starMessage(message.account, message.id, starred)
+    } catch (error) {
+      applyFavorite(!starred)
+      setNotice(`Could not ${starred ? 'favorite' : 'unfavorite'} message: ${error.message}`)
+    } finally {
+      setStarActionKey('')
+    }
+  }
+
   const submitSearch = (event) => {
     event.preventDefault()
     setSelected(null)
@@ -734,9 +756,9 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     const selectedTrashPending = trashTarget?.account === selected.account && trashTarget?.id === selected.id
     return (
       <div className="mail-reader">
-        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> Inbox</button><div className="mail-reader-action-group"><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button><button type="button" className={`danger mail-inline-confirm${selectedTrashPending ? ' confirming' : ''}`} disabled={trashTarget?.working} onClick={() => void confirmTrash(selected)}><Trash2 /><span>{selectedTrashPending ? trashTarget.working ? 'Deleting…' : 'Confirm' : 'Trash'}</span></button></div></div>
+        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> Inbox</button><div className="mail-reader-action-group"><button type="button" className={`mail-favorite-button ${selected.starred ? 'active' : ''}`} disabled={selected.loading || starActionKey === `${selected.account}:${selected.id}`} onClick={() => void toggleFavorite(selected)} aria-label={selected.starred ? 'Remove from favorites' : 'Add to favorites'} title={selected.starred ? 'Remove from favorites' : 'Add to favorites'}><Star />{selected.starred ? 'Favorited' : 'Favorite'}</button><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button><button type="button" className={`danger mail-inline-confirm${selectedTrashPending ? ' confirming' : ''}`} disabled={trashTarget?.working} onClick={() => void confirmTrash(selected)}><Trash2 /><span>{selectedTrashPending ? trashTarget.working ? 'Deleting…' : 'Confirm' : 'Trash'}</span></button></div></div>
         <article>
-          <header>{account === 'all' && <span className="mail-account-badge">{selected.account}</span>}<time>{formatMailDate(selected.date)}</time></header>
+          <header><span className="mail-message-date-stack"><time>{formatMailDate(selected.date)}</time>{account === 'all' && <span className="mail-account-badge">{selected.account}</span>}</span></header>
           <h3>{selected.subject}</h3>
           <dl><div><dt>From</dt><dd>{selected.from}</dd></div><div><dt>To</dt><dd>{selected.to}</dd></div></dl>
           {selected.loading && <div className="service-state">Opening message…</div>}
@@ -773,14 +795,15 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
       {!state.loading && !state.error && <div className="mail-message-list">
         {messages.map((message) => {
           const trashPending = trashTarget?.account === message.account && trashTarget?.id === message.id
-          return <article className="mail-message-row" key={`${message.account}:${message.id}`}>
+          return <article className={`mail-message-row ${message.starred ? 'starred' : ''}`} key={`${message.account}:${message.id}`}>
           <button type="button" className="mail-message-open" onClick={() => openMessage(message)}>
-            <span className="mail-message-meta">{account === 'all' && <span className="mail-account-badge">{message.account}</span>}<time>{formatMailDate(message.date)}</time></span>
-            <strong>{message.subject}</strong>
+            <span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(message.date)}</time>{account === 'all' && <span className="mail-account-badge">{message.account}</span>}</span></span>
+            <span className="mail-message-subject">{message.starred && <Star aria-hidden="true" />}<strong>{message.subject}</strong></span>
             <small>{message.from}</small>
             <p>{message.snippet}</p>
           </button>
           <div className="mail-message-quick-actions" aria-label={`Actions for ${message.subject}`}>
+            <button type="button" className={`mail-favorite-button ${message.starred ? 'active' : ''}`} title={message.starred ? 'Remove from favorites' : 'Add to favorites'} aria-label={`${message.starred ? 'Remove' : 'Add'} ${message.subject} ${message.starred ? 'from' : 'to'} favorites`} disabled={Boolean(starActionKey)} onClick={() => void toggleFavorite(message)}><Star /></button>
             <button type="button" title="Reply" aria-label={`Reply to ${message.subject}`} onClick={() => replyToMessage(message)}><Reply /></button>
             <button type="button" title="Forward" aria-label={`Forward ${message.subject}`} disabled={actionMessageId === message.id} onClick={() => forwardMessage(message)}><Forward /></button>
             <button type="button" className={`danger mail-inline-confirm${trashPending ? ' confirming' : ''}`} title={trashPending ? 'Click again to confirm' : 'Move to Trash'} aria-label={trashPending ? `Confirm moving ${message.subject} to Trash` : `Move ${message.subject} to Trash`} disabled={trashTarget?.working} onClick={() => void confirmTrash(message)}><Trash2 />{trashPending && <span>{trashTarget.working ? 'Deleting…' : 'Confirm'}</span>}</button>

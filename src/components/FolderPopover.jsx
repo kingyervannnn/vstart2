@@ -45,7 +45,7 @@ export function FolderPopover({ folder, children, placements, profile, editMode,
   return createPortal(
     <div className="folder-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="folder-popover" role="dialog" aria-modal="true" aria-label={folder.title}>
-        <header><FolderOpen /><h2>{folder.title}</h2><button type="button" onClick={() => onCreate(null)}><Plus /> Add shortcut</button>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
+        <header><FolderOpen /><h2>{folder.title}</h2><button type="button" className="folder-add-shortcut" onClick={() => onCreate(null)} aria-label="Add shortcut" title="Add shortcut"><Plus /></button>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
         <div
           ref={canvasRef}
           className="folder-canvas"

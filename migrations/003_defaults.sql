@@ -29,6 +29,7 @@ VALUES (
       "fontFamily": "Inter, system-ui, sans-serif",
       "textColor": "#f4f6ff",
       "accentColor": "#8ba6ff",
+      "headerScrollSpeed": 100,
       "glow": {
         "color": "#8ba6ff",
         "adaptToBackground": false,

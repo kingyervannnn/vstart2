@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, 
 import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
+import { normalizeHeaderScrollSpeed } from '../lib/headerScroll.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
 import { musicApi } from '../lib/music.js'
@@ -58,6 +59,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const [newMusicSource, setNewMusicSource] = useState({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
   const [musicChecks, setMusicChecks] = useState({})
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
+  const headerScrollSpeed = normalizeHeaderScrollSpeed(settings.appearance?.headerScrollSpeed)
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
   const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
   const searchAppearance = settings.search?.appearance || {}
@@ -240,6 +242,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <Toggle label="Edge effect" checked={settings.appearance?.edgeEffect} onChange={(value) => onPatch({ appearance: { edgeEffect: value } })} />
               <Toggle label="Edge glow" checked={settings.appearance?.edgeGlow} onChange={(value) => onPatch({ appearance: { edgeGlow: value } })} />
               <Toggle label="Animated overlay" checked={settings.appearance?.animatedOverlay} onChange={(value) => onPatch({ appearance: { animatedOverlay: value } })} />
+              <label className="setting-field range-setting"><span>Top header scroll speed <output aria-hidden="true">{(headerScrollSpeed / 100).toFixed(headerScrollSpeed % 100 ? 2 : 1)}×</output></span><input type="range" min="50" max="200" step="5" value={headerScrollSpeed} aria-label="Top header scroll speed" onChange={(event) => onPatch({ appearance: { headerScrollSpeed: Number(event.target.value) } })} /></label>
               <section className="glow-controller">
                 <div className="glow-controller-heading"><span><strong>Unified glow color</strong><small>Edge, search bar, and music player glows share this color.</small></span><input type="color" value={glowColor} aria-label="Global glow color" onChange={(event) => onPatch({ appearance: { glow: { color: event.target.value } } })} /></div>
                 <Toggle label="Adapt to active background" detail="Samples a lightweight background preview. The saved color remains the fallback." checked={glowSettings.adaptToBackground === true} onChange={(value) => onPatch({ appearance: { glow: { adaptToBackground: value } } })} />

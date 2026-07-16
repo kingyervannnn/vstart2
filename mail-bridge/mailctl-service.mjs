@@ -62,7 +62,7 @@ export class MailctlService {
   async health() {
     try {
       const accounts = await this.accounts({ refresh: true })
-      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'contacts', 'draft', 'reply', 'forward', 'attach', 'send', 'trash'], accountCount: accounts.length }
+      return { status: 'ok', service: 'mailctl', capabilities: ['search', 'read', 'contacts', 'draft', 'reply', 'forward', 'attach', 'send', 'trash', 'star'], accountCount: accounts.length }
     } catch {
       return { status: 'unavailable', service: 'mailctl', capabilities: [], accountCount: 0 }
     }
@@ -195,6 +195,13 @@ export class MailctlService {
     return this.#json(['trash', '--account', alias, '--id', this.#safeId(messageId, 'Message id'), '--yes'])
   }
 
+  async starMessage({ account, messageId, starred }) {
+    if (typeof starred !== 'boolean') throw new MailBridgeError(400, 'star_state_invalid', 'Favorite state must be true or false')
+    const [{ alias }] = await this.#resolveAccounts(account)
+    const result = await this.#json([starred ? 'star' : 'unstar', '--account', alias, '--id', this.#safeId(messageId, 'Message id'), '--yes'])
+    return { account: alias, ...(result.message || {}), starred }
+  }
+
   async #resolveAccounts(requested) {
     const accounts = await this.accounts()
     if (!accounts.length) throw new MailBridgeError(503, 'mail_accounts_missing', 'No mailctl accounts are configured')
@@ -205,6 +212,7 @@ export class MailctlService {
   }
 
   #normalizeMessage(account, message, { includeBody = false } = {}) {
+    const labelIds = Array.isArray(message.labelIds) ? message.labelIds.map(String) : []
     const normalized = {
       account,
       id: String(message.id || ''),
@@ -214,6 +222,8 @@ export class MailctlService {
       to: String(message.to || ''),
       subject: String(message.subject || '(no subject)'),
       snippet: String(message.snippet || ''),
+      labelIds,
+      starred: message.starred === true || labelIds.includes('STARRED'),
     }
     if (includeBody) normalized.body = String(message.body || '')
     return normalized

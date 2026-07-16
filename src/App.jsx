@@ -10,6 +10,7 @@ import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './l
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
 import { backgroundImageLayers, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
+import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
@@ -861,6 +862,7 @@ export function App() {
     '--app-accent': effectiveAccent,
     '--app-glow': adaptiveGlowColor || manualGlowColor,
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
+    '--header-scroll-duration': `${headerScrollDuration(settings.appearance?.headerScrollSpeed)}s`,
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
   }
   const backgroundStyle = {
