@@ -36,6 +36,22 @@ afterEach(() => {
 })
 
 describe('Search dock visual search', () => {
+  it('routes text-only image mode through the inline image provider', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ suggestions: [] }) }))
+    const onInlineResults = vi.fn()
+    const onInlineImageSearch = vi.fn()
+    render(<SearchDock {...props} onInlineResults={onInlineResults} onInlineImageSearch={onInlineImageSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle inline results' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle image search' }))
+    expect(screen.getByRole('textbox', { name: 'Search' }).getAttribute('placeholder')).toBe('Search SearXNG images…')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'red mountain bicycle' } })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
+
+    await waitFor(() => expect(onInlineImageSearch).toHaveBeenCalledWith({ query: 'red mountain bicycle', category: 'images', visualUrl: null }))
+    expect(onInlineResults).not.toHaveBeenCalled()
+  })
+
   it('opens a visible preparation page and forwards the completed external search', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

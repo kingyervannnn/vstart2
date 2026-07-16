@@ -3,7 +3,7 @@ import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Send, Sparkl
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
-import { externalSearchUrl } from '../lib/searchEngines.js'
+import { externalImageSearchUrl, externalSearchUrl } from '../lib/searchEngines.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
@@ -448,9 +448,13 @@ export function SearchDock({
       }
       return
     }
-    if (inline) return onInlineResults(value)
-    const searchQuery = imageMode ? `${value} images` : value
-    const target = externalSearchUrl(settings.search?.engine, searchQuery)
+    if (inline) {
+      if (imageMode) return onInlineImageSearch?.({ query: value, category: 'images', visualUrl: null })
+      return onInlineResults(value)
+    }
+    const target = imageMode
+      ? externalImageSearchUrl(settings.search?.engine, value)
+      : externalSearchUrl(settings.search?.engine, value)
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
   }
 
@@ -609,7 +613,7 @@ export function SearchDock({
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
-            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
+            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
