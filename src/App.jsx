@@ -753,6 +753,11 @@ export function App() {
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
     ...(backgroundId ? { '--app-background-image': `url(/api/assets/${backgroundId})` } : {}),
   }
+  const showCompactInnerRing = compact
+    && settings.general?.innerOutline
+    && !routedInline
+    && routedView.type !== 'service'
+    && !agentMode
 
   return (
     <main
@@ -763,6 +768,7 @@ export function App() {
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
       <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={(kind) => navigateView({ type: 'service', kind })} />
       <section className="dial-rail" onWheel={onDialWheel}>
+        {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedInline ? (
           <InlineResults
             key={location.search}
