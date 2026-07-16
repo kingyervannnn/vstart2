@@ -73,6 +73,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const musicGlowTrigger = MUSIC_GLOW_TRIGGERS.some(([value]) => value === settings.widgets?.musicGlowTrigger)
     ? settings.widgets.musicGlowTrigger
     : 'connected'
+  const glowSettings = settings.appearance?.glow || {}
+  const glowColor = glowSettings.color || settings.appearance?.accentColor || '#8ba6ff'
+  const workspaceGlowColors = glowSettings.workspaceColors || {}
   const musicSources = settings.music?.sources || []
   const weatherLocations = configuredWeatherLocations(settings.widgets)
   const secondaryLocationIds = weatherLocations.secondary.map((location) => location.id)
@@ -205,7 +208,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'search' && <>
               <h3>Search</h3>
-              <label className="setting-field"><span>Default search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option></select></label>
+              <label className="setting-field"><span>Default search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option><option value="searxng">SearXNG (local)</option></select></label>
+              <p className="field-help">SearXNG uses the private instance bundled with this stack. Inline result mode already uses that same local service.</p>
               <Toggle label="Inline results" checked={settings.search?.inlineEnabled !== false} onChange={(value) => onPatch({ search: { inlineEnabled: value } })} />
               <label className="setting-field"><span>Result click behavior</span><select value={settings.search?.inlineLinkBehavior || 'inline'} onChange={(event) => onPatch({ search: { inlineLinkBehavior: event.target.value } })}><option value="inline">Open inline in right rail</option><option value="inline-fullscreen">Open inline full screen</option><option value="external">Open in a new tab</option></select></label>
               <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
@@ -234,6 +238,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <Toggle label="Edge effect" checked={settings.appearance?.edgeEffect} onChange={(value) => onPatch({ appearance: { edgeEffect: value } })} />
               <Toggle label="Edge glow" checked={settings.appearance?.edgeGlow} onChange={(value) => onPatch({ appearance: { edgeGlow: value } })} />
               <Toggle label="Animated overlay" checked={settings.appearance?.animatedOverlay} onChange={(value) => onPatch({ appearance: { animatedOverlay: value } })} />
+              <section className="glow-controller">
+                <div className="glow-controller-heading"><span><strong>Unified glow color</strong><small>Edge, search bar, and music player glows share this color.</small></span><input type="color" value={glowColor} aria-label="Global glow color" onChange={(event) => onPatch({ appearance: { glow: { color: event.target.value } } })} /></div>
+                <Toggle label="Adapt to active background" detail="Samples a lightweight background preview. The saved color remains the fallback." checked={glowSettings.adaptToBackground === true} onChange={(value) => onPatch({ appearance: { glow: { adaptToBackground: value } } })} />
+                <Toggle label="Workspace-specific glow colors" detail="Keeps a manual fallback color for every workspace." checked={glowSettings.workspaceSpecific === true} onChange={(value) => onPatch({ appearance: { glow: { workspaceSpecific: value } } })} />
+                {glowSettings.workspaceSpecific === true && <div className="workspace-glow-list">
+                  {workspaces.map((workspace) => <label key={workspace.id} className={workspace.id === activeWorkspaceId ? 'active' : ''}><span><strong>{workspace.name}</strong><small>{workspace.id === activeWorkspaceId ? 'Current workspace' : 'Workspace fallback'}</small></span><input type="color" value={workspaceGlowColors[workspace.id] || glowColor} aria-label={`${workspace.name} glow color`} onChange={(event) => onPatch({ appearance: { glow: { workspaceColors: { ...workspaceGlowColors, [workspace.id]: event.target.value } } } })} /></label>)}
+                </div>}
+              </section>
               <label className="setting-field"><span>Global font family</span><select value={globalFontFamily} onChange={(event) => onPatch({ appearance: { fontFamily: event.target.value } })}>
                 {!FONT_OPTIONS.some((font) => font.value === globalFontFamily) && <option value={globalFontFamily}>Current custom font</option>}
                 {FONT_OPTIONS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}

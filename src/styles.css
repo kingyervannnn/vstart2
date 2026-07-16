@@ -15,6 +15,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .vstart-app {
   --app-text: #f4f6ff;
   --app-accent: #8ba6ff;
+  --app-glow: #8ba6ff;
   --app-font: Inter, system-ui, sans-serif;
   --widget-rail-width: clamp(260px, 28vw, 430px);
   position: fixed;
@@ -44,8 +45,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @keyframes ambient-overlay { to { transform: rotate(360deg) scale(1.05); } }
 
 .vstart-app.edge-effect { border-radius: 13px; border: 1px solid rgba(255, 255, 255, .3); }
-.vstart-app.edge-glow { box-shadow: inset 0 0 25px color-mix(in srgb, var(--app-accent) 62%, transparent), 0 0 22px color-mix(in srgb, var(--app-accent) 35%, transparent); }
-.vstart-app.compact-mode.edge-glow { box-shadow: inset 0 17px 32px -17px color-mix(in srgb, var(--app-accent) 88%, transparent), inset 0 0 31px color-mix(in srgb, var(--app-accent) 70%, transparent), 0 0 26px color-mix(in srgb, var(--app-accent) 42%, transparent); }
+.vstart-app.edge-glow { box-shadow: inset 0 0 25px color-mix(in srgb, var(--app-glow) 62%, transparent), 0 0 22px color-mix(in srgb, var(--app-glow) 35%, transparent); }
+.vstart-app.compact-mode.edge-glow { box-shadow: inset 0 17px 32px -17px color-mix(in srgb, var(--app-glow) 88%, transparent), inset 0 0 31px color-mix(in srgb, var(--app-glow) 70%, transparent), 0 0 26px color-mix(in srgb, var(--app-glow) 42%, transparent); }
 .vstart-app.mirrored { flex-direction: row-reverse; }
 
 .compact-mode .dial-rail { width: 100%; flex-basis: 100%; }
@@ -156,10 +157,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-widget.music-outline { border-color: rgba(255, 255, 255, .2); }
 .music-widget.music-glow-bottom.glow-trigger-always,
 .music-widget.music-glow-bottom.glow-trigger-connected.music-connected,
-.music-widget.music-glow-bottom.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 24px 30px -19px color-mix(in srgb, var(--app-accent) 66%, transparent); }
+.music-widget.music-glow-bottom.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 24px 30px -19px color-mix(in srgb, var(--app-glow) 66%, transparent); }
 .music-widget.music-glow-full.glow-trigger-always,
 .music-widget.music-glow-full.glow-trigger-connected.music-connected,
-.music-widget.music-glow-full.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 0 30px -5px color-mix(in srgb, var(--app-accent) 55%, transparent); }
+.music-widget.music-glow-full.glow-trigger-playing.music-playing { box-shadow: 0 12px 28px rgba(6, 9, 15, .1), 0 0 30px -5px color-mix(in srgb, var(--app-glow) 55%, transparent); }
 .music-source-select { min-width: 0; display: flex; align-items: center; gap: 7px; color: color-mix(in srgb, var(--app-text) 52%, transparent); font-size: 7px; letter-spacing: .12em; text-transform: uppercase; }
 .music-source-select select { min-width: 0; flex: 1; height: 23px; border: 0; outline: 0; color: color-mix(in srgb, var(--app-text) 74%, transparent); background: transparent; font: inherit; letter-spacing: .04em; text-transform: none; cursor: pointer; }
 .music-summary { width: 100%; min-width: 0; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
@@ -236,8 +237,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .compact-mode .scrolling-header { font-size: clamp(14px, 1.6vw, 18px); }
 .compact-ring-active .scrolling-header { top: 13px; left: 18px; width: calc(100% - 36px); height: 40px; border-radius: 13px 13px 0 0; background: transparent; box-shadow: none; }
 .compact-ring-active .dial-canvas { top: 57px; }
-.compact-mode.edge-glow:not(.compact-ring-active) .scrolling-header { background: linear-gradient(180deg, color-mix(in srgb, var(--app-accent) 23%, rgba(235,241,255,.2)), transparent); box-shadow: inset 0 1px color-mix(in srgb, var(--app-text) 24%, transparent), inset 0 13px 24px -16px color-mix(in srgb, var(--app-accent) 76%, transparent), 0 8px 20px -17px color-mix(in srgb, var(--app-accent) 58%, transparent); }
-.compact-ring-active.edge-glow .scrolling-header { text-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 42%, transparent); }
+.compact-mode.edge-glow:not(.compact-ring-active) .scrolling-header { background: linear-gradient(180deg, color-mix(in srgb, var(--app-glow) 23%, rgba(235,241,255,.2)), transparent); box-shadow: inset 0 1px color-mix(in srgb, var(--app-text) 24%, transparent), inset 0 13px 24px -16px color-mix(in srgb, var(--app-glow) 76%, transparent), 0 8px 20px -17px color-mix(in srgb, var(--app-glow) 58%, transparent); }
+.compact-ring-active.edge-glow .scrolling-header { text-shadow: 0 0 12px color-mix(in srgb, var(--app-glow) 42%, transparent); }
 .compact-mode .shortcut-icon-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 6%), 80px); }
 .compact-mode .shortcut-icon-shell.folder-preview-shell { width: min(calc(var(--shortcut-icon-size, 78%) + 10%), 84px); }
 .compact-inner-ring {
@@ -335,10 +336,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .search-dock.no-outline { border-color: transparent; }
 .search-dock.search-glow-bottom.glow-trigger-always,
 .search-dock.search-glow-bottom.glow-trigger-focus:focus-within,
-.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 19px 27px -10px color-mix(in srgb, var(--app-accent) 66%, transparent); }
+.search-dock.search-glow-bottom.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 19px 27px -10px color-mix(in srgb, var(--app-glow) 66%, transparent); }
 .search-dock.search-glow-full.glow-trigger-always,
 .search-dock.search-glow-full.glow-trigger-focus:focus-within,
-.search-dock.search-glow-full.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 0 30px -3px color-mix(in srgb, var(--app-accent) 52%, transparent); }
+.search-dock.search-glow-full.glow-trigger-typing.has-query:focus-within { box-shadow: 0 12px 36px rgba(8,11,16,.18), inset 0 1px rgba(255,255,255,.13), 0 0 30px -3px color-mix(in srgb, var(--app-glow) 52%, transparent); }
 .search-dock.inline-mode { border-color: color-mix(in srgb, var(--app-accent) 62%, white 10%); }
 .search-dock.agent-dock-active { height: auto; min-height: 52px; align-items: flex-end; box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 38%, transparent), 0 0 24px color-mix(in srgb, var(--app-accent) 18%, transparent), 0 12px 36px rgba(8,11,16,.2); cursor: default; }
 .search-dock.agent-dock-active > button { margin-bottom: 3px; }
@@ -928,6 +929,18 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .setting-field input[type="color"] { width: 42px; height: 30px; border: 0; border-radius: 7px; background: transparent; }
 .setting-field input[type="range"] { width: 200px; accent-color: var(--app-accent); }
 .range-setting output { margin-left: 7px; color: var(--app-text); opacity: .82; }
+.glow-controller { display: grid; margin: 18px 0 8px; padding: 0 15px 13px; border: 1px solid color-mix(in srgb, var(--app-glow) 24%, rgba(255,255,255,.1)); border-radius: 15px; background: linear-gradient(150deg, color-mix(in srgb, var(--app-glow) 7%, transparent), rgba(255,255,255,.018)); box-shadow: 0 18px 30px -27px color-mix(in srgb, var(--app-glow) 48%, transparent); }
+.glow-controller-heading { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid rgba(255,255,255,.09); }
+.glow-controller-heading > span { display: grid; gap: 4px; }
+.glow-controller-heading strong { font-size: 12px; }
+.glow-controller-heading small { color: rgba(238,242,255,.52); font-size: 10px; }
+.glow-controller input[type="color"], .workspace-glow-list input[type="color"] { width: 44px; height: 32px; flex: none; border: 0; border-radius: 8px; padding: 0; background: transparent; cursor: pointer; }
+.workspace-glow-list { display: grid; gap: 6px; margin-top: 12px; }
+.workspace-glow-list > label { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 9px 7px 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; background: rgba(255,255,255,.025); }
+.workspace-glow-list > label.active { border-color: color-mix(in srgb, var(--app-glow) 34%, rgba(255,255,255,.1)); background: color-mix(in srgb, var(--app-glow) 6%, rgba(255,255,255,.02)); }
+.workspace-glow-list span { min-width: 0; display: grid; gap: 2px; }
+.workspace-glow-list strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-glow-list small { color: rgba(238,242,255,.45); font-size: 8px; }
 .time-weather-settings { display: grid; margin: 18px 0 22px; padding: 13px 15px 15px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
 .time-weather-settings h4 { margin: 0 0 2px; font-size: 12px; }
 .time-weather-settings .setting-field { min-height: 52px; }

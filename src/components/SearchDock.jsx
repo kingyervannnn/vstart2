@@ -3,15 +3,10 @@ import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Send, Sparkl
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
+import { externalSearchUrl } from '../lib/searchEngines.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
-
-const ENGINES = {
-  google: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-  duckduckgo: (query) => `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-  brave: (query) => `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
-}
 
 function VoiceWaveform({ levels }) {
   return <div className="voice-waveform" role="status" aria-label="Live microphone waveform">
@@ -455,7 +450,7 @@ export function SearchDock({
     }
     if (inline) return onInlineResults(value)
     const searchQuery = imageMode ? `${value} images` : value
-    const target = (ENGINES[settings.search?.engine] || ENGINES.google)(searchQuery)
+    const target = externalSearchUrl(settings.search?.engine, searchQuery)
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
   }
 

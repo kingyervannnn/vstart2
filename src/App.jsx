@@ -8,6 +8,7 @@ import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/c
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
+import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -70,6 +71,7 @@ export function App() {
   const [agentDraft, setAgentDraft] = useState(null)
   const [shortcutFilter, setShortcutFilter] = useState(null)
   const [shortcutSpotlightId, setShortcutSpotlightId] = useState('')
+  const [adaptiveGlow, setAdaptiveGlow] = useState({ backgroundId: null, color: '' })
   const activeRef = useRef(null)
   const agentRef = useRef(null)
   const shortcutSpotlightTimerRef = useRef(null)
@@ -139,11 +141,39 @@ export function App() {
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
   const appReady = Boolean(bootstrap)
+  const backgroundId = settings.backgrounds?.workspaceSpecific && activeWorkspace?.backgroundAssetId
+    ? activeWorkspace.backgroundAssetId
+    : settings.backgrounds?.globalAssetId
+  const effectiveAccent = activeWorkspace?.accentColor && settings.workspaces?.individualTypography
+    ? activeWorkspace.accentColor
+    : settings.appearance?.accentColor || '#8ba6ff'
+  const glowSettings = settings.appearance?.glow || {}
+  const workspaceGlowColor = glowSettings.workspaceSpecific
+    ? glowSettings.workspaceColors?.[activeWorkspace?.id]
+    : null
+  const manualGlowColor = normalizeHexColor(workspaceGlowColor || glowSettings.color || effectiveAccent, effectiveAccent)
+  const adaptiveGlowColor = glowSettings.adaptToBackground && adaptiveGlow.backgroundId === backgroundId
+    ? adaptiveGlow.color
+    : ''
   const workspaceMailAccount = settings.mail?.workspaceAccounts?.[activeWorkspace?.id]
     || settings.mail?.defaultAccount
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+
+  useEffect(() => {
+    if (!glowSettings.adaptToBackground || !backgroundId) return undefined
+    let live = true
+    const asset = bootstrap?.backgroundAssets?.find((candidate) => candidate.id === backgroundId)
+    const urls = [
+      `/api/assets/${backgroundId}/preview`,
+      asset?.byteLength <= 12 * 1024 * 1024 ? `/api/assets/${backgroundId}` : null,
+    ]
+    void extractAdaptiveGlowColor(urls, manualGlowColor).then((color) => {
+      if (live) setAdaptiveGlow({ backgroundId, color })
+    })
+    return () => { live = false }
+  }, [backgroundId, bootstrap?.backgroundAssets, glowSettings.adaptToBackground, manualGlowColor])
 
   useEffect(() => {
     if (!appReady || agentMode || settings.agent?.enabled === false) return undefined
@@ -822,12 +852,10 @@ export function App() {
 
   const currentFolder = bootstrap.items.find((item) => item.id === folderId && item.kind === 'folder')
   const folderChildren = currentFolder ? bootstrap.items.filter((item) => item.parentFolderId === currentFolder.id) : []
-  const backgroundId = settings.backgrounds?.workspaceSpecific && activeWorkspace.backgroundAssetId
-    ? activeWorkspace.backgroundAssetId
-    : settings.backgrounds?.globalAssetId
   const appStyle = {
     '--app-text': activeWorkspace.textColor && settings.workspaces?.individualTypography ? activeWorkspace.textColor : settings.appearance?.textColor || '#f4f6ff',
-    '--app-accent': activeWorkspace.accentColor && settings.workspaces?.individualTypography ? activeWorkspace.accentColor : settings.appearance?.accentColor || '#8ba6ff',
+    '--app-accent': effectiveAccent,
+    '--app-glow': adaptiveGlowColor || manualGlowColor,
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,
     ...(backgroundId ? { '--app-background-image': `url(/api/assets/${backgroundId})` } : {}),
