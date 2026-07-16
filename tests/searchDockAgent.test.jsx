@@ -13,7 +13,7 @@ const baseProps = {
   onWorkspaceSelect: vi.fn(),
   onWorkspaceContextMenu: vi.fn(),
   onGeometryCommit: vi.fn(),
-  onWorkspaceOffsetCommit: vi.fn(),
+  onWorkspaceLayoutCommit: vi.fn(),
   onInlineResults: vi.fn(),
   agentMode: true,
   agentReady: true,
@@ -50,6 +50,30 @@ describe('Assistant composer', () => {
     render(<SearchDock {...baseProps} draftRequest={{ id: 'edit-1', text: 'Revise this message' }} onDraftConsumed={onDraftConsumed} />)
     expect(screen.getByRole('textbox', { name: 'Message Hermes' }).value).toBe('Revise this message')
     expect(onDraftConsumed).toHaveBeenCalled()
+  })
+
+  it('reveals a transient clear control only while text is present', () => {
+    render(<SearchDock {...baseProps} />)
+    const composer = screen.getByRole('textbox', { name: 'Message Hermes' })
+    expect(screen.queryByRole('button', { name: 'Clear search text' })).toBeNull()
+
+    fireEvent.change(composer, { target: { value: 'Clear me' } })
+    const clear = screen.getByRole('button', { name: 'Clear search text' })
+    fireEvent.click(clear)
+
+    expect(composer.value).toBe('')
+    expect(screen.queryByRole('button', { name: 'Clear search text' })).toBeNull()
+  })
+
+  it('places the workspace switcher below the search bar from persisted settings', () => {
+    const settings = {
+      ...baseProps.settings,
+      search: { ...baseProps.settings.search, workspaceSide: { wide: 'bottom' } },
+    }
+    const { container } = render(<SearchDock {...baseProps} settings={settings} agentMode={false} />)
+
+    expect(container.querySelector('.search-dock-wrap').classList.contains('workspace-side-bottom')).toBe(true)
+    expect(screen.getByRole('navigation', { name: 'Workspaces' }).classList.contains('workspace-switcher-bottom')).toBe(true)
   })
 
   it('exposes glow shape, trigger, and active typing state to styling', () => {

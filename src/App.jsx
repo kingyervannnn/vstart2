@@ -783,7 +783,7 @@ export function App() {
           activeWorkspaceId={activeWorkspace.id}
           onWorkspaceSelect={selectWorkspace}
           onWorkspaceContextMenu={(payload) => { setContextMenu(null); setWorkspaceMenu(payload) }}
-          onWorkspaceOffsetCommit={(profileName, offset) => patchSettings({ search: { workspaceOffset: { [profileName]: offset } } })}
+          onWorkspaceLayoutCommit={(profileName, layout) => patchSettings({ search: { workspaceOffset: { [profileName]: layout.offset }, workspaceSide: { [profileName]: layout.side } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
           onInlineImageSearch={runInlineImageSearch}

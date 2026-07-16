@@ -19,3 +19,8 @@ export function shouldDropSuggestionsUp(rect, viewportHeight, suggestionCount = 
   if (spaceAbove >= estimatedHeight) return true
   return spaceAbove > spaceBelow
 }
+
+export function shouldHideWorkspaceSwitcher(side, suggestionsDropUp, suggestionsVisible) {
+  if (!suggestionsVisible) return false
+  return (side === 'top' && suggestionsDropUp) || (side === 'bottom' && !suggestionsDropUp)
+}

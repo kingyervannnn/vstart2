@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleStop, Globe2, Image, LoaderCircle, Mic, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { googleLensUrl, prepareImageAttachment, uploadImageForLens } from '../lib/imageAttachment.js'
-import { clampDockGeometry, shouldDropSuggestionsUp } from '../lib/searchDock.js'
+import { clampDockGeometry, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
 
@@ -29,7 +29,7 @@ export function SearchDock({
   onWorkspaceSelect,
   onWorkspaceContextMenu,
   onGeometryCommit,
-  onWorkspaceOffsetCommit,
+  onWorkspaceLayoutCommit,
   onInlineResults,
   onInlineImageSearch,
   restoredQuery = '',
@@ -59,6 +59,7 @@ export function SearchDock({
   const configuredY = configured.y
   const configuredWidth = configured.width
   const configuredWorkspaceOffset = Number(settings.search?.workspaceOffset?.[profile]) || 0
+  const configuredWorkspaceSide = settings.search?.workspaceSide?.[profile] === 'bottom' ? 'bottom' : 'top'
   const searchAppearance = settings.search?.appearance || {}
   const searchGlowStyle = ['off', 'bottom', 'full'].includes(searchAppearance.glowStyle)
     ? searchAppearance.glowStyle
@@ -77,6 +78,7 @@ export function SearchDock({
   const [suggestionsDropUp, setSuggestionsDropUp] = useState(false)
   const [interactionKind, setInteractionKind] = useState(null)
   const [workspaceOffset, setWorkspaceOffset] = useState(configuredWorkspaceOffset)
+  const [workspaceSide, setWorkspaceSide] = useState(configuredWorkspaceSide)
   const [workspaceMoving, setWorkspaceMoving] = useState(false)
   const [imageAttachment, setImageAttachment] = useState(null)
   const [imageDragActive, setImageDragActive] = useState(false)
@@ -173,6 +175,7 @@ export function SearchDock({
     setGeometry(next)
   }, [configuredX, configuredY, configuredWidth])
   useEffect(() => setWorkspaceOffset(configuredWorkspaceOffset), [configuredWorkspaceOffset])
+  useEffect(() => setWorkspaceSide(configuredWorkspaceSide), [configuredWorkspaceSide])
   useEffect(() => {
     if (settings.general?.autofocusSearch) inputRef.current?.focus({ preventScroll: true })
   }, [settings.general?.autofocusSearch])
@@ -285,16 +288,26 @@ export function SearchDock({
     if (!editMode || (event.button !== undefined && event.button !== 0)) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
-    workspaceDragRef.current = { pointerId: event.pointerId, startX: event.clientX, initial: workspaceOffset }
+    workspaceDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      initialOffset: workspaceOffset,
+      initialSide: workspaceSide,
+      searchBounds: dockRef.current?.querySelector('.search-dock')?.getBoundingClientRect(),
+    }
     setWorkspaceMoving(true)
   }
 
   const moveWorkspace = useCallback((event) => {
     const value = workspaceDragRef.current
     if (!value || value.pointerId !== event.pointerId) return
-    const next = Math.round(Math.max(-260, Math.min(260, value.initial + event.clientX - value.startX)))
-    value.last = next
-    setWorkspaceOffset(next)
+    const nextOffset = Math.round(Math.max(-260, Math.min(260, value.initialOffset + event.clientX - value.startX)))
+    const searchMiddle = value.searchBounds ? value.searchBounds.top + value.searchBounds.height / 2 : event.clientY
+    const nextSide = event.clientY > searchMiddle ? 'bottom' : 'top'
+    value.lastOffset = nextOffset
+    value.lastSide = nextSide
+    setWorkspaceOffset(nextOffset)
+    setWorkspaceSide(nextSide)
   }, [])
 
   const endWorkspaceMove = useCallback(async (event) => {
@@ -302,10 +315,12 @@ export function SearchDock({
     if (!value || value.pointerId !== event.pointerId) return
     workspaceDragRef.current = null
     setWorkspaceMoving(false)
-    const next = value.last ?? value.initial
-    setWorkspaceOffset(next)
-    await onWorkspaceOffsetCommit(profile, next)
-  }, [onWorkspaceOffsetCommit, profile])
+    const nextOffset = value.lastOffset ?? value.initialOffset
+    const nextSide = value.lastSide ?? value.initialSide
+    setWorkspaceOffset(nextOffset)
+    setWorkspaceSide(nextSide)
+    await onWorkspaceLayoutCommit(profile, { offset: nextOffset, side: nextSide })
+  }, [onWorkspaceLayoutCommit, profile])
 
   useEffect(() => {
     if (!workspaceMoving) return undefined
@@ -443,6 +458,13 @@ export function SearchDock({
     event.currentTarget.form?.requestSubmit()
   }
 
+  const clearQuery = () => {
+    setQuery('')
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   const startVoice = async () => {
     if (recording) {
       mediaRef.current?.stop()
@@ -485,10 +507,15 @@ export function SearchDock({
     }
   }
 
+  const effectiveWorkspaceSide = compact ? 'top' : workspaceSide
+  const suggestionsVisible = !agentMode && suggestionsOpen && suggestions.length > 0
+  const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
+  const clearVisible = query.length > 0 && !recording
+
   return (
     <div
       ref={dockRef}
-      className={`search-dock-wrap ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
+      className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
       style={agentMode ? undefined : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%` }}
       onPointerDown={agentMode ? undefined : beginDockMove}
       onPointerMove={agentMode ? undefined : moveInteraction}
@@ -496,7 +523,7 @@ export function SearchDock({
       onPointerCancel={agentMode ? undefined : endInteraction}
       onLostPointerCapture={agentMode ? undefined : endInteraction}
     >
-      {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} onContextMenu={onWorkspaceContextMenu} onOffsetPointerDown={beginWorkspaceMove} />}
+      {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
       <form
         className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() || imageAttachment ? 'has-query' : ''} ${imageDragActive ? 'image-drop-active' : ''}`}
         style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
@@ -512,6 +539,7 @@ export function SearchDock({
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
             : <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />}
+          <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
@@ -522,13 +550,14 @@ export function SearchDock({
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
             : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? 'Add optional context…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
-          <button type="button" className={imageMode ? 'active' : ''} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
+          <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
+          <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
         </>}
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
-      {!agentMode && suggestionsOpen && suggestions.length > 0 && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
+      {suggestionsVisible && <ul className={`search-suggestions ${suggestionsDropUp ? 'drop-up' : 'drop-down'}`} role="listbox" aria-label="Search suggestions">
         {suggestions.map((suggestion) => <li key={suggestion}><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); inputRef.current?.focus() }}>{suggestion}</button></li>)}
       </ul>}
       {editMode && !agentMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
