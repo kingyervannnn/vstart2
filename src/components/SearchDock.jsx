@@ -595,7 +595,7 @@ export function SearchDock({
   return (
     <div
       ref={dockRef}
-      className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
+      className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${searchAppearance.outline === false ? 'search-outline-off' : ''} ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
       style={dockStyle}
       onPointerDown={agentMode ? undefined : beginDockMove}
       onPointerMove={agentMode ? undefined : moveInteraction}
