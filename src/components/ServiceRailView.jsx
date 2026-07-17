@@ -755,7 +755,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
       <div className="mail-drafts-view">
         <header><button type="button" className="mail-back" onClick={() => setDrafts(null)}><ArrowLeft /> Inbox</button><span>Drafts · {drafts.account}</span></header>
         <div className="mail-message-list">
-          {drafts.items.map((draft) => <button type="button" key={draft.draftId} onClick={() => setPendingSend({ account: drafts.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-meta"><span className="mail-account-badge">DRAFT</span><time>{formatMailDate(draft.date)}</time></span><strong>{draft.subject || '(no subject)'}</strong><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
+          {drafts.items.map((draft) => <button type="button" key={draft.draftId} onClick={() => setPendingSend({ account: drafts.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-heading"><span className="mail-message-subject"><strong>{draft.subject || '(no subject)'}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(draft.date)}</time><span className="mail-account-badge">DRAFT</span></span></span></span><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
           {!drafts.items.length && <div className="service-state">No drafts in this account.</div>}
         </div>
       </div>
@@ -807,8 +807,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
           const trashPending = trashTarget?.account === message.account && trashTarget?.id === message.id
           return <article className={`mail-message-row ${message.starred ? 'starred' : ''}`} key={`${message.account}:${message.id}`}>
           <button type="button" className="mail-message-open" onClick={() => openMessage(message)}>
-            <span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(message.date)}</time>{account === 'all' && <span className="mail-account-badge">{message.account}</span>}</span></span>
-            <span className="mail-message-subject">{message.starred && <Star aria-hidden="true" />}<strong>{message.subject}</strong></span>
+            <span className="mail-message-heading"><span className="mail-message-subject">{message.starred && <Star aria-hidden="true" />}<strong>{message.subject}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(message.date)}</time>{account === 'all' && <span className="mail-account-badge">{message.account}</span>}</span></span></span>
             <small>{message.from}</small>
             <p>{message.snippet}</p>
           </button>

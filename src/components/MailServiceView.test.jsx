@@ -38,10 +38,12 @@ describe('MailServiceView', () => {
     expect(mailBridge.updateCachedMessage).toHaveBeenCalledWith('personal', 'message-1', { starred: true })
   })
 
-  it('places account identifiers beneath the date in the All view', async () => {
+  it('places the subject in the top row with account metadata on the right', async () => {
     const { container } = render(<ServiceRailView kind="mail" initialMailAccount="all" onClose={() => {}} />)
     await screen.findByText('Project update')
-    const stack = container.querySelector('.mail-message-date-stack')
+    const heading = container.querySelector('.mail-message-heading')
+    const stack = heading?.querySelector('.mail-message-date-stack')
+    expect(heading?.querySelector('.mail-message-subject')).toHaveTextContent('Project update')
     expect(stack?.querySelector('time')).toBeInTheDocument()
     expect(stack?.querySelector('.mail-account-badge')).toHaveTextContent('personal')
   })
