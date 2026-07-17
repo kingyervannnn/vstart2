@@ -40,9 +40,9 @@ function backgroundMimeType(file) {
   return ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' })[extension] || ''
 }
 
-function LoadingShell({ error, onRetry }) {
+function LoadingShell({ error, onRetry, backgroundUrl }) {
   return (
-    <main className="loading-shell">
+    <main className="loading-shell" style={{ '--startup-background-image': `url("${backgroundUrl}")` }}>
       <div className="loading-mark">V2</div>
       <h1>{error ? 'Database unavailable' : 'Loading V Start 2'}</h1>
       <p>{error || 'Loading canonical state from PostgreSQL…'}</p>
@@ -57,6 +57,7 @@ export function App() {
   const compact = useCompactMode()
   const profile = compact ? 'compact' : 'wide'
   const [bootstrap, setBootstrap] = useState(null)
+  const bootstrapReady = Boolean(bootstrap)
   const bootstrapRef = useRef(null)
   const [loadError, setLoadError] = useState('')
   const [showLoadingShell, setShowLoadingShell] = useState(false)
@@ -107,6 +108,20 @@ export function App() {
   }, [applyBootstrap])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!bootstrapReady) return undefined
+    const bootBackground = document.getElementById('vstart-boot-background')
+    if (!bootBackground) return undefined
+    let removalTimer = null
+    const frame = window.requestAnimationFrame(() => {
+      bootBackground.classList.add('vstart-boot-hidden')
+      removalTimer = window.setTimeout(() => bootBackground.remove(), 380)
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(removalTimer)
+    }
+  }, [bootstrapReady])
   useEffect(() => {
     if (typeof BroadcastChannel !== 'function') return undefined
     const channel = new BroadcastChannel(BACKGROUND_ROTATION_CHANNEL)
@@ -168,7 +183,7 @@ export function App() {
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || {}
-  const appReady = Boolean(bootstrap)
+  const appReady = bootstrapReady
   const backgroundId = settings.backgrounds?.workspaceSpecific && activeWorkspace?.backgroundAssetId
     ? activeWorkspace.backgroundAssetId
     : settings.backgrounds?.globalAssetId
@@ -933,8 +948,9 @@ export function App() {
   }
 
   if (!bootstrap) {
-    if (loadError || showLoadingShell) return <LoadingShell error={loadError} onRetry={load} />
-    return <main className="startup-shell" style={{ backgroundImage: `url(${startupBackgroundUrl(location.pathname)})` }} aria-label="Starting V Start 2" aria-busy="true" />
+    const backgroundUrl = startupBackgroundUrl(location.pathname)
+    if (loadError || showLoadingShell) return <LoadingShell error={loadError} onRetry={load} backgroundUrl={backgroundUrl} />
+    return <main className="startup-shell" style={{ backgroundImage: `url("${backgroundUrl}")` }} aria-label="Starting V Start 2" aria-busy="true" />
   }
 
   const currentFolder = bootstrap.items.find((item) => item.id === folderId && item.kind === 'folder')
