@@ -49,6 +49,19 @@ describe('MailBridgeHttpServer', () => {
     expect(service.sendDraft).toHaveBeenCalledWith({ account: 'work', draftId: 'draft-1', confirmSend: true })
   })
 
+  it('returns bridge-owned inbox cache metadata and forwards explicit refreshes', async () => {
+    const service = {
+      messagesSnapshot: vi.fn(async () => ({ messages: [{ id: 'message-1' }], fromCache: true, refreshing: false, stale: false, updatedAt: 1234 })),
+    }
+    server = new MailBridgeHttpServer({ service, port: 0 })
+    await server.start()
+    const response = await fetch(`http://127.0.0.1:${server.address.port}/v1/messages?account=all&query=in%3Ainbox&max=30&refresh=1`, { headers: { Origin: origin } })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ messages: [{ id: 'message-1' }], fromCache: true, updatedAt: 1234 })
+    expect(service.messagesSnapshot).toHaveBeenCalledWith({ account: 'all', query: 'in:inbox', max: '30', refresh: true, waitForFresh: true })
+  })
+
   it('passes an explicit confirmation to the trash service', async () => {
     const service = {
       trashMessage: vi.fn(async () => ({ id: 'message-1' })),

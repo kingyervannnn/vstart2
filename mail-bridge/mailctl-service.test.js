@@ -21,6 +21,29 @@ describe('MailctlService', () => {
     expect(run).toHaveBeenCalledTimes(3)
   })
 
+  it('serves shared warm snapshots and coalesces concurrent forced refreshes', async () => {
+    const run = vi.fn(async (_path, args) => {
+      if (args[0] === 'accounts') return { stdout: accounts }
+      const account = args[args.indexOf('--account') + 1]
+      return { stdout: JSON.stringify({ messages: [{ id: `${account}-1`, date: '2026-01-01', subject: account }] }) }
+    })
+    const service = new MailctlService({ mailctlPath: '/fake/mailctl', run })
+
+    const cold = await service.messagesSnapshot({ account: 'work', max: 30 })
+    const warm = await service.messagesSnapshot({ account: 'work', max: 30 })
+    expect(cold.fromCache).toBe(false)
+    expect(warm.fromCache).toBe(true)
+    expect(run).toHaveBeenCalledTimes(2)
+
+    const [left, right] = await Promise.all([
+      service.messagesSnapshot({ account: 'work', max: 30, refresh: true, waitForFresh: true }),
+      service.messagesSnapshot({ account: 'work', max: 30, refresh: true, waitForFresh: true }),
+    ])
+    expect(left.messages).toHaveLength(1)
+    expect(right.messages).toHaveLength(1)
+    expect(run).toHaveBeenCalledTimes(3)
+  })
+
   it('creates a draft with uploaded attachments through temporary files', async () => {
     const calls = []
     const run = vi.fn(async (_path, args) => {

@@ -785,7 +785,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
         <div className="mail-toolbar-actions">
           <button type="button" onClick={openDrafts}><FileText /><span>Drafts</span></button>
           <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>
-          <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail"><RefreshCw /></button>
+          <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail" disabled={state.refreshing}><RefreshCw /></button>
         </div>
         <button type="button" className="mail-close" onClick={onClose} aria-label="Close mail"><X /></button>
       </header>

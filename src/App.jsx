@@ -232,24 +232,8 @@ export function App() {
   }, [agentMode, appReady, settings.agent?.bridgeUrl, settings.agent?.enabled])
 
   useEffect(() => {
-    let live = true
-    const warmMail = async ({ forceInbox = false } = {}) => {
-      const snapshot = await mailBridge.preload({ force: forceInbox })
-      if (!live) return
-      const unavailableAccounts = new Set(snapshot.unavailableAccounts || [])
-      await Promise.all((snapshot.accounts || []).filter((account) => !unavailableAccounts.has(account.alias)).map((account) => mailBridge.contacts({ account: account.alias, max: 80 }).catch(() => null)))
-    }
-    void warmMail().catch(() => {})
-    const refreshSeconds = Number(settings.mail?.refreshSeconds ?? 60)
-    if (refreshSeconds <= 0) return () => { live = false }
-    const timer = window.setInterval(() => {
-      void warmMail({ forceInbox: true }).catch(() => {})
-    }, Math.max(30, refreshSeconds) * 1000)
-    return () => {
-      live = false
-      window.clearInterval(timer)
-    }
-  }, [settings.mail?.refreshSeconds])
+    void mailBridge.preload().catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return

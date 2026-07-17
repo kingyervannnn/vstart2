@@ -46,6 +46,18 @@ describe('mailBridge cache', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('asks the host bridge for one explicit refresh instead of clearing the warm inbox', async () => {
+    const fetchMock = vi.fn((url) => url.endsWith('/accounts')
+      ? response({ accounts: [{ alias: 'work' }] })
+      : response({ messages: [{ id: 'work-1', account: 'work', date: '2026-07-15T10:00:00Z' }], fromCache: false, updatedAt: 1234 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await mailBridge.loadInbox({ account: 'work', force: true })
+
+    expect(fetchMock.mock.calls[1][0]).toContain('refresh=1')
+    expect(mailBridge.peekInbox({ account: 'work' }).messages).toHaveLength(1)
+  })
+
   it('keeps healthy accounts warm when another account needs reauthorization', async () => {
     const fetchMock = vi.fn((url) => {
       if (url.endsWith('/accounts')) return response({ accounts: [{ alias: 'work' }, { alias: 'personal' }] })

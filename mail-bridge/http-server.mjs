@@ -28,12 +28,14 @@ export class MailBridgeHttpServer {
       this.server.listen(this.port, this.host, resolve)
     })
     this.port = this.address.port
+    this.service.start?.()
     return this.address
   }
 
   async stop() {
     const server = this.server
     this.server = null
+    this.service.stop?.()
     if (server) await new Promise((resolve) => server.close(resolve))
   }
 
@@ -60,12 +62,18 @@ export class MailBridgeHttpServer {
         return
       }
       if (request.method === 'GET' && url.pathname === '/v1/messages') {
-        const messages = await this.service.messages({
+        const snapshot = await (this.service.messagesSnapshot?.({
           account: url.searchParams.get('account') || 'all',
           query: url.searchParams.get('query') || 'in:inbox',
           max: url.searchParams.get('max') || 20,
-        })
-        this.#send(response, 200, { messages })
+          refresh: url.searchParams.get('refresh') === '1',
+          waitForFresh: url.searchParams.get('refresh') === '1',
+        }) || this.service.messages({
+          account: url.searchParams.get('account') || 'all',
+          query: url.searchParams.get('query') || 'in:inbox',
+          max: url.searchParams.get('max') || 20,
+        }).then((messages) => ({ messages })))
+        this.#send(response, 200, snapshot)
         return
       }
       if (request.method === 'GET' && url.pathname === '/v1/contacts') {

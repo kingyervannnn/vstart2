@@ -7,6 +7,9 @@ import { promisify } from 'node:util'
 const execFile = promisify(execFileCallback)
 const DEFAULT_MAILCTL_PATH = '/Users/vbitzx/SS/TOOLS/bin/mailctl'
 const CONTACT_CACHE_MS = 5 * 60 * 1000
+const MESSAGE_CACHE_MS = Math.max(15_000, Number(process.env.VSTART_MAIL_CACHE_MS) || 60_000)
+const PREWARM_INTERVAL_MS = Math.max(30_000, Number(process.env.VSTART_MAIL_PREWARM_INTERVAL_MS) || 60_000)
+const MAX_CACHED_MESSAGES = 50
 
 function mailboxParts(value) {
   const parts = []
@@ -57,6 +60,32 @@ export class MailctlService {
     this.run = run
     this.accountCache = null
     this.contactCache = new Map()
+    this.messageCache = new Map()
+    this.messageRefreshes = new Map()
+    this.prewarmTimer = null
+  }
+
+  start() {
+    if (this.prewarmTimer) return
+    void this.prewarm().catch(() => {})
+    this.prewarmTimer = setInterval(() => void this.prewarm().catch(() => {}), PREWARM_INTERVAL_MS)
+    this.prewarmTimer.unref?.()
+  }
+
+  stop() {
+    if (this.prewarmTimer) clearInterval(this.prewarmTimer)
+    this.prewarmTimer = null
+  }
+
+  async prewarm() {
+    const accounts = await this.accounts()
+    return Promise.allSettled(accounts.map(({ alias }) => this.messagesSnapshot({
+      account: alias,
+      query: 'in:inbox',
+      max: 30,
+      refresh: true,
+      waitForFresh: true,
+    })))
   }
 
   async health() {
@@ -80,18 +109,32 @@ export class MailctlService {
     return this.accountCache
   }
 
-  async messages({ account = 'all', query = 'in:inbox', max = 20 } = {}) {
+  async messages(options = {}) {
+    return (await this.messagesSnapshot({ ...options, waitForFresh: true })).messages
+  }
+
+  async messagesSnapshot({ account = 'all', query = 'in:inbox', max = 20, refresh = false, waitForFresh = false } = {}) {
     const accounts = await this.#resolveAccounts(account)
     const safeQuery = String(query || 'in:inbox').trim().slice(0, 500) || 'in:inbox'
     const safeMax = Math.max(1, Math.min(Number(max) || 20, 50))
-    const perAccount = account === 'all' ? Math.max(1, Math.ceil(safeMax / accounts.length)) : safeMax
-    const batches = await Promise.all(accounts.map(async ({ alias }) => {
-      const result = await this.#json(['search', '--account', alias, '--query', safeQuery, '--max', String(perAccount), '--json'])
-      return (Array.isArray(result.messages) ? result.messages : []).map((message) => this.#normalizeMessage(alias, message))
-    }))
-    return batches.flat()
+    const cacheLimit = Math.min(MAX_CACHED_MESSAGES, Math.max(30, safeMax))
+    const snapshots = await Promise.all(accounts.map(({ alias }) => this.#accountMessageSnapshot({
+      alias,
+      query: safeQuery,
+      limit: cacheLimit,
+      refresh,
+      waitForFresh,
+    })))
+    const messages = snapshots.flatMap((snapshot) => snapshot.messages)
       .sort((left, right) => this.#timestamp(right.date) - this.#timestamp(left.date))
       .slice(0, safeMax)
+    return {
+      messages,
+      updatedAt: snapshots.length ? Math.min(...snapshots.map((snapshot) => snapshot.updatedAt)) : Date.now(),
+      fromCache: snapshots.every((snapshot) => snapshot.fromCache),
+      refreshing: snapshots.some((snapshot) => snapshot.refreshing),
+      stale: snapshots.some((snapshot) => snapshot.stale),
+    }
   }
 
   async message(account, id) {
@@ -192,14 +235,56 @@ export class MailctlService {
   async trashMessage({ account, messageId, confirmTrash }) {
     if (confirmTrash !== true) throw new MailBridgeError(400, 'trash_confirmation_required', 'Explicit trash confirmation is required')
     const [{ alias }] = await this.#resolveAccounts(account)
-    return this.#json(['trash', '--account', alias, '--id', this.#safeId(messageId, 'Message id'), '--yes'])
+    const safeMessageId = this.#safeId(messageId, 'Message id')
+    const result = await this.#json(['trash', '--account', alias, '--id', safeMessageId, '--yes'])
+    for (const snapshot of this.messageCache.values()) {
+      snapshot.messages = snapshot.messages.filter((message) => !(message.account === alias && message.id === safeMessageId))
+    }
+    return result
   }
 
   async starMessage({ account, messageId, starred }) {
     if (typeof starred !== 'boolean') throw new MailBridgeError(400, 'star_state_invalid', 'Favorite state must be true or false')
     const [{ alias }] = await this.#resolveAccounts(account)
-    const result = await this.#json([starred ? 'star' : 'unstar', '--account', alias, '--id', this.#safeId(messageId, 'Message id'), '--yes'])
+    const safeMessageId = this.#safeId(messageId, 'Message id')
+    const result = await this.#json([starred ? 'star' : 'unstar', '--account', alias, '--id', safeMessageId, '--yes'])
+    for (const snapshot of this.messageCache.values()) {
+      snapshot.messages = snapshot.messages.map((message) => message.account === alias && message.id === safeMessageId ? { ...message, starred } : message)
+    }
     return { account: alias, ...(result.message || {}), starred }
+  }
+
+  async #accountMessageSnapshot({ alias, query, limit, refresh, waitForFresh }) {
+    const key = `${alias}\u0000${query}`
+    const cached = this.messageCache.get(key)
+    const fresh = cached && Date.now() - cached.updatedAt <= MESSAGE_CACHE_MS && cached.limit >= limit
+    let pending = this.messageRefreshes.get(key)
+    if ((refresh || !fresh) && !pending) {
+      pending = (async () => {
+        const result = await this.#json(['search', '--account', alias, '--query', query, '--max', String(limit), '--json'])
+        const snapshot = {
+          messages: (Array.isArray(result.messages) ? result.messages : []).map((message) => this.#normalizeMessage(alias, message)),
+          updatedAt: Date.now(),
+          limit,
+        }
+        this.messageCache.set(key, snapshot)
+        return snapshot
+      })().finally(() => {
+        if (this.messageRefreshes.get(key) === pending) this.messageRefreshes.delete(key)
+      })
+      this.messageRefreshes.set(key, pending)
+    }
+
+    if (!cached || waitForFresh) {
+      try {
+        const snapshot = pending ? await pending : cached
+        return { ...snapshot, fromCache: !pending, refreshing: false, stale: false }
+      } catch (error) {
+        if (!cached) throw error
+        return { ...cached, fromCache: true, refreshing: false, stale: true }
+      }
+    }
+    return { ...cached, fromCache: true, refreshing: Boolean(pending), stale: !fresh }
   }
 
   async #resolveAccounts(requested) {
