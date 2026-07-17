@@ -59,6 +59,8 @@ describe('music widget', () => {
 
     expect(position).toHaveValue('45')
     expect(volume).toHaveValue('35')
+    expect(position.style.getPropertyValue('--music-range-progress')).toBe('25%')
+    expect(volume.style.getPropertyValue('--music-range-progress')).toBe('35%')
     fireEvent.change(position, { target: { value: '90' } })
     fireEvent.pointerUp(position)
     await waitFor(() => expect(musicApi.seek).toHaveBeenCalledWith('source-one', 90))

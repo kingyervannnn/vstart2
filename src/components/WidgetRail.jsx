@@ -222,6 +222,8 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   const musicDuration = Math.max(0, Number(musicSong?.songDuration) || 0)
   const musicElapsed = seekDraft ?? musicSong?.elapsedSeconds ?? 0
   const musicVolume = volumeDraft ?? musicState.data?.volume ?? 0
+  const musicElapsedPercent = musicDuration > 0 ? Math.max(0, Math.min(100, (Number(musicElapsed) || 0) / musicDuration * 100)) : 0
+  const musicVolumePercent = Math.max(0, Math.min(100, Number(musicVolume) || 0))
 
   if (compact) {
     return (
@@ -253,7 +255,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
             </select><ChevronDown aria-hidden="true" /></label>
             {musicCapabilities.volume === true && <div className="music-widget-volume">
               {musicCapabilities.mute === true && <button type="button" disabled={Boolean(musicAction)} onClick={() => void controlMusic('toggleMute')} aria-label={musicState.data?.isMuted ? 'Unmute' : 'Mute'}>{musicState.data?.isMuted ? <VolumeX /> : <Volume2 />}</button>}
-              <input type="range" min="0" max="100" step="1" value={musicVolume} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Music volume" />
+              <input type="range" min="0" max="100" step="1" value={musicVolume} style={{ '--music-range-progress': `${musicVolumePercent}%` }} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Music volume" />
             </div>}
           </div>
           <div className="music-summary">
@@ -265,7 +267,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
             {musicDuration > 0 && <div className="music-widget-progress">
               <time>{musicTime(musicElapsed)}</time>
               {musicCapabilities.seek === true
-                ? <input type="range" min="0" max={musicDuration} step="1" value={musicElapsed} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Track position" />
+                ? <input type="range" min="0" max={musicDuration} step="1" value={musicElapsed} style={{ '--music-range-progress': `${musicElapsedPercent}%` }} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Track position" />
                 : <progress max={musicDuration} value={musicElapsed} />}
               <time>{musicTime(musicDuration)}</time>
             </div>}
