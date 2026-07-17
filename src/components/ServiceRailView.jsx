@@ -145,7 +145,6 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
     if (!activeSource) return
     try {
       await musicApi.selectQueueItem(activeSource.id, item.index)
-      setNotice(`Playing ${item.title}`)
       window.setTimeout(() => void loadPlayer(), 180)
       window.setTimeout(() => void loadQueue(), 220)
     } catch (error) {
