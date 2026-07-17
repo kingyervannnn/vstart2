@@ -587,12 +587,16 @@ export function SearchDock({
   const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible)
   const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
   const clearVisible = query.length > 0 && !recording
+  const searchBlur = Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))
+  const dockStyle = agentMode
+    ? { '--search-blur': `${searchBlur}px` }
+    : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%`, '--search-blur': `${searchBlur}px` }
 
   return (
     <div
       ref={dockRef}
       className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
-      style={agentMode ? undefined : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%` }}
+      style={dockStyle}
       onPointerDown={agentMode ? undefined : beginDockMove}
       onPointerMove={agentMode ? undefined : moveInteraction}
       onPointerUp={agentMode ? undefined : endInteraction}
@@ -602,7 +606,6 @@ export function SearchDock({
       {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
       <form
         className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() || imageAttachment ? 'has-query' : ''} ${imageDragActive ? 'image-drop-active' : ''}`}
-        style={{ '--search-blur': `${Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))}px` }}
         onSubmit={submit}
         onDragEnter={onImageDragEnter}
         onDragOver={onImageDragOver}

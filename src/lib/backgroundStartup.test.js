@@ -46,4 +46,22 @@ describe('background startup', () => {
     await expect(preloadBackgroundAsset('next-background', FakeImage)).resolves.toBe('next-background')
     expect(loaded).toEqual(['/api/assets/next-background/preview'])
   })
+
+  it('can preload and decode the full image before a rotation crossfade', async () => {
+    const loaded = []
+    class FakeImage {
+      decode() {
+        loaded.push('decoded')
+        return Promise.resolve()
+      }
+
+      set src(value) {
+        loaded.push(value)
+        this.onload()
+      }
+    }
+
+    await expect(preloadBackgroundAsset('next-background', FakeImage, 50, { fullResolution: true })).resolves.toBe('next-background')
+    expect(loaded).toEqual(['/api/assets/next-background', 'decoded'])
+  })
 })

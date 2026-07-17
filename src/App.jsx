@@ -28,7 +28,9 @@ import { WorkspaceDialog } from './components/WorkspaceDialog.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
-const BACKGROUND_FADE_MS = 900
+const BACKGROUND_FADE_MS = 1500
+const BACKGROUND_ROTATION_LOCK = 'vstart2-background-rotation-leader'
+const BACKGROUND_ROTATION_CHANNEL = 'vstart2-background-rotation'
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const MAX_BACKGROUND_BYTES = 300 * 1024 * 1024
 
@@ -82,6 +84,7 @@ export function App() {
   const activeRef = useRef(null)
   const displayedBackgroundRef = useRef(undefined)
   const backgroundFadeTimerRef = useRef(null)
+  const backgroundChannelRef = useRef(null)
   const agentRef = useRef(null)
   const shortcutSpotlightTimerRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
@@ -104,6 +107,19 @@ export function App() {
   }, [applyBootstrap])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'function') return undefined
+    const channel = new BroadcastChannel(BACKGROUND_ROTATION_CHANNEL)
+    backgroundChannelRef.current = channel
+    channel.onmessage = (event) => {
+      const next = event.data?.bootstrap
+      if (event.data?.type === 'background-bootstrap' && next?.settings && Array.isArray(next.workspaces)) applyBootstrap(next)
+    }
+    return () => {
+      if (backgroundChannelRef.current === channel) backgroundChannelRef.current = null
+      channel.close()
+    }
+  }, [applyBootstrap])
   useEffect(() => {
     if (bootstrap || loadError) return undefined
     const timer = window.setTimeout(() => setShowLoadingShell(true), LOADING_SHELL_DELAY_MS)
@@ -195,7 +211,7 @@ export function App() {
       }
     }
     if (displayedBackgroundRef.current === undefined || !nextId) commit()
-    else void preloadBackgroundAsset(nextId).then(commit)
+    else void preloadBackgroundAsset(nextId, globalThis.Image, 15_000, { fullResolution: true }).then(commit)
     return () => { live = false }
   }, [backgroundId])
 
@@ -304,7 +320,12 @@ export function App() {
     return settingsQueueRef.current
   }, [applyBootstrap, load])
 
-  const rotateBackground = useCallback(async () => {
+  const applyRotatedBootstrap = useCallback((next) => {
+    applyBootstrap(next)
+    backgroundChannelRef.current?.postMessage({ type: 'background-bootstrap', bootstrap: next })
+  }, [applyBootstrap])
+
+  const rotateBackground = useCallback(async ({ automatic = false } = {}) => {
     const current = bootstrapRef.current
     const currentSettings = current?.settings?.document || {}
     const workspace = current?.workspaces?.find((item) => item.id === activeWorkspace?.id)
@@ -321,24 +342,60 @@ export function App() {
     const nextId = nextBackgroundId(candidates, currentId)
     if (!nextId || nextId === currentId) return { rotated: false, count: candidates.length }
 
-    if (currentSettings.backgrounds?.workspaceSpecific) {
-      const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: nextId, version: workspace.version })
-      applyBootstrap(result.bootstrap)
-    } else {
-      await patchSettings({ backgrounds: { globalAssetId: nextId } })
+    try {
+      if (currentSettings.backgrounds?.workspaceSpecific) {
+        const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: nextId, version: workspace.version })
+        applyRotatedBootstrap(result.bootstrap)
+      } else {
+        const result = await api.patchSettings(current.settings.version, { backgrounds: { globalAssetId: nextId } })
+        applyRotatedBootstrap(result.bootstrap)
+      }
+    } catch (error) {
+      if (!automatic || error.status !== 409) throw error
+      const latest = await api.bootstrap()
+      applyRotatedBootstrap(latest)
+      return { rotated: false, count: candidates.length, synchronized: true }
     }
     return { rotated: true, count: candidates.length }
-  }, [activeWorkspace?.id, applyBootstrap, patchSettings])
+  }, [activeWorkspace?.id, applyRotatedBootstrap])
 
   useEffect(() => {
     const rotation = settings.backgrounds?.rotation
     if (!rotation?.enabled) return undefined
     if (rotation.scope === 'workspace' && !settings.backgrounds?.workspaceSpecific) return undefined
-    const timer = window.setInterval(() => {
-      void rotateBackground().catch((error) => setToast({ type: 'error', message: error.message }))
-    }, backgroundRotationInterval(rotation.intervalMinutes) * 60_000)
-    return () => window.clearInterval(timer)
-  }, [rotateBackground, settings.backgrounds?.rotation, settings.backgrounds?.workspaceSpecific])
+    const lockName = `${BACKGROUND_ROTATION_LOCK}:${settings.backgrounds?.workspaceSpecific ? activeWorkspace?.id || 'workspace' : 'global'}`
+    let timer = null
+    let releaseLock = null
+    let live = true
+    const run = () => void rotateBackground({ automatic: true }).catch((error) => setToast({ type: 'error', message: error.message }))
+    const start = () => {
+      if (!live || timer) return
+      timer = window.setInterval(run, backgroundRotationInterval(rotation.intervalMinutes) * 60_000)
+    }
+
+    if (!navigator.locks?.request) {
+      start()
+      return () => {
+        live = false
+        window.clearInterval(timer)
+      }
+    }
+
+    const controller = new AbortController()
+    void navigator.locks.request(lockName, { signal: controller.signal }, async () => {
+      if (!live) return
+      start()
+      await new Promise((resolve) => { releaseLock = resolve })
+    }).catch((error) => {
+      if (error.name !== 'AbortError') setToast({ type: 'error', message: 'Background rotation could not start.' })
+    })
+    return () => {
+      live = false
+      window.clearInterval(timer)
+      releaseLock?.()
+      controller.abort()
+    }
+  }, [activeWorkspace?.id, rotateBackground, settings.backgrounds?.rotation, settings.backgrounds?.workspaceSpecific])
 
   const linkAgentSession = useCallback(async (workspaceId, hermesSessionId, titleOverride = null) => {
     const result = await api.linkAgentSession({ workspaceId, hermesSessionId, titleOverride })
@@ -893,6 +950,7 @@ export function App() {
   const displayedBackgroundId = backgroundLayers.currentId === undefined ? backgroundId || null : backgroundLayers.currentId
   const backgroundBaseStyle = {
     '--app-background-scale': backgroundZoomScale(settings.backgrounds?.zoomPercent),
+    '--background-fade-duration': `${BACKGROUND_FADE_MS}ms`,
   }
   const currentBackgroundStyle = {
     ...backgroundBaseStyle,

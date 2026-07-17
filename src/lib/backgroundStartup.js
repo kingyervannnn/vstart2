@@ -21,7 +21,7 @@ export function startupBackgroundUrl(pathname = '/') {
   return `/api/backgrounds/startup?path=${encodeURIComponent(pathname)}`
 }
 
-export function preloadBackgroundAsset(assetId, ImageClass = globalThis.Image, timeoutMs = 1200) {
+export function preloadBackgroundAsset(assetId, ImageClass = globalThis.Image, timeoutMs = 1200, { fullResolution = false } = {}) {
   if (!assetId || typeof ImageClass !== 'function') return Promise.resolve(assetId)
   return new Promise((resolve) => {
     let settled = false
@@ -33,11 +33,18 @@ export function preloadBackgroundAsset(assetId, ImageClass = globalThis.Image, t
       resolve(assetId)
     }
     const image = new ImageClass()
-    image.onload = finish
+    image.onload = () => {
+      if (typeof image.decode !== 'function') {
+        finish()
+        return
+      }
+      void image.decode().catch(() => {}).finally(finish)
+    }
     image.onerror = finish
     image.decoding = 'async'
+    if (fullResolution) image.fetchPriority = 'high'
     timer = setTimeout(finish, timeoutMs)
-    image.src = `/api/assets/${assetId}/preview`
+    image.src = `/api/assets/${assetId}${fullResolution ? '' : '/preview'}`
   })
 }
 
