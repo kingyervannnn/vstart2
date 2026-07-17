@@ -9,8 +9,8 @@ function ClockFace({ location, now, twentyFourHour, primary = false, active = fa
   if (!primary) {
     return (
       <button type="button" className={'sub-clock ' + (active ? 'active' : '')} onClick={() => onSelect(location.id)} aria-label={'Show ' + location.city + ' weather'}>
-        <small>{location.city}</small>
         <span><strong>{time.hour}:{time.minute}</strong>{!twentyFourHour && <em>{time.period}</em>}</span>
+        <small>{location.city}</small>
       </button>
     )
   }
