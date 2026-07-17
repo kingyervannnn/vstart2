@@ -12,9 +12,13 @@ export function bootstrapBackgroundId(bootstrap, pathname = '/') {
     : settings.backgrounds?.globalAssetId || null
 }
 
-export function backgroundImageLayers(assetId) {
-  if (!assetId) return ''
-  return `url(/api/assets/${assetId}), url(/api/assets/${assetId}/preview)`
+export function backgroundLayerVariables(assetId, { fullReady = false } = {}) {
+  if (!assetId) return {}
+  return {
+    '--app-background-image': `url(/api/assets/${assetId}/preview)`,
+    '--app-background-full-image': `url(/api/assets/${assetId})`,
+    '--app-background-full-opacity': fullReady ? 1 : 0,
+  }
 }
 
 export function startupBackgroundUrl(pathname = '/') {

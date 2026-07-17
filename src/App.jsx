@@ -8,7 +8,7 @@ import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/c
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from './lib/viewRoute.js'
 import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
-import { backgroundImageLayers, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
+import { backgroundLayerVariables, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
@@ -29,6 +29,7 @@ import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 
 const LOADING_SHELL_DELAY_MS = 350
 const BACKGROUND_FADE_MS = 1500
+const BACKGROUND_RESOLUTION_FADE_MS = 650
 const BACKGROUND_ROTATION_LOCK = 'vstart2-background-rotation-leader'
 const BACKGROUND_ROTATION_CHANNEL = 'vstart2-background-rotation'
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
@@ -82,6 +83,7 @@ export function App() {
   const [shortcutSpotlightId, setShortcutSpotlightId] = useState('')
   const [adaptiveGlow, setAdaptiveGlow] = useState({ backgroundId: null, color: '' })
   const [backgroundLayers, setBackgroundLayers] = useState({ currentId: undefined, previousId: undefined })
+  const [fullReadyBackgrounds, setFullReadyBackgrounds] = useState(() => new Set())
   const activeRef = useRef(null)
   const displayedBackgroundRef = useRef(undefined)
   const backgroundFadeTimerRef = useRef(null)
@@ -108,20 +110,6 @@ export function App() {
   }, [applyBootstrap])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => {
-    if (!bootstrapReady) return undefined
-    const bootBackground = document.getElementById('vstart-boot-background')
-    if (!bootBackground) return undefined
-    let removalTimer = null
-    const frame = window.requestAnimationFrame(() => {
-      bootBackground.classList.add('vstart-boot-hidden')
-      removalTimer = window.setTimeout(() => bootBackground.remove(), 380)
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-      window.clearTimeout(removalTimer)
-    }
-  }, [bootstrapReady])
   useEffect(() => {
     if (typeof BroadcastChannel !== 'function') return undefined
     const channel = new BroadcastChannel(BACKGROUND_ROTATION_CHANNEL)
@@ -210,9 +198,15 @@ export function App() {
   }, [viewVeil])
 
   useEffect(() => {
+    if (!appReady) return undefined
     const nextId = backgroundId || null
     if (displayedBackgroundRef.current === nextId) return undefined
     let live = true
+    const markFullReady = () => {
+      if (!nextId || !live) return false
+      setFullReadyBackgrounds((current) => current.has(nextId) ? current : new Set([...current, nextId]))
+      return true
+    }
     const commit = () => {
       if (!live) return
       const previousId = displayedBackgroundRef.current
@@ -225,10 +219,31 @@ export function App() {
         }, BACKGROUND_FADE_MS + 80)
       }
     }
-    if (displayedBackgroundRef.current === undefined || !nextId) commit()
-    else void preloadBackgroundAsset(nextId, globalThis.Image, 15_000, { fullResolution: true }).then(commit)
+    if (displayedBackgroundRef.current === undefined || !nextId) {
+      commit()
+      if (nextId) void preloadBackgroundAsset(nextId, globalThis.Image, 15_000, { fullResolution: true }).then(markFullReady)
+    } else {
+      void preloadBackgroundAsset(nextId, globalThis.Image, 15_000, { fullResolution: true }).then(() => {
+        if (markFullReady()) commit()
+      })
+    }
     return () => { live = false }
-  }, [backgroundId])
+  }, [appReady, backgroundId])
+
+  useEffect(() => {
+    if (!appReady || (backgroundId && !fullReadyBackgrounds.has(backgroundId))) return undefined
+    const bootBackground = document.getElementById('vstart-boot-background')
+    if (!bootBackground) return undefined
+    let removalTimer = null
+    const settleTimer = window.setTimeout(() => {
+      bootBackground.classList.add('vstart-boot-hidden')
+      removalTimer = window.setTimeout(() => bootBackground.remove(), 380)
+    }, BACKGROUND_RESOLUTION_FADE_MS + 120)
+    return () => {
+      window.clearTimeout(settleTimer)
+      window.clearTimeout(removalTimer)
+    }
+  }, [appReady, backgroundId, fullReadyBackgrounds])
 
   useEffect(() => () => window.clearTimeout(backgroundFadeTimerRef.current), [])
 
@@ -967,14 +982,15 @@ export function App() {
   const backgroundBaseStyle = {
     '--app-background-scale': backgroundZoomScale(settings.backgrounds?.zoomPercent),
     '--background-fade-duration': `${BACKGROUND_FADE_MS}ms`,
+    '--background-resolution-fade-duration': `${BACKGROUND_RESOLUTION_FADE_MS}ms`,
   }
   const currentBackgroundStyle = {
     ...backgroundBaseStyle,
-    ...(displayedBackgroundId ? { '--app-background-image': backgroundImageLayers(displayedBackgroundId) } : {}),
+    ...backgroundLayerVariables(displayedBackgroundId, { fullReady: fullReadyBackgrounds.has(displayedBackgroundId) }),
   }
   const previousBackgroundStyle = backgroundLayers.previousId === undefined ? null : {
     ...backgroundBaseStyle,
-    ...(backgroundLayers.previousId ? { '--app-background-image': backgroundImageLayers(backgroundLayers.previousId) } : {}),
+    ...backgroundLayerVariables(backgroundLayers.previousId, { fullReady: fullReadyBackgrounds.has(backgroundLayers.previousId) }),
   }
   const showCompactInnerRing = compact
     && settings.general?.innerOutline
@@ -983,8 +999,8 @@ export function App() {
     && !agentMode
 
   return (<>
-    {previousBackgroundStyle && <div className="app-background-layer background-previous" style={previousBackgroundStyle} aria-hidden="true" />}
-    <div key={displayedBackgroundId || 'default'} className={`app-background-layer background-current ${previousBackgroundStyle ? 'background-fading-in' : ''}`} style={currentBackgroundStyle} aria-hidden="true" />
+    {previousBackgroundStyle && <div className={`app-background-layer background-previous ${backgroundLayers.previousId ? 'background-custom' : 'background-default'}`} style={previousBackgroundStyle} aria-hidden="true" />}
+    <div key={displayedBackgroundId || 'default'} className={`app-background-layer background-current ${displayedBackgroundId ? 'background-custom' : 'background-default'} ${previousBackgroundStyle ? 'background-fading-in' : ''}`} style={currentBackgroundStyle} aria-hidden="true" />
     <main
       className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}

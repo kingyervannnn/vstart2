@@ -35,8 +35,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   z-index: 0;
   inset: -1px;
   pointer-events: none;
-  background-color: #1d283d;
-  background-image: var(--app-background-image, radial-gradient(circle at 68% 26%, rgba(220, 230, 255, .62), transparent 24%), radial-gradient(circle at 66% 52%, rgba(109, 128, 167, .88), transparent 38%), linear-gradient(150deg, #8296b7 0%, #a8b5cc 34%, #42566e 61%, #1a2e35 100%));
+  background-color: transparent;
+  background-image: var(--app-background-image, none);
   background-position: center;
   background-size: cover;
   transform: scale(var(--app-background-scale, 1));
@@ -44,6 +44,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
   transition: transform 180ms ease;
   will-change: opacity, transform;
   backface-visibility: hidden;
+}
+.app-background-layer.background-default {
+  background-color: #1d283d;
+  background-image: radial-gradient(circle at 68% 26%, rgba(220,230,255,.62), transparent 24%), radial-gradient(circle at 66% 52%, rgba(109,128,167,.88), transparent 38%), linear-gradient(150deg, #8296b7 0%, #a8b5cc 34%, #42566e 61%, #1a2e35 100%);
+}
+.app-background-layer.background-custom::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--app-background-full-image, none);
+  background-position: center;
+  background-size: cover;
+  opacity: var(--app-background-full-opacity, 0);
+  transition: opacity var(--background-resolution-fade-duration, 650ms) ease-in-out;
 }
 .app-background-layer.background-previous { z-index: 0; }
 .app-background-layer.background-current { z-index: 0; }
@@ -1297,6 +1312,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .app-background-layer.background-fading-in { animation-duration: 900ms !important; animation-timing-function: ease-in-out !important; }
+  .app-background-layer.background-custom::after { transition-duration: 480ms !important; }
   .scrolling-header-track { animation-duration: var(--header-scroll-duration, 32s) !important; animation-iteration-count: infinite !important; }
   .workspace-switcher-active { transition: transform 440ms cubic-bezier(.16,1,.3,1) !important; }
 }

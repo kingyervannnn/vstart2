@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { backgroundImageLayers, bootstrapBackgroundId, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './backgroundStartup.js'
+import { backgroundLayerVariables, bootstrapBackgroundId, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './backgroundStartup.js'
 
 const bootstrap = {
   settings: { document: { backgrounds: { workspaceSpecific: true, globalAssetId: 'global' } } },
@@ -16,8 +16,13 @@ describe('background startup', () => {
     expect(bootstrapBackgroundId(bootstrap, '/')).toBe('home-background')
   })
 
-  it('layers the full image over its lightweight preview', () => {
-    expect(backgroundImageLayers('asset-id')).toBe('url(/api/assets/asset-id), url(/api/assets/asset-id/preview)')
+  it('keeps the decoded preview visible until the full image is ready', () => {
+    expect(backgroundLayerVariables('asset-id')).toEqual({
+      '--app-background-image': 'url(/api/assets/asset-id/preview)',
+      '--app-background-full-image': 'url(/api/assets/asset-id)',
+      '--app-background-full-opacity': 0,
+    })
+    expect(backgroundLayerVariables('asset-id', { fullReady: true })['--app-background-full-opacity']).toBe(1)
     expect(startupBackgroundUrl('/w/work')).toBe('/api/backgrounds/startup?path=%2Fw%2Fwork')
   })
 
