@@ -18,5 +18,6 @@ export const musicApi = {
   queue: (sourceId, signal) => request(`/api/music/queue${sourceQuery(sourceId)}`, { signal }),
   selectQueueItem: (sourceId, index) => request('/api/music/queue', { method: 'PATCH', body: JSON.stringify({ sourceId, index }) }),
   addQueueItem: (sourceId, videoId, insertPosition = 'INSERT_AT_END') => request('/api/music/queue', { method: 'POST', body: JSON.stringify({ sourceId, videoId, insertPosition }) }),
+  playItem: (sourceId, videoId) => request('/api/music/play', { method: 'POST', body: JSON.stringify({ sourceId, videoId }) }),
   search: (sourceId, query, signal) => request('/api/music/search', { method: 'POST', body: JSON.stringify({ sourceId, query }), signal }),
 }

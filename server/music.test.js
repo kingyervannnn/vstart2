@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { normalizeQueue, normalizeSearch, readMusicState, seekMusic, setMusicVolume } from './music.mjs'
+import { normalizeQueue, normalizeSearch, playMusicItem, readMusicState, seekMusic, setMusicVolume } from './music.mjs'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -67,5 +67,16 @@ describe('music adapter', () => {
 
     expect(fetch).toHaveBeenNthCalledWith(1, new URL('http://127.0.0.1:26538/api/v1/seek-to'), expect.objectContaining({ method: 'POST', body: JSON.stringify({ seconds: 94 }) }))
     expect(fetch).toHaveBeenNthCalledWith(2, new URL('http://127.0.0.1:26538/api/v1/volume'), expect.objectContaining({ method: 'POST', body: JSON.stringify({ volume: 37 }) }))
+  })
+
+  it('plays a search result immediately instead of only adding it to the queue', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+
+    await playMusicItem(client, 'ytm', 'video-3')
+
+    expect(fetch).toHaveBeenNthCalledWith(1, new URL('http://127.0.0.1:26538/api/v1/queue'), expect.objectContaining({ method: 'POST', body: JSON.stringify({ videoId: 'video-3', insertPosition: 'INSERT_AFTER_CURRENT_VIDEO' }) }))
+    expect(fetch).toHaveBeenNthCalledWith(2, new URL('http://127.0.0.1:26538/api/v1/next'), expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenNthCalledWith(3, new URL('http://127.0.0.1:26538/api/v1/play'), expect.objectContaining({ method: 'POST' }))
   })
 })

@@ -258,7 +258,7 @@ geometry, but it does not replace the rail with launchers or remove widget conte
   Settings.
 
 The initial adapter supports live song state, play/pause, previous/next, shuffle, repeat,
-volume state, queue selection, queue insertion, and provider search. Future adapters use
+volume state, queue selection, queue insertion, immediate playback from search, and provider search. Future adapters use
 the same source registry and normalized V Start API rather than adding provider-specific
 logic to the widget.
 

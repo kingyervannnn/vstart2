@@ -232,6 +232,14 @@ export async function addMusicQueueItem(client, sourceId, videoId, insertPositio
   return { ok: true, sourceId: source.id }
 }
 
+export async function playMusicItem(client, sourceId, videoId) {
+  const source = await resolveMusicSource(client, sourceId)
+  await providerRequest(source, '/api/v1/queue', { method: 'POST', body: JSON.stringify({ videoId, insertPosition: 'INSERT_AFTER_CURRENT_VIDEO' }) })
+  await providerRequest(source, '/api/v1/next', { method: 'POST' })
+  await providerRequest(source, '/api/v1/play', { method: 'POST' })
+  return { ok: true, sourceId: source.id }
+}
+
 export async function searchMusic(client, sourceId, query) {
   const source = await resolveMusicSource(client, sourceId)
   const payload = await providerRequest(source, '/api/v1/search', { method: 'POST', body: JSON.stringify({ query }) })

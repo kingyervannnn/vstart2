@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readBuffer, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
 import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
-import { addMusicQueueItem, controlMusic, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
+import { addMusicQueueItem, controlMusic, playMusicItem, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
@@ -291,6 +291,14 @@ async function handleRequest(request, response) {
       insertPosition: z.enum(['INSERT_AT_END', 'INSERT_AFTER_CURRENT_VIDEO']).default('INSERT_AT_END'),
     }), await readJson(request))
     return sendJson(response, 200, await addMusicQueueItem(pool, data.sourceId, data.videoId, data.insertPosition))
+  }
+
+  if (request.method === 'POST' && pathname === '/api/music/play') {
+    const data = parse(z.object({
+      sourceId: musicSourceId,
+      videoId: z.string().trim().min(1).max(100),
+    }), await readJson(request))
+    return sendJson(response, 200, await playMusicItem(pool, data.sourceId, data.videoId))
   }
 
   if (request.method === 'POST' && pathname === '/api/music/search') {

@@ -176,6 +176,17 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
     }
   }
 
+  const playResult = async (result) => {
+    if (!activeSource) return
+    try {
+      await musicApi.playItem(activeSource.id, result.videoId)
+      window.setTimeout(() => void loadPlayer(), 180)
+      window.setTimeout(() => void loadQueue(), 220)
+    } catch (error) {
+      setNotice(error.message)
+    }
+  }
+
   const capabilities = player.data?.capabilities || (activeSource?.adapter === 'youtube-music-desktop' ? { queue: true, search: true } : {})
   const song = player.data?.song
   const elapsed = seekDraft ?? song?.elapsedSeconds ?? 0
@@ -220,7 +231,7 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
         </section>}
         {capabilities.search === true && (query || search.loading || search.results.length || search.error) && <section><h3><Search /> Search results</h3>
           {search.error && <div className="service-state error">{search.error}</div>}
-          {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => addResult(result, 'INSERT_AFTER_CURRENT_VIDEO')} title="Play next"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
+          {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => playResult(result)} title="Play now"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
         </section>}
       </div>
     </div>
