@@ -386,7 +386,8 @@ The optional **Edge Effect** is purely decorative and is grouped with other effe
 
 - Edge effect enabled.
 - Edge glow enabled.
-- Edge glow color source/intensity.
+- Edge glow intensity, independent from the shared search-bar/music-player glow intensity.
+- One glow color with optional workspace and adaptive-background overrides.
 - Edge softness/width.
 - Animated overlay enabled/speed/intensity.
 - Inner outline enabled.

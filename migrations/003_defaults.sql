@@ -33,6 +33,8 @@ VALUES (
       "glow": {
         "color": "#8ba6ff",
         "adaptToBackground": false,
+        "edgeIntensity": 100,
+        "elementIntensity": 100,
         "workspaceSpecific": false,
         "workspaceColors": {}
       },

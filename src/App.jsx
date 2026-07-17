@@ -12,6 +12,7 @@ import { backgroundLayerVariables, preloadBackgroundAsset, preloadBootstrapBackg
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
+import { glowStrength } from './lib/glowIntensity.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -974,6 +975,8 @@ export function App() {
     '--app-text': activeWorkspace.textColor && settings.workspaces?.individualTypography ? activeWorkspace.textColor : settings.appearance?.textColor || '#f4f6ff',
     '--app-accent': effectiveAccent,
     '--app-glow': adaptiveGlowColor || manualGlowColor,
+    '--edge-glow-strength': glowStrength(glowSettings.edgeIntensity),
+    '--element-glow-strength': glowStrength(glowSettings.elementIntensity),
     '--app-font': activeWorkspace.fontFamily && settings.workspaces?.individualTypography ? activeWorkspace.fontFamily : settings.appearance?.fontFamily || 'Inter, system-ui, sans-serif',
     '--header-scroll-duration': `${headerScrollDuration(settings.appearance?.headerScrollSpeed)}s`,
     '--shortcut-icon-size': `${Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))}%`,

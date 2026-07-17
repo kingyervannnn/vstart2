@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, 
 import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
+import { DEFAULT_EDGE_GLOW_INTENSITY, DEFAULT_ELEMENT_GLOW_INTENSITY, normalizeGlowIntensity } from '../lib/glowIntensity.js'
 import { normalizeHeaderScrollSpeed } from '../lib/headerScroll.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
@@ -78,6 +79,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
     : 'connected'
   const glowSettings = settings.appearance?.glow || {}
   const glowColor = glowSettings.color || settings.appearance?.accentColor || '#8ba6ff'
+  const edgeGlowIntensity = normalizeGlowIntensity(glowSettings.edgeIntensity, DEFAULT_EDGE_GLOW_INTENSITY)
+  const elementGlowIntensity = normalizeGlowIntensity(glowSettings.elementIntensity, DEFAULT_ELEMENT_GLOW_INTENSITY)
   const workspaceGlowColors = glowSettings.workspaceColors || {}
   const musicSources = settings.music?.sources || []
   const weatherLocations = configuredWeatherLocations(settings.widgets)
@@ -245,6 +248,8 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <label className="setting-field range-setting"><span>Top header scroll speed <output aria-hidden="true">{(headerScrollSpeed / 100).toFixed(headerScrollSpeed % 100 ? 2 : 1)}×</output></span><input type="range" min="50" max="200" step="5" value={headerScrollSpeed} aria-label="Top header scroll speed" onChange={(event) => onPatch({ appearance: { headerScrollSpeed: Number(event.target.value) } })} /></label>
               <section className="glow-controller">
                 <div className="glow-controller-heading"><span><strong>Unified glow color</strong><small>Edge, search bar, and music player glows share this color.</small></span><input type="color" value={glowColor} aria-label="Global glow color" onChange={(event) => onPatch({ appearance: { glow: { color: event.target.value } } })} /></div>
+                <label className="setting-field range-setting"><span>Edge glow intensity <output aria-hidden="true">{edgeGlowIntensity}%</output></span><input type="range" min="0" max="100" step="5" value={edgeGlowIntensity} aria-label="Edge glow intensity" onChange={(event) => onPatch({ appearance: { glow: { edgeIntensity: Number(event.target.value) } } })} /></label>
+                <label className="setting-field range-setting"><span>Search and music glow intensity <output aria-hidden="true">{elementGlowIntensity}%</output></span><input type="range" min="0" max="100" step="5" value={elementGlowIntensity} aria-label="Search and music glow intensity" onChange={(event) => onPatch({ appearance: { glow: { elementIntensity: Number(event.target.value) } } })} /></label>
                 <Toggle label="Adapt to active background" detail="Samples a lightweight background preview. The saved color remains the fallback." checked={glowSettings.adaptToBackground === true} onChange={(value) => onPatch({ appearance: { glow: { adaptToBackground: value } } })} />
                 <Toggle label="Workspace-specific glow colors" detail="Keeps a manual fallback color for every workspace." checked={glowSettings.workspaceSpecific === true} onChange={(value) => onPatch({ appearance: { glow: { workspaceSpecific: value } } })} />
                 {glowSettings.workspaceSpecific === true && <div className="workspace-glow-list">

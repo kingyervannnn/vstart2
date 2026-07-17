@@ -189,8 +189,9 @@ CLI-registry, arbitrary command, secret, or sudo controls.
 
 - Edge effect.
 - Edge glow.
-- Edge glow intensity.
-- Edge glow color source: accent, workspace accent, custom.
+- Independent edge glow intensity.
+- Shared search-bar and music-player glow intensity.
+- One glow color with optional workspace and adaptive-background overrides.
 - Edge softness/width.
 - Animated overlay.
 - Animated overlay speed.
