@@ -1007,6 +1007,7 @@ async function handleRequest(request, response) {
     const endpoint = new URL('/search', process.env.SEARXNG_URL || 'http://127.0.0.1:8181')
     endpoint.searchParams.set('q', query)
     endpoint.searchParams.set('format', 'json')
+    endpoint.searchParams.set('language', 'en-US')
     if (category === 'images') endpoint.searchParams.set('categories', 'images')
     try {
       const upstream = await fetch(endpoint, {

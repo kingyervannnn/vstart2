@@ -1,14 +1,12 @@
 use_default_settings:
   engines:
     keep_only:
-      - bing
       - bing images
+      - duckduckgo
       - google
       - google images
+      - startpage
       - wikipedia
-engines:
-  - name: bing
-    disabled: false
 server:
   secret_key: "vstart2-local-searxng"
   bind_address: "0.0.0.0"
@@ -16,6 +14,7 @@ server:
   limiter: false
 search:
   safe_search: 0
+  default_lang: "en-US"
   autocomplete: "duckduckgo"
   formats:
     - html
