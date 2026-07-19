@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
-const DEFAULT_CLI_PATH = '/Users/vbitzx/.local/bin/room-light'
+const DEFAULT_CLI_PATH = join(homedir(), '.local/bin/room-light')
 const DEFAULT_TIMEOUT_MS = 8_000
 const CAPABILITY_CACHE_MS = 5_000
 const KNOWN_SWATCHES = {

@@ -22,7 +22,7 @@ Keychain access, and macOS folder selection stay on the host.
 Run in the foreground while developing:
 
 ```sh
-cd /Users/vbitzx/SS/vstart2
+cd vstart2
 npm run agent:bridge
 ```
 

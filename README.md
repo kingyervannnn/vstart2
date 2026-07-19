@@ -12,7 +12,7 @@ state.
 
 ## Non-negotiable constraints
 
-- V Start 2 lives in `/Users/vbitzx/SS/vstart2` and runs as its own Docker Compose project.
+- V Start 2 is a standalone repository and runs as its own Docker Compose project.
 - PostgreSQL is the only durable application store.
 - The browser may hold temporary UI state in memory, but it may not persist application
   state in `localStorage`, `sessionStorage`, IndexedDB, Cache Storage, or cookies.
@@ -41,7 +41,9 @@ state.
 ## Run it
 
 ```sh
-cd /Users/vbitzx/SS/vstart2
+git clone https://github.com/kingyervannnn/vstart2.git
+cd vstart2
+cp .env.example .env  # optional; customize host integrations here
 ./scripts/stack.sh up
 ```
 
@@ -81,7 +83,9 @@ Parallel host ports:
 | Environment bridge (native host service) | `/environment-bridge` via V Start; `3140` loopback only |
 
 Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
-untracked `.env` file before stack startup. Mail uses the existing local `mailctl`
+untracked `.env` file before stack startup. The portable Notes default is
+`./data/notes`; point `VSTART2_NOTES_ROOT` at an existing notes directory when desired.
+Mail uses the existing local `mailctl`
 accounts and Keychain credentials through the native
 [Mail Bridge](mail-bridge/README.md); install it with
 `npm run mail:bridge:manage -- install`. V Start proxies `/mail-bridge` to that loopback
@@ -113,7 +117,7 @@ images into PostgreSQL. Normal shortcut creation performs the same retrieval aut
 To import V Start 1's bundled and uploaded background library into PostgreSQL, run:
 
 ```sh
-npm run import:vstart1:backgrounds -- --source /Users/vbitzx/SS/VSTART --select theme_2.gif
+npm run import:vstart1:backgrounds -- --source ../VSTART --select theme_2.gif
 ```
 
 The import is transactional and content-deduplicated. `--select` optionally makes the

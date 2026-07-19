@@ -13,3 +13,7 @@ The bridge binds only to `127.0.0.1:3130`. V Start exposes its typed API through
 `/mail-bridge/` reverse proxy, so LAN and Tailscale clients can use Mail without exposing port 3130.
 The proxy supplies the bridge's allowlisted loopback Host and Origin; direct remote requests to the
 native bridge remain unavailable.
+
+The launcher defaults to `~/SS/TOOLS/bin/mailctl`. Set `VSTART_MAILCTL_PATH` before
+installation when `mailctl` lives elsewhere; the generated LaunchAgent records the
+resolved path without committing machine-specific paths to this repository.

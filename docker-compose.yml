@@ -102,7 +102,7 @@ services:
       - "3410:3410"
     volumes:
       - ./server:/app/server:ro
-      - ${VSTART2_NOTES_ROOT:-/Users/vbitzx/Desktop/SYNC/Vaults}:/vault
+      - ${VSTART2_NOTES_ROOT:-./data/notes}:/vault
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3410/notes/health >/dev/null 2>&1 || exit 1"]

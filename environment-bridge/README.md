@@ -19,3 +19,7 @@ npm run environment:bridge:manage -- status
 ```
 
 The launch agent binds only to `127.0.0.1:3140`. V Start proxies it through `/environment-bridge/` so LAN and Tailscale clients use the start page's existing origin.
+
+The launcher defaults to `~/.local/bin/room-light`. Set `VSTART_LIGHT_CLI_PATH` before
+installation when the CLI lives elsewhere; the generated LaunchAgent records the
+resolved path without committing machine-specific paths to this repository.

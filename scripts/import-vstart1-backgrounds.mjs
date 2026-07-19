@@ -4,10 +4,11 @@ import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
 const { Client } = pg
-const DEFAULT_SOURCE = '/Users/vbitzx/SS/VSTART'
+const DEFAULT_SOURCE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../VSTART')
 const DEFAULT_DATABASE_URL = 'postgres://vstart2:vstart2-local-password@127.0.0.1:55432/vstart2'
 const MAX_BYTES = 256 * 1024 * 1024
 const MIME_TYPES = new Map([

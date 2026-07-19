@@ -83,8 +83,9 @@ In Compact Mode:
 
 ### 2.3 Exact visual reference
 
-The Wide layout must visually match the supplied
-[V Start 1 reference screenshot](</Users/vbitzx/Desktop/Screenshot 2026-07-13 at 10.44.53 PM.png>).
+The Wide layout must visually match the original V Start 1 wide-layout reference used
+during the initial design pass. That local design input is intentionally not linked from
+the portable repository documentation.
 
 The reference is a design target, not loose inspiration. V Start 2 must preserve:
 

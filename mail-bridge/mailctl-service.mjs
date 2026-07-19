@@ -1,11 +1,11 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCallback)
-const DEFAULT_MAILCTL_PATH = '/Users/vbitzx/SS/TOOLS/bin/mailctl'
+const DEFAULT_MAILCTL_PATH = join(homedir(), 'SS/TOOLS/bin/mailctl')
 const CONTACT_CACHE_MS = 5 * 60 * 1000
 const MESSAGE_CACHE_MS = Math.max(15_000, Number(process.env.VSTART_MAIL_CACHE_MS) || 60_000)
 const PREWARM_INTERVAL_MS = Math.max(30_000, Number(process.env.VSTART_MAIL_PREWARM_INTERVAL_MS) || 60_000)

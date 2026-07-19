@@ -9,8 +9,7 @@ Deliverables:
 
 - Agree on the product, data/service, settings, and sequence documents.
 - Record provisional decisions that may change: Compact Mode breakpoints and parallel ports.
-- Initialize a new Git repository in `/Users/vbitzx/SS/vstart2` only when implementation
-  begins.
+- Initialize V Start 2 as an independent repository only when implementation begins.
 
 Gate:
 

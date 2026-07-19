@@ -14,18 +14,15 @@ PostgreSQL workspace/session-link storage, streaming conversation UI, tool activ
 approval and clarification cards, model/reasoning/fast controls, interrupt/steer, native
 directory selection, responsive Wide/Compact layout, and explicit launchd management.
 
-The current machine's Hermes profile uses `manual` approvals, and the Agent Bridge is
-installed and loaded as the per-user `com.vstart.agent-bridge` launchd service. A live
-Copilot `gpt-4o-mini` run has passed gateway and HTTP-bridge streaming, pause-before-tool,
-Allow once, steering, interruption, restart/resume, and browser reload checks. V Start
-still fails closed whenever the active Hermes profile reports approvals `off`; it never
-silently relaxes the global Hermes policy.
+The Agent Bridge supports per-user `launchd` installation and has passed gateway and
+HTTP-bridge streaming, pause-before-tool, Allow once, steering, interruption,
+restart/resume, and browser-reload checks. V Start fails closed whenever the active Hermes
+profile reports approvals `off`; it never silently relaxes the global Hermes policy.
 
-The active OpenAI Codex credential is currently invalidated, so the tested workspace
-preference is Copilot `gpt-4o-mini`. Credentials remain owned by Hermes and are never
-stored in V Start. Remaining hardening work includes session-link rename/pin/unlink
-controls in the conversation toolbar, richer collapsible tool detail, stream reconnection
-under prolonged network loss, and the full Phase G matrix.
+Credentials remain owned by Hermes and are never stored in V Start. Remaining hardening
+work includes session-link rename/pin/unlink controls in the conversation toolbar, richer
+collapsible tool detail, stream reconnection under prolonged network loss, and the full
+Phase G matrix.
 
 ## 1. Product decision
 
@@ -52,7 +49,8 @@ inside the host bridge so another runtime can be added later, but there will be 
 database abstraction for hypothetical providers until a concrete Hermes limitation is
 found.
 
-`/Users/vbitzx/TOOLS.md` remains the human-readable local capability index. V Start does
+`~/TOOLS.md` remains the human-readable local capability index on installations that use
+it. V Start does
 not scrape it, turn it into an executable catalog, or duplicate it in PostgreSQL. Hermes'
 own model/tool/session APIs are the machine-readable runtime inventory for Agent Mode.
 

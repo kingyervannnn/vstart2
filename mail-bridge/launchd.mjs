@@ -15,6 +15,7 @@ const plistPath = join(launchAgentsDir, `${LABEL}.plist`)
 const logDir = join(homedir(), 'Library/Logs/VStart2')
 const stdoutLog = join(logDir, 'mail-bridge.log')
 const stderrLog = join(logDir, 'mail-bridge.error.log')
+const mailctlPath = process.env.VSTART_MAILCTL_PATH || join(homedir(), 'SS/TOOLS/bin/mailctl')
 const domain = `gui/${process.getuid()}`
 const serviceTarget = `${domain}/${LABEL}`
 
@@ -29,7 +30,7 @@ function plist() {
   <key>WorkingDirectory</key><string>${xml(projectRoot)}</string>
   <key>EnvironmentVariables</key><dict>
     <key>VSTART_MAIL_BRIDGE_PORT</key><string>3130</string>
-    <key>VSTART_MAILCTL_PATH</key><string>/Users/vbitzx/SS/TOOLS/bin/mailctl</string>
+    <key>VSTART_MAILCTL_PATH</key><string>${xml(mailctlPath)}</string>
     <key>PATH</key><string>${xml(`${dirname(process.execPath)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`)}</string>
   </dict>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>10</integer>
