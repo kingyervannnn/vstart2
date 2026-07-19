@@ -17,6 +17,7 @@ vi.mock('../lib/mailBridge.js', () => ({
     starMessage: vi.fn(async () => ({ message: { id: 'message-1', starred: true } })),
     updateCachedMessage: vi.fn(),
     contacts: vi.fn(async () => ({ contacts: [] })),
+    drafts: vi.fn(async (account) => ({ drafts: [{ account, draftId: `${account}-draft`, date: '2026-07-14T12:00:00Z', to: 'recipient@example.com', subject: `${account} draft`, snippet: 'Draft copy' }] })),
   },
 }))
 
@@ -46,5 +47,19 @@ describe('MailServiceView', () => {
     expect(heading?.querySelector('.mail-message-subject')).toHaveTextContent('Project update')
     expect(stack?.querySelector('time')).toBeInTheDocument()
     expect(stack?.querySelector('.mail-account-badge')).toHaveTextContent('personal')
+  })
+
+  it('switches between real Gmail categories and aggregates drafts across accounts', async () => {
+    render(<ServiceRailView kind="mail" initialMailAccount="all" onClose={() => {}} />)
+    const category = await screen.findByRole('combobox', { name: 'Mail category' })
+
+    fireEvent.change(category, { target: { value: 'sent' } })
+    await waitFor(() => expect(mailBridge.loadInbox).toHaveBeenCalledWith(expect.objectContaining({ account: 'all', query: 'in:sent' })))
+
+    fireEvent.change(category, { target: { value: 'drafts' } })
+    await waitFor(() => expect(mailBridge.drafts).toHaveBeenCalledWith('personal'))
+    expect(mailBridge.drafts).toHaveBeenCalledWith('work')
+    expect(await screen.findByText('personal draft')).toBeInTheDocument()
+    expect(screen.getByText('work draft')).toBeInTheDocument()
   })
 })

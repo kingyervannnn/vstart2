@@ -752,6 +752,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-brand { display: flex; align-items: center; gap: 9px; }
 .mail-brand > svg { width: 16px; opacity: .66; }
 .mail-brand h2 { margin: 0; font-size: 19px; }
+.mail-category-select { width: 92px; height: 30px; flex: none; display: flex; align-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); }
+.mail-category-select > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mail-category-select select { width: 100%; height: 100%; border: 0; outline: 0; padding: 0 7px; color: inherit; background: transparent; cursor: pointer; font-size: 9px; }
 .mail-toolbar-actions { display: flex; align-items: center; gap: 5px; }
 .mail-toolbar-actions > button, .mail-reader-action-group > button { height: 30px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 0 9px; color: inherit; background: rgba(9,13,21,.2); backdrop-filter: blur(12px); cursor: pointer; font-size: 8px; }
 .mail-toolbar-actions > button.primary { border-color: color-mix(in srgb, var(--app-accent) 40%, transparent); background: color-mix(in srgb, var(--app-accent) 14%, transparent); }
@@ -868,6 +871,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 680px) {
   .mail-brand h2 { display: none; }
   .mail-brand > svg { width: 17px; }
+  .mail-category-select { width: 76px; }
   .mail-toolbar-actions > button span { display: none; }
   .mail-toolbar-actions > button { width: 32px; justify-content: center; padding: 0; }
   .mail-message-open { padding-right: 100px; }

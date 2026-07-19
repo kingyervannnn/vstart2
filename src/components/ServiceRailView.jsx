@@ -470,7 +470,7 @@ function RecipientField({ label, value, contacts, required = false, onChange }) 
   )
 }
 
-function MailComposer({ accounts, initial, onCancel, onCreated }) {
+function MailComposer({ accounts, initial, backLabel = 'Inbox', onCancel, onCreated }) {
   const [draft, setDraft] = useState(() => ({
     account: initial?.account || accounts[0]?.alias || '',
     to: initial?.replyTo ? '' : (initial?.to || ''),
@@ -510,7 +510,7 @@ function MailComposer({ accounts, initial, onCancel, onCreated }) {
 
   return (
     <form className="mail-composer" onSubmit={(event) => submit(event, false)}>
-      <header><button type="button" className="mail-back" onClick={onCancel}><ArrowLeft /> Inbox</button><span>{draft.replyTo ? 'Reply' : initial?.forwarded ? 'Forward' : 'New message'}</span></header>
+      <header><button type="button" className="mail-back" onClick={onCancel}><ArrowLeft /> {backLabel}</button><span>{draft.replyTo ? 'Reply' : initial?.forwarded ? 'Forward' : 'New message'}</span></header>
       <label><span>From</span><select value={draft.account} onChange={(event) => setDraft((value) => ({ ...value, account: event.target.value }))}>{accounts.map((item) => <option key={item.alias} value={item.alias}>{item.alias} · {item.email}</option>)}</select></label>
       {!draft.replyTo && <RecipientField label="To" required value={draft.to} contacts={contacts} onChange={(to) => setDraft((value) => ({ ...value, to }))} />}
       {!draft.replyTo && <RecipientField label="Cc" value={draft.cc} contacts={contacts} onChange={(cc) => setDraft((value) => ({ ...value, cc }))} />}
@@ -531,10 +531,28 @@ function MailComposer({ accounts, initial, onCancel, onCreated }) {
   )
 }
 
+const MAIL_CATEGORIES = [
+  { id: 'inbox', label: 'Inbox', query: 'in:inbox' },
+  { id: 'sent', label: 'Sent', query: 'in:sent' },
+  { id: 'drafts', label: 'Drafts', query: null },
+  { id: 'starred', label: 'Starred', query: 'is:starred' },
+  { id: 'trash', label: 'Trash', query: 'in:trash' },
+]
+
+function mailCategory(id) {
+  return MAIL_CATEGORIES.find((category) => category.id === id) || MAIL_CATEGORIES[0]
+}
+
+function scopedMailQuery(categoryId, input = '') {
+  const base = mailCategory(categoryId).query || 'in:inbox'
+  return [base, input.trim()].filter(Boolean).join(' ')
+}
+
 function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInline, onClose }) {
   const initialSnapshot = mailBridge.peekInbox({ account: initialAccount, query: 'in:inbox', max: 30 })
   const [accounts, setAccounts] = useState(initialSnapshot?.accounts || mailBridge.peekAccounts())
   const [account, setAccount] = useState(initialAccount)
+  const [category, setCategory] = useState('inbox')
   const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('in:inbox')
   const [messages, setMessages] = useState(initialSnapshot?.messages || [])
@@ -698,20 +716,34 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   const submitSearch = (event) => {
     event.preventDefault()
     setSelected(null)
-    setQuery(queryInput.trim() || 'in:inbox')
+    setQuery(scopedMailQuery(category, queryInput))
   }
 
-  const openDrafts = async () => {
-    const target = account === 'all' ? accounts[0]?.alias : account
-    if (!target) return
-    setState({ loading: true, error: '' })
+  const openDrafts = async (requestedAccount = account) => {
+    const targets = requestedAccount === 'all' ? accounts.map((item) => item.alias) : [requestedAccount]
+    if (!targets.length) return
+    setState({ loading: true, refreshing: false, error: '' })
     try {
-      const result = await mailBridge.drafts(target)
-      setDrafts({ account: target, items: result.drafts || [] })
-      setState({ loading: false, error: '' })
+      const results = await Promise.all(targets.map((target) => mailBridge.drafts(target)))
+      const items = results.flatMap((result, index) => (result.drafts || []).map((draft) => ({ ...draft, account: draft.account || targets[index] })))
+        .sort((left, right) => String(right.date || '').localeCompare(String(left.date || '')))
+      setDrafts({ account: requestedAccount, items })
+      setState({ loading: false, refreshing: false, error: '' })
     } catch (error) {
-      setState({ loading: false, error: error.message })
+      setState({ loading: false, refreshing: false, error: error.message })
     }
+  }
+
+  const selectCategory = (nextCategory) => {
+    setSelected(null)
+    setQueryInput('')
+    setCategory(nextCategory)
+    if (nextCategory === 'drafts') {
+      void openDrafts()
+      return
+    }
+    setDrafts(null)
+    setQuery(scopedMailQuery(nextCategory))
   }
 
   const finishDraft = ({ account: draftAccount, draft, sendAfter, summary }) => {
@@ -726,6 +758,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     setState({ loading: true, error: '' })
     try {
       await mailBridge.sendDraft(pendingSend.account, pendingSend.draftId)
+      setDrafts((current) => current ? { ...current, items: current.items.filter((draft) => draft.draftId !== pendingSend.draftId) } : current)
       setPendingSend(null)
       setNotice('Message sent.')
       setState({ loading: false, error: '' })
@@ -735,7 +768,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     }
   }
 
-  if (compose) return <MailComposer accounts={accounts} initial={compose} onCancel={() => setCompose(null)} onCreated={finishDraft} />
+  if (compose) return <MailComposer accounts={accounts} initial={compose} backLabel={mailCategory(category).label} onCancel={() => setCompose(null)} onCreated={finishDraft} />
 
   if (pendingSend) {
     return (
@@ -753,10 +786,10 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   if (drafts) {
     return (
       <div className="mail-drafts-view">
-        <header><button type="button" className="mail-back" onClick={() => setDrafts(null)}><ArrowLeft /> Inbox</button><span>Drafts · {drafts.account}</span></header>
+        <header><button type="button" className="mail-back" onClick={() => selectCategory('inbox')}><ArrowLeft /> Inbox</button><span>Drafts · {drafts.account === 'all' ? 'All accounts' : drafts.account}</span></header>
         <div className="mail-message-list">
-          {drafts.items.map((draft) => <button type="button" key={draft.draftId} onClick={() => setPendingSend({ account: drafts.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-heading"><span className="mail-message-subject"><strong>{draft.subject || '(no subject)'}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(draft.date)}</time><span className="mail-account-badge">DRAFT</span></span></span></span><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
-          {!drafts.items.length && <div className="service-state">No drafts in this account.</div>}
+          {drafts.items.map((draft) => <button type="button" key={`${draft.account}:${draft.draftId}`} onClick={() => setPendingSend({ account: draft.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-heading"><span className="mail-message-subject"><strong>{draft.subject || '(no subject)'}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(draft.date)}</time><span className="mail-account-badge">{drafts.account === 'all' ? draft.account : 'DRAFT'}</span></span></span></span><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
+          {!drafts.items.length && <div className="service-state">No drafts in {drafts.account === 'all' ? 'these accounts' : 'this account'}.</div>}
         </div>
       </div>
     )
@@ -766,7 +799,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     const selectedTrashPending = trashTarget?.account === selected.account && trashTarget?.id === selected.id
     return (
       <div className="mail-reader">
-        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> Inbox</button><div className="mail-reader-action-group"><button type="button" className={`mail-favorite-button ${selected.starred ? 'active' : ''}`} disabled={selected.loading || starActionKey === `${selected.account}:${selected.id}`} onClick={() => void toggleFavorite(selected)} aria-label={selected.starred ? 'Remove from favorites' : 'Add to favorites'} title={selected.starred ? 'Remove from favorites' : 'Add to favorites'}><Star />{selected.starred ? 'Favorited' : 'Favorite'}</button><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button><button type="button" className={`danger mail-inline-confirm${selectedTrashPending ? ' confirming' : ''}`} disabled={trashTarget?.working} onClick={() => void confirmTrash(selected)}><Trash2 /><span>{selectedTrashPending ? trashTarget.working ? 'Deleting…' : 'Confirm' : 'Trash'}</span></button></div></div>
+        <div className="mail-reader-actions"><button type="button" className="mail-back" onClick={() => setSelected(null)}><ArrowLeft /> {mailCategory(category).label}</button><div className="mail-reader-action-group"><button type="button" className={`mail-favorite-button ${selected.starred ? 'active' : ''}`} disabled={selected.loading || starActionKey === `${selected.account}:${selected.id}`} onClick={() => void toggleFavorite(selected)} aria-label={selected.starred ? 'Remove from favorites' : 'Add to favorites'} title={selected.starred ? 'Remove from favorites' : 'Add to favorites'}><Star />{selected.starred ? 'Favorited' : 'Favorite'}</button><button type="button" onClick={() => replyToMessage(selected)}><Reply /> Reply</button><button type="button" disabled={selected.loading || actionMessageId === selected.id} onClick={() => forwardMessage(selected)}><Forward /> Forward</button>{category !== 'trash' && <button type="button" className={`danger mail-inline-confirm${selectedTrashPending ? ' confirming' : ''}`} disabled={trashTarget?.working} onClick={() => void confirmTrash(selected)}><Trash2 /><span>{selectedTrashPending ? trashTarget.working ? 'Deleting…' : 'Confirm' : 'Trash'}</span></button>}</div></div>
         <article>
           <header><span className="mail-message-date-stack"><time>{formatMailDate(selected.date)}</time>{account === 'all' && <span className="mail-account-badge">{selected.account}</span>}</span></header>
           <h3>{selected.subject}</h3>
@@ -783,8 +816,9 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     <div className="mail-service-view">
       <header ref={headerRef} className={`mail-unified-header ${headerHidden ? 'is-hidden' : ''}`}>
         <div className="mail-brand"><Mail /><h2>Mail</h2></div>
+        <label className="mail-category-select"><span>Mailbox</span><select aria-label="Mail category" value={category} onChange={(event) => selectCategory(event.target.value)}>{MAIL_CATEGORIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <form className="mail-search" onSubmit={submitSearch}>
-          <input aria-label="Search mail (Gmail query syntax)" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Search mail…" />
+          <input aria-label="Search mail (Gmail query syntax)" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder={`Search ${mailCategory(category).label.toLocaleLowerCase()}…`} />
           <VoiceSearchButton label="Voice mail search" onTranscript={setQueryInput} onError={setNotice} />
           <button type="submit" aria-label="Search mail"><Search /></button>
         </form>
@@ -793,7 +827,6 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
           {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => setAccount(item.alias)}>{item.alias}</button>)}
         </div>
         <div className="mail-toolbar-actions">
-          <button type="button" onClick={openDrafts}><FileText /><span>Drafts</span></button>
           <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>
           <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail" disabled={state.refreshing}><RefreshCw /></button>
         </div>
@@ -808,17 +841,17 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
           return <article className={`mail-message-row ${message.starred ? 'starred' : ''}`} key={`${message.account}:${message.id}`}>
           <button type="button" className="mail-message-open" onClick={() => openMessage(message)}>
             <span className="mail-message-heading"><span className="mail-message-subject">{message.starred && <Star aria-hidden="true" />}<strong>{message.subject}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(message.date)}</time>{account === 'all' && <span className="mail-account-badge">{message.account}</span>}</span></span></span>
-            <small>{message.from}</small>
+            <small>{category === 'sent' || message.labelIds?.includes('SENT') ? `To: ${message.to || 'Unknown recipient'}` : message.from}</small>
             <p>{message.snippet}</p>
           </button>
           <div className="mail-message-quick-actions" aria-label={`Actions for ${message.subject}`}>
             <button type="button" className={`mail-favorite-button ${message.starred ? 'active' : ''}`} title={message.starred ? 'Remove from favorites' : 'Add to favorites'} aria-label={`${message.starred ? 'Remove' : 'Add'} ${message.subject} ${message.starred ? 'from' : 'to'} favorites`} disabled={Boolean(starActionKey)} onClick={() => void toggleFavorite(message)}><Star /></button>
             <button type="button" title="Reply" aria-label={`Reply to ${message.subject}`} onClick={() => replyToMessage(message)}><Reply /></button>
             <button type="button" title="Forward" aria-label={`Forward ${message.subject}`} disabled={actionMessageId === message.id} onClick={() => forwardMessage(message)}><Forward /></button>
-            <button type="button" className={`danger mail-inline-confirm${trashPending ? ' confirming' : ''}`} title={trashPending ? 'Click again to confirm' : 'Move to Trash'} aria-label={trashPending ? `Confirm moving ${message.subject} to Trash` : `Move ${message.subject} to Trash`} disabled={trashTarget?.working} onClick={() => void confirmTrash(message)}><Trash2 />{trashPending && <span>{trashTarget.working ? 'Deleting…' : 'Confirm'}</span>}</button>
+            {category !== 'trash' && <button type="button" className={`danger mail-inline-confirm${trashPending ? ' confirming' : ''}`} title={trashPending ? 'Click again to confirm' : 'Move to Trash'} aria-label={trashPending ? `Confirm moving ${message.subject} to Trash` : `Move ${message.subject} to Trash`} disabled={trashTarget?.working} onClick={() => void confirmTrash(message)}><Trash2 />{trashPending && <span>{trashTarget.working ? 'Deleting…' : 'Confirm'}</span>}</button>}
           </div>
         </article>})}
-        {!messages.length && <div className="service-state">No messages match this search.</div>}
+        {!messages.length && <div className="service-state">{queryInput.trim() ? 'No messages match this search.' : `No messages in ${mailCategory(category).label.toLocaleLowerCase()}.`}</div>}
       </div>}
     </div>
   )
