@@ -191,6 +191,8 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
   const song = player.data?.song
   const elapsed = seekDraft ?? song?.elapsedSeconds ?? 0
   const volume = volumeDraft ?? player.data?.volume ?? 0
+  const elapsedPercent = song?.songDuration > 0 ? Math.max(0, Math.min(100, (Number(elapsed) || 0) / song.songDuration * 100)) : 0
+  const volumePercent = Math.max(0, Math.min(100, Number(volume) || 0))
 
   return (
     <div className="music-service-view">
@@ -209,7 +211,7 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
           <strong>{song?.title || activeSource?.name || 'Music'}</strong>
           <span>{player.error || song?.artist || 'No track selected'}</span>
           {song?.songDuration > 0 && <div className="music-seek-control"><time>{musicTime(elapsed)}</time>{capabilities.seek
-            ? <input type="range" min="0" max={song.songDuration} step="1" value={elapsed} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Song position" />
+            ? <input type="range" min="0" max={song.songDuration} step="1" value={elapsed} style={{ '--music-range-progress': `${elapsedPercent}%` }} onChange={(event) => setSeekDraft(Number(event.target.value))} onPointerUp={(event) => void commitSeek(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitSeek(event.currentTarget.value)} aria-label="Song position" />
             : <progress max={song.songDuration} value={elapsed} />}<time>{musicTime(song.songDuration)}</time></div>}
         </div>
         <div className="music-player-controls">
@@ -220,18 +222,18 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
             {capabilities.queue && <button type="button" className={player.data?.shuffle ? 'active' : ''} disabled={Boolean(playerAction)} onClick={() => void controlPlayer('shuffle')} aria-label="Shuffle"><Shuffle /></button>}
             <button type="button" className={player.data?.repeatMode !== 'NONE' ? 'active' : ''} disabled={Boolean(playerAction)} onClick={() => void controlPlayer('cycleRepeat')} aria-label={'Repeat ' + String(player.data?.repeatMode || 'none').toLowerCase()}><Repeat2 />{player.data?.repeatMode === 'ONE' && <small>1</small>}</button>
           </div>}
-          {capabilities.volume && <div className="music-volume-control">{capabilities.mute && <button type="button" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('toggleMute')} aria-label={player.data?.isMuted ? 'Unmute' : 'Mute'}>{player.data?.isMuted ? <VolumeX /> : <Volume2 />}</button>}<input type="range" min="0" max="100" step="1" value={volume} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Volume" /><small>{Math.round(volume)}%</small></div>}
+          {capabilities.volume && <div className="music-volume-control">{capabilities.mute && <button type="button" disabled={Boolean(playerAction)} onClick={() => void controlPlayer('toggleMute')} aria-label={player.data?.isMuted ? 'Unmute' : 'Mute'}>{player.data?.isMuted ? <VolumeX /> : <Volume2 />}</button>}<input type="range" min="0" max="100" step="1" value={volume} style={{ '--music-range-progress': `${volumePercent}%` }} onChange={(event) => setVolumeDraft(Number(event.target.value))} onPointerUp={(event) => void commitVolume(event.currentTarget.value)} onKeyUp={(event) => ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) && void commitVolume(event.currentTarget.value)} aria-label="Volume" /><small>{Math.round(volume)}%</small></div>}
         </div>
       </section>
       <div className={'music-browser-grid ' + (query || search.loading || search.results.length || search.error ? 'with-search' : '')}>
-        {capabilities.queue === true && <section><h3><ListMusic /> Queue</h3>
+        {capabilities.search === true && (query || search.loading || search.results.length || search.error) && <section className="music-search-panel"><h3><Search /> Search results</h3>
+          {search.error && <div className="service-state error">{search.error}</div>}
+          {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => playResult(result)} title="Play now"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
+        </section>}
+        {capabilities.queue === true && <section className="music-queue-panel"><h3><ListMusic /> Queue</h3>
           {queue.loading && <div className="service-state">Reading queue…</div>}
           {queue.error && <div className="service-state error">{queue.error}</div>}
           {!queue.loading && !queue.error && <div className="music-item-list">{queue.items.map((item) => <button type="button" key={`${item.index}:${item.videoId || item.title}`} className={item.selected || item.videoId === player.data?.song?.videoId ? 'active' : ''} onClick={() => chooseQueueItem(item)}><MusicArtwork src={item.imageUrl} /><span><strong>{item.title}</strong><small>{item.detail || item.artist}</small></span><time>{item.duration}</time><Play /></button>)}{!queue.items.length && <div className="service-state">The active player queue is empty.</div>}</div>}
-        </section>}
-        {capabilities.search === true && (query || search.loading || search.results.length || search.error) && <section><h3><Search /> Search results</h3>
-          {search.error && <div className="service-state error">{search.error}</div>}
-          {!search.loading && <div className="music-search-results">{search.results.map((result) => <article key={result.videoId}><MusicArtwork src={result.imageUrl} /><span><strong>{result.title}</strong><small>{result.detail}</small></span><div><button type="button" onClick={() => playResult(result)} title="Play now"><Play /></button><button type="button" onClick={() => addResult(result, 'INSERT_AT_END')} title="Add to queue"><ListPlus /></button></div></article>)}{query && !search.loading && !search.results.length && !search.error && <div className="service-state">Search to load matching songs.</div>}</div>}
         </section>}
       </div>
     </div>
