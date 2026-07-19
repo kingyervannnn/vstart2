@@ -99,6 +99,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   text-shadow: 0 1px 12px rgba(255, 255, 255, .16), 0 1px 4px rgba(0, 0, 0, .25);
 }
 .widget-rail::-webkit-scrollbar { display: none; }
+.mirrored .widget-rail { padding: clamp(68px, 8vh, 112px) 28px 28px 26px; text-align: right; }
 
 .compact-widget-dock {
   position: absolute;
@@ -150,6 +151,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-days small { overflow: hidden; font-size: 7px; white-space: nowrap; text-overflow: ellipsis; }
 .weather-days strong, .weather-days em { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .weather-days em { opacity: .5; }
+.mirrored .weather-widget { margin-right: 0; margin-left: auto; text-align: right; }
+.mirrored .weather-current { flex-direction: row-reverse; }
+.mirrored .weather-current > div { align-items: flex-end; }
+.mirrored .weather-days > span { text-align: right; }
 
 .widget-access-list { display: flex; gap: 11px; margin-top: 26px; flex-wrap: wrap; }
 .widget-access {
@@ -173,6 +178,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .widget-inline-panel p { margin: 5px 0 0; font-size: 11px; opacity: .72; line-height: 1.45; }
 .widget-inline-panel ul { list-style: none; margin: 7px 0 0; padding: 0; display: grid; gap: 4px; }
 .widget-inline-panel li { max-width: 100%; overflow: hidden; font-size: 10px; opacity: .72; white-space: nowrap; text-overflow: ellipsis; }
+.mirrored .widget-access-list { justify-content: flex-end; }
+.mirrored .widget-access { grid-template-columns: 1fr auto; text-align: right; }
+.mirrored .widget-access svg { grid-column: 2; }
+.mirrored .widget-access span, .mirrored .widget-access small { grid-column: 1; }
+.mirrored .widget-inline-panel { margin-right: 0; margin-left: auto; text-align: right; }
 
 .environment-control { min-width: 0; color: inherit; }
 .environment-control.widget { width: min(100%, 300px); display: grid; gap: 10px; margin-top: 17px; padding: 12px 0; border-block: 1px solid rgba(255,255,255,.13); }
@@ -241,6 +251,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .environment-control.expanded .environment-intensity input[type='range'] { height: 24px; }
 .environment-control.expanded .environment-intensity input[type='range']::-webkit-slider-runnable-track { height: 4px; }
 .environment-control.expanded .environment-intensity input[type='range']::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -5.5px; }
+.mirrored .environment-control.widget { margin-right: 0; margin-left: auto; text-align: right; }
+.mirrored .environment-control.widget.compact-strip { direction: rtl; }
+.mirrored .environment-control.widget.compact-strip > * { direction: ltr; }
+.mirrored .environment-control.widget.compact-strip .environment-open { flex-direction: row-reverse; text-align: right; }
+.mirrored .environment-control.widget.rail-expanded > header { flex-direction: row-reverse; }
+.mirrored .environment-control.widget.rail-expanded .environment-heading-button,
+.mirrored .environment-control.widget.rail-expanded .environment-channel-list button { flex-direction: row-reverse; text-align: right; }
 
 .music-widget {
   position: relative;
@@ -305,6 +322,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .music-controls svg { width: 14px; height: 14px; }
 .music-controls button.primary svg { width: 16px; height: 16px; }
 .music-controls button small { position: absolute; right: 3px; bottom: 1px; font-size: 6px; opacity: 1; }
+.mirrored .music-widget { margin-right: 0; margin-left: auto; text-align: right; }
+.mirrored .music-widget-utility { flex-direction: row-reverse; }
+.mirrored .music-widget-volume { flex-direction: row-reverse; justify-content: flex-start; }
+.mirrored .music-summary-open { direction: rtl; text-align: right; }
+.mirrored .music-summary-open > * { direction: ltr; }
+.mirrored .music-summary-copy { align-items: flex-end; }
 
 .dial-rail { min-width: 0; flex: 1 1 auto; position: relative; overflow: hidden; }
 
@@ -974,6 +997,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .page-controls { position: absolute; z-index: 70; right: 18px; bottom: 18px; display: flex; gap: 8px; }
+.mirrored .page-controls { right: auto; left: 18px; }
 .page-controls button { width: 35px; height: 35px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 60%, transparent); background: transparent; cursor: pointer; }
 .page-controls button:hover, .page-controls button.active { color: var(--app-text); background: rgba(255,255,255,.13); backdrop-filter: blur(12px); }
 .page-controls svg { width: 17px; }
@@ -1308,6 +1332,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
   .iframe-toolbar-actions .result-shortcut-target { order: 3; }
   .iframe-assist-status { margin-right: auto; }
   .page-controls { right: 8px; bottom: 8px; }
+  .mirrored .page-controls { right: auto; left: 8px; }
   .background-zoom-settings { align-items: stretch; flex-direction: column; gap: 10px; }
   .background-zoom-settings > div { flex-wrap: wrap; }
 }
