@@ -35,7 +35,7 @@ afterEach(() => {
 })
 
 describe('expanded music search', () => {
-  it('uses the play control for immediate playback rather than queue insertion', async () => {
+  it('plays immediately from the result row and leaves queueing as the secondary action', async () => {
     const { container } = render(<ServiceRailView kind="music" musicSettings={musicSettings} onMusicSettingsPatch={() => {}} onClose={() => {}} />)
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search music' }), { target: { value: 'search terms' } })
@@ -44,10 +44,14 @@ describe('expanded music search', () => {
     const panels = container.querySelectorAll('.music-browser-grid > section')
     expect(panels[0]).toHaveClass('music-search-panel')
     expect(panels[1]).toHaveClass('music-queue-panel')
-    fireEvent.click(screen.getByTitle('Play now'))
+    expect(screen.queryByTitle('Play now')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Play Search Result now' }))
 
     await waitFor(() => expect(musicApi.playItem).toHaveBeenCalledWith('source-one', 'result-1'))
     expect(musicApi.addQueueItem).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Search Result to queue' }))
+    await waitFor(() => expect(musicApi.addQueueItem).toHaveBeenCalledWith('source-one', 'result-1', 'INSERT_AT_END'))
   })
 
   it('uses filled-line seek and volume progress values', async () => {
