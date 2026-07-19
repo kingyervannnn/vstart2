@@ -568,6 +568,17 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   const [headerHidden, setHeaderHidden] = useState(false)
   const headerRef = useRef(null)
   const lastScrollRef = useRef(0)
+  const draftRequestRef = useRef(0)
+  const visibleDrafts = useMemo(() => {
+    const term = queryInput.trim().toLocaleLowerCase()
+    const items = drafts?.items || []
+    if (!term) return items
+    return items.filter((draft) => [draft.subject, draft.to, draft.snippet, draft.account]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(term))
+  }, [drafts, queryInput])
 
   useEffect(() => {
     if (!trashTarget || trashTarget.working) return undefined
@@ -591,6 +602,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   }, [])
 
   useEffect(() => {
+    if (category === 'drafts') return undefined
     const controller = new AbortController()
     const cached = mailBridge.peekInbox({ account, query, max: 30 })
     if (cached) {
@@ -618,7 +630,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
       }
     })()
     return () => controller.abort()
-  }, [account, query])
+  }, [account, category, query])
 
   const refreshInbox = async () => {
     setState((current) => ({ ...current, refreshing: true, error: '' }))
@@ -716,22 +728,45 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
   const submitSearch = (event) => {
     event.preventDefault()
     setSelected(null)
+    if (category === 'drafts') return
     setQuery(scopedMailQuery(category, queryInput))
   }
 
-  const openDrafts = async (requestedAccount = account) => {
+  const openDrafts = async (requestedAccount = account, { refreshing = false } = {}) => {
+    const requestId = draftRequestRef.current + 1
+    draftRequestRef.current = requestId
     const targets = requestedAccount === 'all' ? accounts.map((item) => item.alias) : [requestedAccount]
-    if (!targets.length) return
-    setState({ loading: true, refreshing: false, error: '' })
+    if (!targets.length) {
+      setDrafts({ account: requestedAccount, items: [] })
+      setState({ loading: false, refreshing: false, error: '' })
+      return
+    }
+    setState({ loading: !refreshing, refreshing, error: '' })
     try {
       const results = await Promise.all(targets.map((target) => mailBridge.drafts(target)))
+      if (requestId !== draftRequestRef.current) return
       const items = results.flatMap((result, index) => (result.drafts || []).map((draft) => ({ ...draft, account: draft.account || targets[index] })))
         .sort((left, right) => String(right.date || '').localeCompare(String(left.date || '')))
       setDrafts({ account: requestedAccount, items })
       setState({ loading: false, refreshing: false, error: '' })
     } catch (error) {
+      if (requestId !== draftRequestRef.current) return
       setState({ loading: false, refreshing: false, error: error.message })
     }
+  }
+
+  const selectAccount = (nextAccount) => {
+    setSelected(null)
+    setAccount(nextAccount)
+    if (category === 'drafts') void openDrafts(nextAccount)
+  }
+
+  const refreshMail = () => {
+    if (category === 'drafts') {
+      void openDrafts(account, { refreshing: true })
+      return
+    }
+    void refreshInbox()
   }
 
   const selectCategory = (nextCategory) => {
@@ -739,9 +774,10 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     setQueryInput('')
     setCategory(nextCategory)
     if (nextCategory === 'drafts') {
-      void openDrafts()
+      void openDrafts(account)
       return
     }
+    draftRequestRef.current += 1
     setDrafts(null)
     setQuery(scopedMailQuery(nextCategory))
   }
@@ -751,6 +787,7 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
     if (sendAfter) setPendingSend({ account: draftAccount, draftId: draft.draftId, summary })
     else {
       setNotice('Draft saved to Gmail.')
+      if (category === 'drafts') void openDrafts(account)
     }
   }
 
@@ -762,7 +799,8 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
       setPendingSend(null)
       setNotice('Message sent.')
       setState({ loading: false, error: '' })
-      void refreshInbox()
+      if (category === 'drafts') void openDrafts(account)
+      else void refreshInbox()
     } catch (error) {
       setState({ loading: false, error: error.message })
     }
@@ -779,18 +817,6 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
         <p>Send this message from <strong>{pendingSend.account}</strong> to <strong>{pendingSend.summary.to}</strong>?</p>
         {state.error && <div className="service-state error">{state.error}</div>}
         <div><button type="button" onClick={() => setPendingSend(null)}>Keep as draft</button><button type="button" className="primary" onClick={sendPendingDraft} disabled={state.loading}>Send now</button></div>
-      </div>
-    )
-  }
-
-  if (drafts) {
-    return (
-      <div className="mail-drafts-view">
-        <header><button type="button" className="mail-back" onClick={() => selectCategory('inbox')}><ArrowLeft /> Inbox</button><span>Drafts · {drafts.account === 'all' ? 'All accounts' : drafts.account}</span></header>
-        <div className="mail-message-list">
-          {drafts.items.map((draft) => <button type="button" key={`${draft.account}:${draft.draftId}`} onClick={() => setPendingSend({ account: draft.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-heading"><span className="mail-message-subject"><strong>{draft.subject || '(no subject)'}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(draft.date)}</time><span className="mail-account-badge">{drafts.account === 'all' ? draft.account : 'DRAFT'}</span></span></span></span><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
-          {!drafts.items.length && <div className="service-state">No drafts in {drafts.account === 'all' ? 'these accounts' : 'this account'}.</div>}
-        </div>
       </div>
     )
   }
@@ -823,19 +849,23 @@ function MailServiceView({ initialAccount = 'all', openLinksInNewTab, onOpenInli
           <button type="submit" aria-label="Search mail"><Search /></button>
         </form>
         <div className="mail-account-tabs" aria-label="Mail account">
-          <button type="button" className={account === 'all' ? 'active' : ''} onClick={() => setAccount('all')}>All</button>
-          {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => setAccount(item.alias)}>{item.alias}</button>)}
+          <button type="button" className={account === 'all' ? 'active' : ''} onClick={() => selectAccount('all')}>All</button>
+          {accounts.map((item) => <button type="button" key={item.alias} className={account === item.alias ? 'active' : ''} title={item.email} onClick={() => selectAccount(item.alias)}>{item.alias}</button>)}
         </div>
         <div className="mail-toolbar-actions">
           <button type="button" className="primary" onClick={() => setCompose({ account: account === 'all' ? accounts[0]?.alias : account })}><PenLine /><span>Compose</span></button>
-          <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshInbox} aria-label="Refresh mail" disabled={state.refreshing}><RefreshCw /></button>
+          <button type="button" className={`mail-refresh ${state.refreshing ? 'refreshing' : ''}`} onClick={refreshMail} aria-label="Refresh mail" disabled={state.refreshing}><RefreshCw /></button>
         </div>
         <button type="button" className="mail-close" onClick={onClose} aria-label="Close mail"><X /></button>
       </header>
       {notice && <button type="button" className="mail-notice" onClick={() => setNotice('')}>{notice}</button>}
       {state.loading && <div className="service-state">Reading local mail…</div>}
       {state.error && <div className="service-state error"><strong>Mail bridge unavailable.</strong><br />{state.error}</div>}
-      {!state.loading && !state.error && <div className="mail-message-list">
+      {!state.loading && !state.error && category === 'drafts' && <div className="mail-drafts-view mail-message-list">
+        {visibleDrafts.map((draft) => <button type="button" key={`${draft.account}:${draft.draftId}`} onClick={() => setPendingSend({ account: draft.account, draftId: draft.draftId, summary: { to: draft.to, subject: draft.subject } })}><span className="mail-message-heading"><span className="mail-message-subject"><strong>{draft.subject || '(no subject)'}</strong></span><span className="mail-message-meta"><span className="mail-message-date-stack"><time>{formatMailDate(draft.date)}</time><span className="mail-account-badge">{account === 'all' ? draft.account : 'DRAFT'}</span></span></span></span><small>{draft.to}</small><p>{draft.snippet}</p></button>)}
+        {!visibleDrafts.length && <div className="service-state">{queryInput.trim() ? 'No drafts match this search.' : `No drafts in ${account === 'all' ? 'these accounts' : 'this account'}.`}</div>}
+      </div>}
+      {!state.loading && !state.error && category !== 'drafts' && <div className="mail-message-list">
         {messages.map((message) => {
           const trashPending = trashTarget?.account === message.account && trashTarget?.id === message.id
           return <article className={`mail-message-row ${message.starred ? 'starred' : ''}`} key={`${message.account}:${message.id}`}>

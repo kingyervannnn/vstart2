@@ -61,5 +61,29 @@ describe('MailServiceView', () => {
     expect(mailBridge.drafts).toHaveBeenCalledWith('work')
     expect(await screen.findByText('personal draft')).toBeInTheDocument()
     expect(screen.getByText('work draft')).toBeInTheDocument()
+
+    expect(screen.getByRole('combobox', { name: 'Mail category' })).toHaveValue('drafts')
+    expect(screen.getByRole('textbox', { name: 'Search mail (Gmail query syntax)' })).toHaveAttribute('placeholder', 'Search drafts…')
+    expect(screen.getByRole('button', { name: 'Compose' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh mail' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close mail' })).toBeInTheDocument()
+  })
+
+  it('filters drafts in place and reloads them when the account changes', async () => {
+    render(<ServiceRailView kind="mail" initialMailAccount="all" onClose={() => {}} />)
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Mail category' }), { target: { value: 'drafts' } })
+    expect(await screen.findByText('personal draft')).toBeInTheDocument()
+    expect(screen.getByText('work draft')).toBeInTheDocument()
+
+    const search = screen.getByRole('textbox', { name: 'Search mail (Gmail query syntax)' })
+    fireEvent.change(search, { target: { value: 'personal' } })
+    expect(screen.getByText('personal draft')).toBeInTheDocument()
+    expect(screen.queryByText('work draft')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'personal' }))
+    await waitFor(() => expect(mailBridge.drafts).toHaveBeenLastCalledWith('personal'))
+    expect(screen.getByRole('combobox', { name: 'Mail category' })).toHaveValue('drafts')
+    expect(await screen.findByText('personal draft')).toBeInTheDocument()
+    expect(screen.queryByText('work draft')).not.toBeInTheDocument()
   })
 })

@@ -822,9 +822,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mail-reader dt { opacity: .42; }
 .mail-reader dd { margin: 0; overflow: hidden; opacity: .7; text-overflow: ellipsis; white-space: nowrap; }
 .mail-body { padding-bottom: 60px; opacity: .82; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mail-composer, .mail-drafts-view { padding-top: 17px; }
-.mail-composer > header, .mail-drafts-view > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
-.mail-composer > header > span, .mail-drafts-view > header > span { opacity: .56; font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
+.mail-composer { padding-top: 17px; }
+.mail-composer > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
+.mail-composer > header > span { opacity: .56; font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
 .mail-composer > label { min-height: 39px; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; border-bottom: 1px solid rgba(255,255,255,.09); }
 .mail-composer > label > span:first-child { opacity: .46; font-size: 9px; }
 .mail-recipient-control { position: relative; min-width: 0; align-self: stretch; display: flex; align-items: center; }
