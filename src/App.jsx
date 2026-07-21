@@ -1088,7 +1088,7 @@ export function App() {
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
-        {!(routedView.type === 'service' && ['mail', 'music', 'notes', 'environment'].includes(routedView.kind)) && <SearchDock
+        {routedView.type !== 'service' && <SearchDock
           settings={settings}
           profile={profile}
           compact={compact}
