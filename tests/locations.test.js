@@ -28,6 +28,9 @@ describe('time and weather locations', () => {
     expect(url.searchParams.get('temperature_unit')).toBe('celsius')
     expect(url.searchParams.get('wind_speed_unit')).toBe('kmh')
     expect(url.searchParams.get('current')).toContain('apparent_temperature')
+    expect(url.searchParams.get('hourly')).toContain('precipitation_probability')
+    expect(url.searchParams.get('hourly')).toContain('relative_humidity_2m')
+    expect(url.searchParams.get('daily')).toContain('precipitation_probability_max')
   })
 
   it('formats the same city independently in 12-hour and 24-hour time', () => {

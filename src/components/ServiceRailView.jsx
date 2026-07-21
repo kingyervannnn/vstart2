@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CloudSun, FileText, Forward, Lightbulb, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Star, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, Cloud, CloudFog, CloudLightning, CloudRain, CloudSun, Droplets, FileText, Forward, Lightbulb, ListMusic, ListPlus, Mail, Music2, NotebookPen, Paperclip, Pause, PenLine, Play, Plus, RefreshCw, Repeat2, Reply, Save, Search, Send, Shuffle, SkipBack, SkipForward, Snowflake, Star, Sun, Thermometer, Trash2, Umbrella, Volume2, VolumeX, Wind, X } from 'lucide-react'
 import { mailBridge } from '../lib/mailBridge.js'
 import { activeWeatherLocation, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
@@ -240,21 +240,99 @@ function MusicServiceView({ musicSettings, onSettingsPatch, onClose }) {
   )
 }
 
+function weatherCondition(code) {
+  const value = Number(code)
+  if (value === 0) return { label: 'Clear', Icon: Sun }
+  if (value <= 2) return { label: value === 1 ? 'Mostly clear' : 'Partly cloudy', Icon: CloudSun }
+  if (value === 3) return { label: 'Overcast', Icon: Cloud }
+  if (value === 45 || value === 48) return { label: 'Foggy', Icon: CloudFog }
+  if (value >= 51 && value <= 57) return { label: 'Drizzle', Icon: CloudRain }
+  if ((value >= 61 && value <= 67) || (value >= 80 && value <= 82)) return { label: value >= 80 ? 'Rain showers' : 'Rain', Icon: CloudRain }
+  if ((value >= 71 && value <= 77) || (value >= 85 && value <= 86)) return { label: value >= 85 ? 'Snow showers' : 'Snow', Icon: Snowflake }
+  if (value >= 95) return { label: 'Thunderstorms', Icon: CloudLightning }
+  return { label: 'Current conditions', Icon: CloudSun }
+}
+
+function localHourLabel(value) {
+  const hour = Number(String(value || '').slice(11, 13))
+  if (!Number.isFinite(hour)) return '—'
+  return new Intl.DateTimeFormat([], { hour: 'numeric' }).format(new Date(2000, 0, 1, hour))
+}
+
+function nextHourlyForecast(data, count = 24) {
+  const hourly = data.hourly || {}
+  const times = hourly.time || []
+  const currentHour = String(data.current?.time || '').slice(0, 13)
+  const foundIndex = times.findIndex((time) => String(time).slice(0, 13) >= currentHour)
+  const start = foundIndex < 0 ? 0 : foundIndex
+  return times.slice(start, start + count).map((time, offset) => {
+    const index = start + offset
+    return {
+      time,
+      temperature: hourly.temperature_2m?.[index],
+      apparentTemperature: hourly.apparent_temperature?.[index],
+      weatherCode: hourly.weather_code?.[index],
+      precipitation: hourly.precipitation_probability?.[index],
+      humidity: hourly.relative_humidity_2m?.[index],
+      wind: hourly.wind_speed_10m?.[index],
+    }
+  })
+}
+
+function roundedWeatherValue(value, suffix = '') {
+  return Number.isFinite(Number(value)) ? `${Math.round(Number(value))}${suffix}` : '—'
+}
+
 function WeatherServiceView({ data, location, celsius }) {
-  const current = data.current
+  const current = data.current || {}
+  const currentCondition = weatherCondition(current.weather_code)
+  const CurrentConditionIcon = currentCondition.Icon
+  const hours = nextHourlyForecast(data)
   const days = (data.daily?.time || []).map((date, index) => ({
     date,
     high: data.daily.temperature_2m_max[index],
     low: data.daily.temperature_2m_min[index],
+    weatherCode: data.daily.weather_code?.[index],
+    precipitation: data.daily.precipitation_probability_max?.[index],
     sunrise: data.daily.sunrise[index],
     sunset: data.daily.sunset[index],
   }))
+  const currentHour = hours[0]
+  const windUnit = celsius ? 'km/h' : 'mph'
   return (
     <div className="weather-service-view">
-      <section className="weather-detail-current"><CloudSun /><div><small>{location.city.toLocaleUpperCase()} · FEELS LIKE {Math.round(current.apparent_temperature)}°</small><strong>{Math.round(current.temperature_2m)}°{celsius ? 'C' : 'F'}</strong><p>{Math.round(current.relative_humidity_2m)}% humidity · {Math.round(current.wind_speed_10m)} {celsius ? 'km/h' : 'mph'} wind</p></div></section>
-      <div className="weather-detail-days">
-        {days.map((day, index) => <article key={day.date}><span><small>{index === 0 ? 'Today' : new Intl.DateTimeFormat([], { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))}</small><strong>{new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(new Date(`${day.date}T12:00:00`))}</strong></span><span className="weather-high-low"><strong>{Math.round(day.high)}°</strong><small>{Math.round(day.low)}°</small></span><span className="weather-sun"><small>Sunrise {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunrise))}</small><small>Sunset {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunset))}</small></span></article>)}
-      </div>
+      <section className="weather-detail-current">
+        <div className="weather-current-summary">
+          <CurrentConditionIcon />
+          <div><small>{location.city.toLocaleUpperCase()}</small><strong>{roundedWeatherValue(current.temperature_2m, `°${celsius ? 'C' : 'F'}`)}</strong><p>{currentCondition.label}</p></div>
+        </div>
+        <div className="weather-current-metrics" aria-label="Current weather details">
+          <article><Thermometer /><span><small>Feels like</small><strong>{roundedWeatherValue(current.apparent_temperature, '°')}</strong></span></article>
+          <article><Droplets /><span><small>Humidity</small><strong>{roundedWeatherValue(current.relative_humidity_2m, '%')}</strong></span></article>
+          <article><Wind /><span><small>Wind</small><strong>{roundedWeatherValue(current.wind_speed_10m, ` ${windUnit}`)}</strong></span></article>
+          <article><Umbrella /><span><small>Precipitation</small><strong>{roundedWeatherValue(currentHour?.precipitation, '%')}</strong></span></article>
+        </div>
+      </section>
+      <section className="weather-hourly-section" aria-label="Hourly forecast">
+        <header><span><small>NEXT 24 HOURS</small><h3>Hourly</h3></span><p>Scroll for later</p></header>
+        <div className="weather-hourly-list">
+          {hours.map((hour, index) => {
+            const condition = weatherCondition(hour.weatherCode)
+            const HourIcon = condition.Icon
+            return <article key={hour.time} title={`${condition.label} · feels like ${roundedWeatherValue(hour.apparentTemperature, '°')} · ${roundedWeatherValue(hour.humidity, '%')} humidity · ${roundedWeatherValue(hour.wind, ` ${windUnit}`)} wind`}><time>{index === 0 ? 'Now' : localHourLabel(hour.time)}</time><HourIcon /><strong>{roundedWeatherValue(hour.temperature, '°')}</strong><small><Umbrella />{roundedWeatherValue(hour.precipitation, '%')}</small></article>
+          })}
+        </div>
+      </section>
+      <section className="weather-daily-section" aria-label="Seven-day forecast">
+        <header><small>OUTLOOK</small><h3>Seven day</h3></header>
+        <div className="weather-detail-days">
+          {days.map((day, index) => {
+            const condition = weatherCondition(day.weatherCode)
+            const DayIcon = condition.Icon
+            return <article key={day.date}><span><small>{index === 0 ? 'Today' : new Intl.DateTimeFormat([], { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))}</small><strong>{new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(new Date(`${day.date}T12:00:00`))}</strong></span><span className="weather-day-condition"><DayIcon /><small>{condition.label}</small></span><span className="weather-high-low"><strong>{roundedWeatherValue(day.high, '°')}</strong><small>{roundedWeatherValue(day.low, '°')}</small></span><span className="weather-day-rain"><Umbrella /><small>{roundedWeatherValue(day.precipitation, '%')}</small></span><span className="weather-sun"><small>Sunrise {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunrise))}</small><small>Sunset {new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(day.sunset))}</small></span></article>
+          })}
+        </div>
+      </section>
     </div>
   )
 }

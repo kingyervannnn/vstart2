@@ -54,8 +54,11 @@ export function weatherForecastUrl(location, { celsius = false, detailed = false
     ? 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m'
     : 'temperature_2m,weather_code')
   url.searchParams.set('daily', detailed
-    ? 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset'
+    ? 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
     : 'weather_code,temperature_2m_max,temperature_2m_min')
+  if (detailed) {
+    url.searchParams.set('hourly', 'temperature_2m,apparent_temperature,weather_code,precipitation_probability,relative_humidity_2m,wind_speed_10m')
+  }
   url.searchParams.set('temperature_unit', celsius ? 'celsius' : 'fahrenheit')
   url.searchParams.set('wind_speed_unit', celsius ? 'kmh' : 'mph')
   url.searchParams.set('timezone', location.timeZone)
