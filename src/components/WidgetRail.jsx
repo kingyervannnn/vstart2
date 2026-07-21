@@ -100,7 +100,7 @@ function musicTime(seconds) {
   return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
 }
 
-export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
+export function WidgetRail({ compact, settings, onOpenWidget, onPatch, onEmptyClick }) {
   const musicSources = useMemo(() => (settings.music?.sources || []).filter((source) => source.enabled !== false), [settings.music?.sources])
   const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
@@ -238,7 +238,7 @@ export function WidgetRail({ compact, settings, onOpenWidget, onPatch }) {
   }
 
   return (
-    <aside className="widget-rail" aria-label="Widgets">
+    <aside className="widget-rail" aria-label="Widgets" onClick={(event) => event.target === event.currentTarget && onEmptyClick?.()}>
       {widgets.clock !== false && <ClockWidget settings={widgets} onLocationSelect={(locationId) => onPatch({ widgets: { activeWeatherLocationId: locationId } })} />}
       {widgets.weather !== false && <WeatherWidget compact={compact} settings={widgets} onOpen={() => onOpenWidget('weather')} />}
       <div className="widget-access-list">

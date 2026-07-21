@@ -48,4 +48,33 @@ describe('Widget rail city clocks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show Yerevan weather' }))
     expect(onPatch).toHaveBeenCalledWith({ widgets: { activeWeatherLocationId: 'yerevan' } })
   })
+
+  it('dismisses an open service from empty rail space without swallowing widget clicks', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        current: { temperature_2m: 72 },
+        daily: { time: [], temperature_2m_max: [], temperature_2m_min: [] },
+      }),
+    }))
+    const onEmptyClick = vi.fn()
+    const onOpenWidget = vi.fn()
+    const { container } = render(<WidgetRail
+      compact={false}
+      settings={{
+        widgets: { clock: false, weather: true, notes: false, email: false, music: false, environment: false },
+        music: { sources: [] },
+      }}
+      onOpenWidget={onOpenWidget}
+      onPatch={vi.fn()}
+      onEmptyClick={onEmptyClick}
+    />)
+
+    fireEvent.click(container.querySelector('.widget-rail'))
+    expect(onEmptyClick).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open weather details' }))
+    expect(onOpenWidget).toHaveBeenCalledWith('weather')
+    expect(onEmptyClick).toHaveBeenCalledTimes(1)
+  })
 })

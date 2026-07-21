@@ -1014,7 +1014,7 @@ export function App() {
         aria-hidden="true"
       />
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} />
+      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedInline ? (
