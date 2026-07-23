@@ -117,12 +117,12 @@ There are no Modern, Classic, Edge, Stage, or layout-override settings.
 
 ### Behavior
 
-- Default engine: Google, DuckDuckGo, Bing, SearXNG.
+- External search engine: Google, DuckDuckGo, Bing, SearXNG.
 - Suggestions enabled.
 - Suggestion provider: Automatic, DuckDuckGo, Google, Brave, SearXNG.
 - Maximum suggestions: small bounded choice.
 - Inline search enabled.
-- Inline result engine: SearXNG (initially the only supported web provider).
+- Inline result engine: the bundled SearXNG service, independent of the external search-engine selection.
 - Inline image results enabled.
 - Image search enabled.
 - Voice/STT enabled.

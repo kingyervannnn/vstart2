@@ -215,8 +215,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'search' && <>
               <h3>Search</h3>
-              <label className="setting-field"><span>Default search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option><option value="searxng">SearXNG (local)</option></select></label>
-              <p className="field-help">SearXNG uses the private instance bundled with this stack. Inline result mode already uses that same local service.</p>
+              <label className="setting-field"><span>External search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option><option value="searxng">SearXNG (local)</option></select></label>
+              <p className="field-help">Used only when Inline Results is off. This selection never changes the inline provider.</p>
+              <div className="setting-note"><strong>Inline search provider · SearXNG</strong><span>Inline text and image results always use the private SearXNG service bundled with V Start.</span></div>
               <Toggle label="Inline results" checked={settings.search?.inlineEnabled !== false} onChange={(value) => onPatch({ search: { inlineEnabled: value } })} />
               <label className="setting-field"><span>Result click behavior</span><select value={settings.search?.inlineLinkBehavior || 'inline'} onChange={(event) => onPatch({ search: { inlineLinkBehavior: event.target.value } })}><option value="inline">Open inline in right rail</option><option value="inline-fullscreen">Open inline full screen</option><option value="external">Open in a new tab</option></select></label>
               <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
