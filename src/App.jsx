@@ -790,6 +790,20 @@ export function App() {
   }
 
   const runInlineSearch = (query) => navigateView({ type: 'search', query, category: 'general' })
+  const openSearchBarUrl = useCallback((url) => {
+    let title = url
+    try {
+      title = new URL(url).hostname
+    } catch {
+      // keep raw url as title fallback
+    }
+    navigateView({
+      type: 'frame',
+      query: '',
+      result: { title, url },
+      fullScreen: settings.search?.inlineLinkBehavior === 'inline-fullscreen',
+    })
+  }, [navigateView, settings.search?.inlineLinkBehavior])
   const runInlineImageSearch = ({ query, visualUrl }) => {
     if (visualUrl) {
       navigateView({
@@ -1102,6 +1116,7 @@ export function App() {
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
           onInlineImageSearch={runInlineImageSearch}
+          onOpenUrl={openSearchBarUrl}
           onOpenShortcut={openShortcutFromSearch}
           onLocateShortcut={locateShortcutFromSearch}
           onShortcutFilterChange={setShortcutFilter}

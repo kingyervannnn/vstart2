@@ -141,7 +141,7 @@ export const AgentMode = forwardRef(function AgentMode({
     setRunning(false)
     setWorkingDirectory(activePreferences?.cwd || '')
     setControlError('')
-    setConnection({ state: hasConnectedRef.current ? 'reconnecting' : 'connecting', message: hasConnectedRef.current ? 'Restoring the local Hermes connection…' : 'Connecting to the local Agent Bridge…' })
+    setConnection({ state: hasConnectedRef.current ? 'reconnecting' : 'connecting', message: hasConnectedRef.current ? 'Restoring the Hermes connection…' : 'Connecting to Hermes…' })
 
     const scheduleReconnect = (error) => {
       if (cancelled || abort.signal.aborted) return
@@ -452,7 +452,7 @@ export const AgentMode = forwardRef(function AgentMode({
 
   return (
     <section className="agent-mode" aria-label="Agent Mode">
-      {connection.state !== 'ready' && (connection.state !== 'connecting' || connectionNoticeReady) && <div className="agent-connection-strip" role="status"><LoaderCircle className="spin" /><span><strong>{connection.state === 'reconnecting' ? 'Reconnecting locally' : 'Connecting locally'}</strong><small>{connection.message}</small></span></div>}
+      {connection.state !== 'ready' && (connection.state !== 'connecting' || connectionNoticeReady) && <div className="agent-connection-strip" role="status"><LoaderCircle className="spin" /><span><strong>{connection.state === 'reconnecting' ? 'Reconnecting' : 'Connecting'}</strong><small>{connection.message}</small></span></div>}
       <header className="agent-toolbar">
         <div className="agent-session-picker">
           <Bot />

@@ -4,8 +4,10 @@ import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 
+import { loadConnectionConfig, publicConnectionView, saveConnectionConfig } from './connection-config.mjs'
 import { AgentEventBroker } from './event-broker.mjs'
 import { HermesGatewayClient } from './gateway-client.mjs'
+import { HermesWebuiClient } from './webui-client.mjs'
 
 const execFileAsync = promisify(execFile)
 const DIRECTORY_GRANT_TTL_MS = 60 * 60 * 1_000
@@ -24,11 +26,11 @@ export class BridgeError extends Error {
 
 export class AgentBridgeService {
   constructor({
-    gateway = new HermesGatewayClient(),
+    gateway = null,
     defaultCwd = process.cwd(),
     maxRestartAttempts = MAX_RESTART_ATTEMPTS,
+    connection = null,
   } = {}) {
-    this.gateway = gateway
     this.defaultCwd = resolve(defaultCwd)
     this.maxRestartAttempts = maxRestartAttempts
     this.broker = new AgentEventBroker()
@@ -41,15 +43,18 @@ export class AgentBridgeService {
     this.restartAttempts = 0
     this.restartTimer = null
     this.directoryGrants = new Map()
-
-    this.gateway.on('gateway-event', ({ event }) => this.#handleGatewayEvent(event))
-    this.gateway.on('exit', ({ expected }) => {
-      this.gatewayReady = false
-      if (!expected && !this.stopping) this.#scheduleRestart()
-    })
+    this.connection = connection || (gateway
+      ? { mode: 'local', remoteUrl: '', password: '', source: 'injected' }
+      : null)
+    this.backend = 'local'
+    this.webui = null
+    this.gateway = gateway
+    this.streamControllers = new Map()
+    this.#wireGateway(gateway)
   }
 
   get safe() {
+    if (this.backend === 'webui') return this.gatewayReady
     return this.gatewayReady && this.approvalsMode !== 'off'
   }
 
@@ -57,7 +62,8 @@ export class AgentBridgeService {
     if (this.started) return this.health()
     this.started = true
     this.stopping = false
-    await this.#startGateway()
+    if (!this.connection) this.connection = await loadConnectionConfig()
+    await this.#startBackend()
     return this.health()
   }
 
@@ -66,7 +72,10 @@ export class AgentBridgeService {
     this.started = false
     if (this.restartTimer) clearTimeout(this.restartTimer)
     this.restartTimer = null
-    await this.gateway.stop()
+    for (const controller of this.streamControllers.values()) controller.abort()
+    this.streamControllers.clear()
+    if (this.backend === 'webui') await this.webui?.stop()
+    else await this.gateway?.stop()
     this.gatewayReady = false
   }
 
@@ -77,9 +86,23 @@ export class AgentBridgeService {
       safe: this.safe,
       approvalsMode: this.approvalsMode,
       profile: this.profile,
+      backend: this.backend,
+      remoteUrl: this.backend === 'webui' ? this.connection?.remoteUrl || '' : '',
       restartAttempts: this.restartAttempts,
+      connection: this.connection ? publicConnectionView(this.connection) : undefined,
       error: this.lastError || undefined,
     }
+  }
+
+  connectionStatus() {
+    return this.connection ? publicConnectionView(this.connection) : { mode: 'local', remoteUrl: '', hasPassword: false }
+  }
+
+  async configureConnection({ mode = 'local', remoteUrl = '', password = '' } = {}) {
+    const saved = await saveConnectionConfig({ mode, remoteUrl, password })
+    this.connection = await loadConnectionConfig()
+    await this.#restartBackend()
+    return { ...saved, health: this.health() }
   }
 
   capabilities() {
@@ -90,46 +113,60 @@ export class AgentBridgeService {
       models: true,
       reasoning: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
       fastMode: true,
-      approvals: ['once', 'deny'],
+      approvals: this.backend === 'webui' ? [] : ['once', 'deny'],
       permanentApproval: false,
-      clarify: true,
+      clarify: this.backend !== 'webui',
       sudo: false,
       secrets: false,
-      remoteAccess: false,
+      remoteAccess: this.backend === 'webui',
       providerCredentials: false,
-      imageAttachments: true,
-      directoryPicker: process.platform === 'darwin',
+      imageAttachments: this.backend !== 'webui',
+      directoryPicker: process.platform === 'darwin' && this.backend !== 'webui',
+      backend: this.backend,
     }
   }
 
   async models(sessionId = '') {
     this.#assertGateway()
+    if (this.backend === 'webui') return this.webui.models()
     return this.gateway.request('model.options', sessionId ? { session_id: sessionId } : {})
   }
 
   async sessions() {
     this.#assertGateway()
+    if (this.backend === 'webui') return this.webui.listSessions()
     return this.gateway.request('session.list', { limit: 200 })
   }
 
   async createSession({ directoryGrantId = '', title = '' } = {}) {
     this.#assertGateway()
+    if (this.backend === 'webui') {
+      return this.webui.createSession({ title, workspace: this.defaultCwd })
+    }
     const cwd = directoryGrantId ? this.#consumeDirectoryGrant(directoryGrantId) : this.defaultCwd
     return this.gateway.request('session.create', { cols: 120, cwd, title })
   }
 
   async resumeSession(storedSessionId) {
     this.#assertGateway()
+    if (this.backend === 'webui') return this.webui.getSession(storedSessionId)
     return this.gateway.request('session.resume', { session_id: storedSessionId, cols: 120 })
   }
 
   async history(runtimeSessionId) {
     this.#assertGateway()
+    if (this.backend === 'webui') {
+      const session = await this.webui.getSession(runtimeSessionId)
+      return { messages: session.messages, session }
+    }
     return this.gateway.request('session.history', { session_id: runtimeSessionId })
   }
 
   async status(runtimeSessionId) {
     this.#assertGateway()
+    if (this.backend === 'webui') {
+      return { status: this.broker.activeTurn(runtimeSessionId) ? 'running' : 'idle' }
+    }
     const active = await this.gateway.request('session.active_list')
     const session = active.sessions?.find((candidate) => candidate.id === runtimeSessionId)
     return {
@@ -140,6 +177,7 @@ export class AgentBridgeService {
 
   async submitTurn(runtimeSessionId, text) {
     this.#assertSafe()
+    if (this.backend === 'webui') return this.#submitWebuiTurn(runtimeSessionId, text)
     const turnId = this.broker.beginTurn(runtimeSessionId)
     try {
       const result = await this.gateway.request('prompt.submit', { session_id: runtimeSessionId, text })
@@ -152,6 +190,9 @@ export class AgentBridgeService {
 
   async attachImage(runtimeSessionId, { filename, data }) {
     this.#assertSafe()
+    if (this.backend === 'webui') {
+      throw new BridgeError(501, 'unsupported', 'Image attach is not yet mapped for Hermes WebUI mode')
+    }
     this.#assertBetweenTurns(runtimeSessionId)
     return this.gateway.request('image.attach_bytes', {
       session_id: runtimeSessionId,
@@ -162,17 +203,31 @@ export class AgentBridgeService {
 
   async steer(runtimeSessionId, text) {
     this.#assertSafe()
+    if (this.backend === 'webui') return this.webui.steer(runtimeSessionId, text)
     return this.gateway.request('session.steer', { session_id: runtimeSessionId, text })
   }
 
   async interrupt(runtimeSessionId) {
     this.#assertGateway()
+    if (this.backend === 'webui') {
+      this.streamControllers.get(runtimeSessionId)?.abort()
+      this.streamControllers.delete(runtimeSessionId)
+      const turnId = this.broker.activeTurn(runtimeSessionId)
+      this.broker.cancelTurn(runtimeSessionId, turnId)
+      this.broker.publish('turn.interrupted', { sessionId: runtimeSessionId, turnId, payload: { status: 'interrupted' } })
+      return this.webui.interrupt(runtimeSessionId)
+    }
     return this.gateway.request('session.interrupt', { session_id: runtimeSessionId })
   }
 
   async setModel(runtimeSessionId, provider, model) {
     this.#assertSafe()
     this.#assertBetweenTurns(runtimeSessionId)
+    if (this.backend === 'webui') {
+      // WebUI applies model on the next /api/chat/start payload.
+      this._webuiModelPreference = { provider, model }
+      return { ok: true, deferred: true, provider, model }
+    }
     const options = await this.models(runtimeSessionId)
     const providerRow = options.providers?.find((candidate) => candidate.slug === provider)
     if (!providerRow?.authenticated) throw new BridgeError(400, 'provider_unavailable', 'Provider is not authenticated in Hermes')
@@ -189,12 +244,20 @@ export class AgentBridgeService {
   async setReasoning(runtimeSessionId, effort) {
     this.#assertSafe()
     this.#assertBetweenTurns(runtimeSessionId)
+    if (this.backend === 'webui') {
+      this._webuiReasoning = effort
+      return { ok: true, deferred: true, effort }
+    }
     return this.gateway.request('config.set', { key: 'reasoning', value: effort, session_id: runtimeSessionId })
   }
 
   async setFastMode(runtimeSessionId, enabled) {
     this.#assertSafe()
     this.#assertBetweenTurns(runtimeSessionId)
+    if (this.backend === 'webui') {
+      this._webuiFastMode = enabled
+      return { ok: true, deferred: true, enabled }
+    }
     return this.gateway.request('config.set', {
       key: 'fast',
       value: enabled ? 'fast' : 'normal',
@@ -204,6 +267,9 @@ export class AgentBridgeService {
 
   async resolveApproval(runtimeSessionId, requestId, choice) {
     this.#assertSafe()
+    if (this.backend === 'webui') {
+      throw new BridgeError(501, 'unsupported', 'Approvals are handled inside Hermes WebUI for this connection mode')
+    }
     const pending = this.broker.takeApproval(requestId, runtimeSessionId)
     if (!pending) throw new BridgeError(409, 'approval_stale', 'Approval is no longer pending for this session')
     const result = await this.gateway.request('approval.respond', {
@@ -221,6 +287,9 @@ export class AgentBridgeService {
 
   async resolveClarification(runtimeSessionId, requestId, answer) {
     this.#assertSafe()
+    if (this.backend === 'webui') {
+      throw new BridgeError(501, 'unsupported', 'Clarifications are handled inside Hermes WebUI for this connection mode')
+    }
     const pending = this.broker.takeClarification(requestId, runtimeSessionId)
     if (!pending) throw new BridgeError(409, 'clarification_stale', 'Clarification is no longer pending for this session')
     const result = await this.gateway.request('clarify.respond', {
@@ -238,13 +307,18 @@ export class AgentBridgeService {
 
   async closeSession(runtimeSessionId) {
     this.#assertGateway()
-    const result = await this.gateway.request('session.close', { session_id: runtimeSessionId })
+    this.streamControllers.get(runtimeSessionId)?.abort()
+    this.streamControllers.delete(runtimeSessionId)
     this.broker.cancelTurn(runtimeSessionId, this.broker.activeTurn(runtimeSessionId))
-    return result
+    if (this.backend === 'webui') return { ok: true }
+    return this.gateway.request('session.close', { session_id: runtimeSessionId })
   }
 
   async chooseDirectory() {
     this.#assertSafe()
+    if (this.backend === 'webui') {
+      throw new BridgeError(501, 'directory_picker_unavailable', 'Directory picker is local-bridge only')
+    }
     if (process.platform !== 'darwin') throw new BridgeError(501, 'directory_picker_unavailable', 'Native directory picker is unavailable')
     let stdout
     try {
@@ -267,13 +341,177 @@ export class AgentBridgeService {
   async setDirectory(runtimeSessionId, grantId) {
     this.#assertSafe()
     this.#assertBetweenTurns(runtimeSessionId)
+    if (this.backend === 'webui') {
+      throw new BridgeError(501, 'unsupported', 'Working directory changes are local-bridge only in this version')
+    }
     const path = this.#consumeDirectoryGrant(grantId)
     const result = await this.gateway.request('session.cwd.set', { session_id: runtimeSessionId, cwd: path })
     return { ...result, path }
   }
 
+  async #submitWebuiTurn(sessionId, text) {
+    const turnId = this.broker.beginTurn(sessionId)
+    this.broker.publish('turn.started', { sessionId, turnId, payload: {} })
+    this.broker.publish('message.delta', { sessionId, turnId, payload: { role: 'assistant', text: '' } })
+    try {
+      const extras = {}
+      if (this._webuiModelPreference?.model) {
+        extras.model = this._webuiModelPreference.model
+        extras.model_provider = this._webuiModelPreference.provider
+      }
+      const start = await this.webui.startTurn(sessionId, text, extras)
+      const streamId = start.stream_id
+      if (!streamId) throw new Error('Hermes WebUI did not return a stream_id')
+      void this.#pumpWebuiStream(sessionId, turnId, streamId)
+      return { turnId, status: 'streaming', streamId }
+    } catch (error) {
+      this.broker.publish('turn.failed', {
+        sessionId,
+        turnId,
+        payload: { code: 'webui_start_failed', message: error.message },
+      })
+      this.broker.cancelTurn(sessionId, turnId)
+      throw new BridgeError(error.status || 502, 'webui_turn_failed', error.message)
+    }
+  }
+
+  async #pumpWebuiStream(sessionId, turnId, streamId) {
+    const controller = new AbortController()
+    this.streamControllers.set(sessionId, controller)
+    let assistant = ''
+    try {
+      const response = await this.webui.openEventStream(`/api/chat/stream?stream_id=${encodeURIComponent(streamId)}`)
+      for await (const event of this.webui.readSse(response)) {
+        if (controller.signal.aborted) break
+        if (event.event === 'token') {
+          const piece = event.data?.text || event.data?.token || ''
+          if (!piece) continue
+          assistant += piece
+          this.broker.publish('message.delta', {
+            sessionId,
+            turnId,
+            payload: { role: 'assistant', text: piece },
+          })
+          continue
+        }
+        if (event.event === 'tool' || event.event === 'tool_start') {
+          this.broker.publish('tool.start', {
+            sessionId,
+            turnId,
+            payload: {
+              tool: event.data?.name || event.data?.tool || 'tool',
+              status: event.data?.status || 'running',
+              command: event.data?.command || event.data?.input || '',
+            },
+          })
+          continue
+        }
+        if (event.event === 'tool_end' || event.event === 'tool_complete') {
+          this.broker.publish('tool.complete', {
+            sessionId,
+            turnId,
+            payload: {
+              tool: event.data?.name || event.data?.tool || 'tool',
+              status: event.data?.status || 'complete',
+            },
+          })
+          continue
+        }
+        if (event.event === 'error') {
+          this.broker.publish('turn.failed', {
+            sessionId,
+            turnId,
+            payload: { code: 'webui_stream_error', message: event.data?.error || event.data?.message || 'Stream error' },
+          })
+          this.broker.cancelTurn(sessionId, turnId)
+          break
+        }
+        if (event.event === 'done' || event.event === 'stream_end') {
+          this.broker.publish('message.complete', {
+            sessionId,
+            turnId,
+            payload: { role: 'assistant', text: assistant, status: 'complete' },
+          })
+          this.broker.publish('turn.complete', {
+            sessionId,
+            turnId,
+            payload: { status: 'complete' },
+          })
+          this.broker.cancelTurn(sessionId, turnId)
+          break
+        }
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        this.broker.publish('turn.failed', {
+          sessionId,
+          turnId,
+          payload: { code: 'webui_stream_failed', message: error.message },
+        })
+        this.broker.cancelTurn(sessionId, turnId)
+      }
+    } finally {
+      this.streamControllers.delete(sessionId)
+    }
+  }
+
+  async #restartBackend() {
+    for (const controller of this.streamControllers.values()) controller.abort()
+    this.streamControllers.clear()
+    if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = null
+    this.gatewayReady = false
+    if (this.backend === 'webui') await this.webui?.stop()
+    else await this.gateway?.stop()
+    await this.#startBackend()
+  }
+
+  async #startBackend() {
+    const mode = this.connection?.mode === 'webui' ? 'webui' : 'local'
+    this.backend = mode
+    if (mode === 'webui') {
+      await this.#startWebui()
+      return
+    }
+    await this.#startGateway()
+  }
+
+  async #startWebui() {
+    try {
+      this.webui = new HermesWebuiClient({
+        baseUrl: this.connection.remoteUrl,
+        password: this.connection.password,
+      })
+      await this.webui.start()
+      this.approvalsMode = 'webui'
+      this.profile = 'webui'
+      this.gatewayReady = true
+      this.lastError = ''
+      this.restartAttempts = 0
+      this.broker.publish('gateway.ready', {
+        payload: {
+          profile: this.profile,
+          safe: this.safe,
+          approvalsMode: this.approvalsMode,
+          backend: 'webui',
+          remoteUrl: this.connection.remoteUrl,
+        },
+      })
+    } catch (error) {
+      this.gatewayReady = false
+      this.lastError = error.message
+      this.broker.publish('gateway.unavailable', {
+        payload: { message: error.message || 'Hermes WebUI is unavailable', backend: 'webui' },
+      })
+    }
+  }
+
   async #startGateway() {
     try {
+      if (!this.gateway) {
+        this.gateway = new HermesGatewayClient()
+        this.#wireGateway(this.gateway)
+      }
       await this.gateway.start()
       const [config, profile] = await Promise.all([
         this.gateway.request('config.get', { key: 'full' }),
@@ -285,13 +523,24 @@ export class AgentBridgeService {
       this.lastError = ''
       this.restartAttempts = 0
       this.broker.publish('gateway.ready', {
-        payload: { profile: this.profile, safe: this.safe, approvalsMode: this.approvalsMode },
+        payload: { profile: this.profile, safe: this.safe, approvalsMode: this.approvalsMode, backend: 'local' },
       })
     } catch (error) {
       this.gatewayReady = false
       this.lastError = error.message
-      this.broker.publish('gateway.unavailable', { payload: { message: 'Hermes gateway is unavailable' } })
+      this.broker.publish('gateway.unavailable', { payload: { message: 'Hermes gateway is unavailable', backend: 'local' } })
     }
+  }
+
+  #wireGateway(gateway) {
+    if (!gateway || gateway.__vstartWired) return
+    gateway.__vstartWired = true
+    gateway.on?.('gateway-event', ({ event }) => this.#handleGatewayEvent(event))
+    gateway.on?.('exit', ({ expected }) => {
+      if (this.backend !== 'local') return
+      this.gatewayReady = false
+      if (!expected && !this.stopping) this.#scheduleRestart()
+    })
   }
 
   #handleGatewayEvent(event) {
@@ -311,6 +560,7 @@ export class AgentBridgeService {
   }
 
   #scheduleRestart() {
+    if (this.backend !== 'local') return
     if (this.restartTimer || this.restartAttempts >= this.maxRestartAttempts) {
       if (this.restartAttempts >= this.maxRestartAttempts) {
         this.broker.publish('gateway.unavailable', { payload: { message: 'Hermes restart limit reached' } })
@@ -343,7 +593,7 @@ export class AgentBridgeService {
 
   #assertSafe() {
     this.#assertGateway()
-    if (this.approvalsMode === 'off') {
+    if (this.backend !== 'webui' && this.approvalsMode === 'off') {
       throw new BridgeError(503, 'unsafe_approval_mode', 'Hermes approvals are disabled; Agent Mode is locked')
     }
   }

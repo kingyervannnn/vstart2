@@ -70,4 +70,65 @@ describe('Notes service view', () => {
     }))
     expect(fetch).toHaveBeenCalledWith('/notes/api/v1/vault/default/notes/note-new', expect.objectContaining({ method: 'PUT' }))
   })
+
+  it('deletes a note from the vault after a second confirmation click and clears metadata', async () => {
+    const fetch = vi.fn(async (url, options = {}) => {
+      if (options.method === 'DELETE') {
+        return { ok: true, json: async () => ({ ok: true }) }
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          notes: [{ id: 'note-1', title: '', content: 'Body text', updatedAt: 10, folder: 'Home' }],
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetch)
+    const onNotesSettingsPatch = vi.fn().mockResolvedValue(undefined)
+
+    render(<ServiceRailView
+      kind="notes"
+      workspaces={workspaces}
+      activeWorkspaceId="home"
+      notesSettings={{ metadata: { 'note-1': { title: 'Keep or delete', workspaceId: 'home' } } }}
+      onNotesSettingsPatch={onNotesSettingsPatch}
+      onClose={vi.fn()}
+    />)
+
+    expect(await screen.findByText('Keep or delete')).toBeTruthy()
+    const deleteButton = screen.getByRole('button', { name: 'Delete Keep or delete' })
+    fireEvent.click(deleteButton)
+    expect(screen.getByRole('button', { name: 'Confirm delete Keep or delete' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete Keep or delete' }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      '/notes/api/v1/vault/default/notes/note-1?folder=Home',
+      expect.objectContaining({ method: 'DELETE' }),
+    ))
+    await waitFor(() => expect(onNotesSettingsPatch).toHaveBeenCalledWith({
+      metadata: { 'note-1': null },
+    }))
+    await waitFor(() => expect(screen.queryByText('Keep or delete')).toBeNull())
+  })
+
+  it('opens a note when the row is clicked', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ notes: [{ id: 'note-1', title: '', content: 'Original body', updatedAt: 10 }] }),
+    }))
+
+    render(<ServiceRailView
+      kind="notes"
+      workspaces={workspaces}
+      activeWorkspaceId="home"
+      notesSettings={{ metadata: { 'note-1': { title: 'Database title', workspaceId: 'home' } } }}
+      onClose={vi.fn()}
+    />)
+
+    expect(await screen.findByText('Database title')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Database title' }))
+    expect((await screen.findByRole('textbox', { name: 'Note title' })).value).toBe('Database title')
+    expect(screen.getByRole('textbox', { name: 'Note content' }).value).toBe('Original body')
+    expect(screen.getByText('Editing note')).toBeTruthy()
+  })
 })

@@ -39,6 +39,11 @@ const approvalSchema = z.object({ choice: z.enum(['once', 'deny']) }).strict()
 const clarificationSchema = z.object({ answer: z.string().min(1).max(16_384) }).strict()
 const directorySchema = z.object({ grantId: z.string().min(1).max(100) }).strict()
 const emptySchema = z.object({}).strict()
+const connectionSchema = z.object({
+  mode: z.enum(['local', 'webui', 'remote']),
+  remoteUrl: z.string().trim().max(500).optional().default(''),
+  password: z.string().max(500).optional().default(''),
+}).strict()
 
 const idPart = '([^/]+)'
 
@@ -111,6 +116,15 @@ export class AgentBridgeHttpServer {
 
       if (request.method === 'GET' && url.pathname === '/v1/health') {
         this.#send(response, 200, this.service.health())
+        return
+      }
+      if (request.method === 'GET' && url.pathname === '/v1/connection') {
+        this.#send(response, 200, this.service.connectionStatus())
+        return
+      }
+      if (request.method === 'PUT' && url.pathname === '/v1/connection') {
+        const body = await this.#readJson(request, connectionSchema)
+        this.#send(response, 200, await this.service.configureConnection(body))
         return
       }
       if (request.method === 'GET' && url.pathname === '/v1/capabilities') {
@@ -277,7 +291,7 @@ export class AgentBridgeHttpServer {
   #setCors(response, origin) {
     response.setHeader('Access-Control-Allow-Origin', origin)
     response.setHeader('Vary', 'Origin')
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
+    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS')
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-VStart-Agent-Session')
     response.setHeader('Access-Control-Expose-Headers', 'X-VStart-Event-Cursor')
     response.setHeader('Access-Control-Max-Age', '600')

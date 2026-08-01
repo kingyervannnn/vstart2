@@ -97,6 +97,8 @@ export class AgentBridgeClient {
   }
 
   health() { return this.request('/v1/health') }
+  connection() { return this.request('/v1/connection') }
+  configureConnection(values = {}) { return this.request('/v1/connection', { method: 'PUT', body: values }) }
   capabilities() { return this.request('/v1/capabilities') }
   models(sessionId = '') { return this.request(`/v1/models${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ''}`) }
   sessions() { return this.request('/v1/sessions') }

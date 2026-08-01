@@ -97,12 +97,15 @@ services:
     command: node server/integrations/notes-server.mjs
     environment:
       NOTES_PORT: 3410
-      NOTES_ROOT: /vault
+      NOTES_USE_HOST_BIND: "1"
+      NOTES_BIND_HOST: ${VSTART2_NOTES_BIND_HOST:-/Users/vbitzx}
+      NOTES_BIND_CONTAINER: /host
+      NOTES_ROOT_HOST: ${VSTART2_NOTES_ROOT:-/Users/vbitzx/SYNC/Vaults}
     ports:
       - "3410:3410"
     volumes:
       - ./server:/app/server:ro
-      - ${VSTART2_NOTES_ROOT:-./data/notes}:/vault
+      - ${VSTART2_NOTES_BIND_HOST:-/Users/vbitzx}:/host
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3410/notes/health >/dev/null 2>&1 || exit 1"]

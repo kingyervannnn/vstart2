@@ -238,7 +238,8 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 
 - Clock: preset, time format, optional seconds.
 - Weather: location, units, refresh behavior.
-- Notes: filter/default view and center/overlay behavior retained only where functional.
+- Notes: Obsidian vault path (host path under the Notes bind root), plus filter/default view
+  behavior retained only where functional.
 - Email: account/filter/default mailbox behavior retained only where functional.
 - Music: enabled and glass blur amount. Provider configuration lives on the dedicated
   Music page.

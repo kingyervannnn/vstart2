@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
@@ -8,6 +8,8 @@ import { normalizeHeaderScrollSpeed } from '../lib/headerScroll.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
 import { musicApi } from '../lib/music.js'
+
+const DEFAULT_NOTES_VAULT_PATH = '/Users/vbitzx/SYNC/Vaults'
 
 const PAGES = [
   ['general', 'General', SlidersHorizontal],
@@ -59,6 +61,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const [mailConnection, setMailConnection] = useState('checking')
   const [newMusicSource, setNewMusicSource] = useState({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
   const [musicChecks, setMusicChecks] = useState({})
+  const [notesVaultDraft, setNotesVaultDraft] = useState(() => settings.notes?.vaultPath || DEFAULT_NOTES_VAULT_PATH)
+  const [notesVaultStatus, setNotesVaultStatus] = useState({ state: 'idle', detail: '' })
+  const [agentConnectionStatus, setAgentConnectionStatus] = useState({ state: 'idle', detail: '' })
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
   const headerScrollSpeed = normalizeHeaderScrollSpeed(settings.appearance?.headerScrollSpeed)
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
@@ -102,6 +107,35 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
     return () => { live = false }
   }, [])
 
+  useEffect(() => {
+    setNotesVaultDraft(settings.notes?.vaultPath || DEFAULT_NOTES_VAULT_PATH)
+  }, [settings.notes?.vaultPath])
+
+  useEffect(() => {
+    if (page !== 'widgets') return undefined
+    let live = true
+    setNotesVaultStatus({ state: 'checking', detail: 'Checking notes vault…' })
+    void fetch('/notes/api/v1/config')
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(body.error || 'Notes service unavailable')
+        if (!live) return
+        if (!settings.notes?.vaultPath && body.vaultPath) {
+          setNotesVaultDraft(body.vaultPath)
+        }
+        setNotesVaultStatus({
+          state: body.ok ? 'ready' : 'error',
+          detail: body.ok
+            ? `${body.noteCount || 0} markdown notes · ${body.vaultPath}`
+            : (body.error || 'Vault path is not ready'),
+        })
+      })
+      .catch((error) => {
+        if (live) setNotesVaultStatus({ state: 'error', detail: error.message || 'Notes service unavailable' })
+      })
+    return () => { live = false }
+  }, [page, settings.notes?.vaultPath])
+
   const addWorkspace = async (event) => {
     event.preventDefault()
     if (!workspaceName.trim()) return
@@ -117,6 +151,31 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   }
 
   const updateMusicSource = (sourceId, changes) => updateMusicSources(musicSources.map((source) => source.id === sourceId ? { ...source, ...changes } : source))
+
+  const saveNotesVaultPath = async (event) => {
+    event.preventDefault()
+    const vaultPath = notesVaultDraft.trim() || DEFAULT_NOTES_VAULT_PATH
+    setNotesVaultStatus({ state: 'saving', detail: 'Applying vault path…' })
+    try {
+      const response = await fetch('/notes/api/v1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vaultPath }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || 'Could not update the notes vault path')
+      await onPatch({ notes: { vaultPath: body.vaultPath || vaultPath } })
+      setNotesVaultDraft(body.vaultPath || vaultPath)
+      setNotesVaultStatus({
+        state: body.ok ? 'ready' : 'error',
+        detail: body.ok
+          ? `${body.noteCount || 0} markdown notes · ${body.vaultPath || vaultPath}`
+          : (body.error || 'Vault path saved but is not ready'),
+      })
+    } catch (error) {
+      setNotesVaultStatus({ state: 'error', detail: error.message || 'Could not update the notes vault path' })
+    }
+  }
 
   const addMusicSource = (event) => {
     event.preventDefault()
@@ -234,12 +293,83 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <h3>Agent</h3>
               <Toggle label="Enable Agent Mode" detail="Routes through V Start to the native loopback Hermes bridge; no provider API is embedded." checked={settings.agent?.enabled !== false} onChange={(value) => onPatch({ agent: { enabled: value } })} />
               <label className="setting-field"><span>Agent bridge route</span><input className="text-setting-input" defaultValue={settings.agent?.bridgeUrl || '/agent-bridge'} onBlur={(event) => event.target.value.trim() && event.target.value.trim() !== settings.agent?.bridgeUrl && onPatch({ agent: { bridgeUrl: event.target.value.trim() } })} /></label>
+              <label className="setting-field"><span>Hermes connection</span>
+                <select value={settings.agent?.connectionMode || 'local'} onChange={(event) => onPatch({ agent: { connectionMode: event.target.value } })}>
+                  <option value="local">Local agent bridge (spawn tui_gateway)</option>
+                  <option value="webui">Hermes WebUI / tailnet server</option>
+                </select>
+              </label>
+              {(settings.agent?.connectionMode || 'local') === 'webui' && <>
+                <label className="setting-field"><span>Hermes server URL</span>
+                  <input
+                    className="text-setting-input"
+                    defaultValue={settings.agent?.remoteUrl || 'https://vahagns-macbook-pro.tail030d61.ts.net:8788'}
+                    placeholder="https://host.tailnet:8788"
+                    onBlur={(event) => {
+                      const value = event.target.value.trim()
+                      if (value && value !== settings.agent?.remoteUrl) onPatch({ agent: { remoteUrl: value } })
+                    }}
+                  />
+                </label>
+                <label className="setting-field"><span>Server password</span>
+                  <input
+                    className="text-setting-input"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder={settings.agent?.remoteConfigured ? 'Saved on this Mac — enter to replace' : 'Hermes WebUI password'}
+                    onBlur={(event) => {
+                      const password = event.target.value
+                      if (!password) return
+                      event.target.value = ''
+                      void (async () => {
+                        setAgentConnectionStatus({ state: 'saving', detail: 'Saving Hermes connection…' })
+                        try {
+                          const { getSharedAgentBridgeClient } = await import('../lib/agentBridge.js')
+                          const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
+                          const remoteUrl = settings.agent?.remoteUrl || 'https://vahagns-macbook-pro.tail030d61.ts.net:8788'
+                          await client.configureConnection({ mode: 'webui', remoteUrl, password })
+                          onPatch({ agent: { connectionMode: 'webui', remoteUrl, remoteConfigured: true } })
+                          setAgentConnectionStatus({ state: 'ready', detail: 'Connected to Hermes WebUI.' })
+                        } catch (error) {
+                          setAgentConnectionStatus({ state: 'error', detail: error?.message || 'Failed to save Hermes connection' })
+                        }
+                      })()
+                    }}
+                  />
+                </label>
+                <p className="field-help">Password is stored only on this Mac inside the agent-bridge secret file (mode 0600), not in PostgreSQL. URL can be the Tailscale HTTPS address you already use for Hermes WebUI.</p>
+                {agentConnectionStatus.state !== 'idle' && (
+                  <p className={`field-help ${agentConnectionStatus.state === 'error' ? 'is-error' : ''}`} role="status">
+                    {agentConnectionStatus.detail}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="text-setting-input"
+                  onClick={() => {
+                    void (async () => {
+                      setAgentConnectionStatus({ state: 'saving', detail: 'Switching to local agent bridge…' })
+                      try {
+                        const { getSharedAgentBridgeClient } = await import('../lib/agentBridge.js')
+                        const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
+                        await client.configureConnection({ mode: 'local', remoteUrl: '', password: '' })
+                        onPatch({ agent: { connectionMode: 'local', remoteConfigured: false } })
+                        setAgentConnectionStatus({ state: 'ready', detail: 'Using local agent bridge.' })
+                      } catch (error) {
+                        setAgentConnectionStatus({ state: 'error', detail: error?.message || 'Failed to switch back to local bridge' })
+                      }
+                    })()
+                  }}
+                >
+                  Use local agent bridge
+                </button>
+              </>}
               <label className="setting-field"><span>Hermes-profile reasoning default</span><select value={settings.agent?.defaultReasoningEffort || 'medium'} onChange={(event) => onPatch({ agent: { defaultReasoningEffort: event.target.value } })}><option value="none">Off</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Max</option></select></label>
               <Toggle label="Fast mode by default" detail="Applied only when the selected Hermes model supports it." checked={settings.agent?.defaultFastMode} onChange={(value) => onPatch({ agent: { defaultFastMode: value } })} />
               <Toggle label="Show tool activity" checked={settings.agent?.showToolActivity !== false} onChange={(value) => onPatch({ agent: { showToolActivity: value } })} />
               <Toggle label="Show token usage" checked={settings.agent?.showUsage} onChange={(value) => onPatch({ agent: { showUsage: value } })} />
               <Toggle label="Workspace-specific agent defaults" detail="Stores working-directory and model preferences in PostgreSQL." checked={settings.agent?.workspaceDefaultsEnabled !== false} onChange={(value) => onPatch({ agent: { workspaceDefaultsEnabled: value } })} />
-              <div className="setting-note"><strong>Credentials stay in Hermes.</strong><span>V Start contains no provider key, OAuth, sudo, secret, executable, or arbitrary CLI controls. If Hermes approvals are off, Agent Mode locks rather than running tools automatically.</span></div>
+              <div className="setting-note"><strong>Provider credentials stay in Hermes.</strong><span>V Start never stores model API keys. The optional WebUI password is a host-local bridge secret used only to authenticate to your Hermes server on the tailnet.</span></div>
             </>}
             {page === 'appearance' && <>
               <h3>Appearance</h3>
@@ -347,6 +477,41 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             {page === 'widgets' && <>
               <h3>Widgets</h3>
               {['clock', 'weather', 'notes', 'email', 'music', 'environment'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              <div className="notes-vault-settings">
+                <h4><NotebookPen /> Notes vault</h4>
+                <p className="settings-intro">Notes are plain Markdown files in your Obsidian vault. Workspace metadata stays in PostgreSQL; note bodies live on disk.</p>
+                <form className="notes-vault-form" onSubmit={saveNotesVaultPath}>
+                  <label className="setting-field">
+                    <span>Vault path</span>
+                    <input
+                      value={notesVaultDraft}
+                      onChange={(event) => setNotesVaultDraft(event.target.value)}
+                      placeholder={DEFAULT_NOTES_VAULT_PATH}
+                      spellCheck={false}
+                      autoComplete="off"
+                      aria-label="Notes vault path"
+                    />
+                  </label>
+                  <div className="notes-vault-actions">
+                    <button type="submit" disabled={notesVaultStatus.state === 'saving' || notesVaultStatus.state === 'checking'}>
+                      {notesVaultStatus.state === 'saving' ? 'Saving…' : 'Save vault path'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotesVaultDraft(DEFAULT_NOTES_VAULT_PATH)
+                      }}
+                    >
+                      Use SYNC/Vaults
+                    </button>
+                  </div>
+                </form>
+                <div className={`notes-vault-status ${notesVaultStatus.state}`}>
+                  <strong>{notesVaultStatus.state === 'ready' ? 'Vault connected' : notesVaultStatus.state === 'error' ? 'Vault issue' : notesVaultStatus.state === 'saving' ? 'Saving path' : 'Checking vault'}</strong>
+                  <span>{notesVaultStatus.detail || 'Open this page to verify the mounted vault.'}</span>
+                </div>
+                <div className="setting-note"><strong>Path must stay under your home folder.</strong><span>The Notes Docker service mounts <code>/Users/vbitzx</code> and can switch vault folders inside it without a rebuild.</span></div>
+              </div>
               <div className="time-weather-settings">
                 <h4>Time &amp; weather</h4>
                 <label className="setting-field"><span>Primary city</span><select value={weatherLocations.primary.id} onChange={(event) => selectPrimaryLocation(event.target.value)}>{LOCATION_OPTIONS.map((location) => <option key={location.id} value={location.id}>{location.city} · {location.country}</option>)}</select></label>

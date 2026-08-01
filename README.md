@@ -82,10 +82,14 @@ Parallel host ports:
 | Mail bridge (native host service) | `/mail-bridge` via V Start; `3130` loopback only |
 | Environment bridge (native host service) | `/environment-bridge` via V Start; `3140` loopback only |
 
-Configure `IMGBB_API_KEY` and optionally `VSTART2_NOTES_ROOT` in the shell or an
-untracked `.env` file before stack startup. The portable Notes default is
-`./data/notes`; point `VSTART2_NOTES_ROOT` at an existing notes directory when desired.
-Mail uses the existing local `mailctl`
+Configure `IMGBB_API_KEY` and optionally Notes vault paths in the shell or an
+untracked `.env` file before stack startup:
+
+- `VSTART2_NOTES_BIND_HOST` defaults to `/Users/vbitzx` and is mounted into the Notes service
+- `VSTART2_NOTES_ROOT` defaults to `/Users/vbitzx/SYNC/Vaults`
+
+After startup, Settings → Widgets can change the active vault path to any folder inside the
+bind host without rebuilding the container. Mail uses the existing local `mailctl`
 accounts and Keychain credentials through the native
 [Mail Bridge](mail-bridge/README.md); install it with
 `npm run mail:bridge:manage -- install`. V Start proxies `/mail-bridge` to that loopback

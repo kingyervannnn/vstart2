@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { externalImageSearchUrl, externalSearchUrl } from './searchEngines.js'
+import { externalImageSearchUrl, externalSearchUrl, normalizeNavigableUrl } from './searchEngines.js'
+
+describe('normalizeNavigableUrl', () => {
+  it('accepts full http(s) URLs and normalizes them', () => {
+    expect(normalizeNavigableUrl('https://example.com/path?q=1')).toBe('https://example.com/path?q=1')
+    expect(normalizeNavigableUrl('http://localhost:3000/notes')).toBe('http://localhost:3000/notes')
+  })
+
+  it('accepts bare domains and local hosts without a scheme', () => {
+    expect(normalizeNavigableUrl('example.com')).toBe('https://example.com/')
+    expect(normalizeNavigableUrl('www.openai.com/research')).toBe('https://www.openai.com/research')
+    expect(normalizeNavigableUrl('localhost:3410')).toBe('http://localhost:3410/')
+  })
+
+  it('rejects ordinary search queries', () => {
+    expect(normalizeNavigableUrl('open ai models')).toBeNull()
+    expect(normalizeNavigableUrl('not a url')).toBeNull()
+    expect(normalizeNavigableUrl('ftp://example.com')).toBeNull()
+    expect(normalizeNavigableUrl('javascript:alert(1)')).toBeNull()
+  })
+})
 
 describe('externalSearchUrl', () => {
   it('routes SearXNG through the bundled same-origin service', () => {

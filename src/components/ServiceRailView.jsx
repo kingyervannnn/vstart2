@@ -352,26 +352,45 @@ function noteTitle(title, content) {
     || 'Untitled note'
 }
 
-function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsPatch, openLinksInNewTab, onOpenInline, onClose }) {
+function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsPatch, onClose }) {
   const [notes, setNotes] = useState([])
   const [scope, setScope] = useState(activeWorkspaceId || 'all')
   const [query, setQuery] = useState('')
   const [editor, setEditor] = useState(null)
-  const [state, setState] = useState({ loading: true, refreshing: false, saving: false, error: '' })
-  const metadata = useMemo(() => settings?.metadata || {}, [settings?.metadata])
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [state, setState] = useState({ loading: true, refreshing: false, saving: false, deleting: false, error: '' })
+  const metadata = useMemo(() => {
+    const raw = settings?.metadata || {}
+    return Object.fromEntries(Object.entries(raw).filter(([, value]) => value != null))
+  }, [settings?.metadata])
+  const configuredVaultPath = settings?.vaultPath || ''
+
+  const ensureVaultPath = useCallback(async () => {
+    if (!configuredVaultPath) return
+    const response = await fetch('/notes/api/v1/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vaultPath: configuredVaultPath }),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.error || 'Could not open the configured notes vault')
+    }
+  }, [configuredVaultPath])
 
   const loadNotes = useCallback(async ({ refreshing = false } = {}) => {
     setState((current) => ({ ...current, loading: !refreshing, refreshing, error: '' }))
     try {
+      await ensureVaultPath()
       const response = await fetch('/notes/api/v1/vault/default/notes')
       if (!response.ok) throw new Error('Notes service is unavailable')
       const result = await response.json()
       setNotes(result.notes || [])
-      setState({ loading: false, refreshing: false, saving: false, error: '' })
+      setState({ loading: false, refreshing: false, saving: false, deleting: false, error: '' })
     } catch (error) {
-      setState({ loading: false, refreshing: false, saving: false, error: error.message })
+      setState({ loading: false, refreshing: false, saving: false, deleting: false, error: error.message })
     }
-  }, [])
+  }, [ensureVaultPath])
 
   useEffect(() => { void loadNotes() }, [loadNotes])
 
@@ -385,6 +404,7 @@ function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsP
   }, [decoratedNotes, query, scope])
 
   const beginNote = (note = null) => {
+    setPendingDeleteId(null)
     setEditor(note ? { ...note, isNew: false } : {
       id: crypto.randomUUID(),
       title: '',
@@ -412,42 +432,120 @@ function NotesServiceView({ workspaces, activeWorkspaceId, settings, onSettingsP
       setNotes((current) => [...current.filter((note) => note.id !== editor.id), { ...saved, title, workspaceId }])
       setScope((current) => current === 'all' ? current : workspaceId || 'all')
       setEditor(null)
-      setState({ loading: false, refreshing: false, saving: false, error: '' })
+      setState({ loading: false, refreshing: false, saving: false, deleting: false, error: '' })
     } catch (error) {
       setState((current) => ({ ...current, saving: false, error: error.message }))
     }
   }
 
+  const cancelDeleteNote = () => {
+    if (state.deleting) return
+    setPendingDeleteId(null)
+  }
+
+  const confirmDeleteNote = async (note) => {
+    if (!note?.id || state.deleting) return
+    if (pendingDeleteId !== note.id) {
+      setPendingDeleteId(note.id)
+      return
+    }
+    setState((current) => ({ ...current, deleting: true, error: '' }))
+    try {
+      const folder = String(note.folder || '').trim()
+      const params = folder ? `?folder=${encodeURIComponent(folder)}` : ''
+      const response = await fetch('/notes/api/v1/vault/default/notes/' + encodeURIComponent(note.id) + params, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error('Could not delete the note')
+      await onSettingsPatch?.({ metadata: { [note.id]: null } })
+      setNotes((current) => current.filter((entry) => entry.id !== note.id))
+      setPendingDeleteId(null)
+      if (editor?.id === note.id) setEditor(null)
+      setState({ loading: false, refreshing: false, saving: false, deleting: false, error: '' })
+    } catch (error) {
+      setState((current) => ({ ...current, deleting: false, error: error.message }))
+    }
+  }
+
   return (
-    <div className="notes-service-view">
-      <header className="mail-unified-header notes-unified-header">
-        <div className="mail-brand"><NotebookPen /><h2>Notes</h2></div>
-        <form className="mail-search" onSubmit={(event) => event.preventDefault()}>
-          <input aria-label="Search notes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes…" />
-          <VoiceSearchButton label="Voice notes search" onTranscript={setQuery} onError={(message) => setState((current) => ({ ...current, error: message }))} />
-          <button type="submit" aria-label="Search notes"><Search /></button>
-        </form>
-        <div className="mail-account-tabs" aria-label="Notes workspace">
-          <button type="button" className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
-          {workspaces.map((workspace) => <button type="button" key={workspace.id} className={scope === workspace.id ? 'active' : ''} title={workspace.name} onClick={() => setScope(workspace.id)}>{workspace.name}</button>)}
-        </div>
-        <div className="mail-toolbar-actions">
-          <button type="button" className="primary" onClick={() => beginNote()}><Plus /><span>New note</span></button>
-          <button type="button" className={'mail-refresh ' + (state.refreshing ? 'refreshing' : '')} onClick={() => void loadNotes({ refreshing: true })} aria-label="Refresh notes"><RefreshCw /></button>
-        </div>
-        <button type="button" className="mail-close" onClick={onClose} aria-label="Close notes"><X /></button>
-      </header>
+    <div className={`notes-service-view${editor ? ' is-editing' : ''}`}>
+      {!editor && (
+        <header className="mail-unified-header notes-unified-header">
+          <div className="mail-brand"><NotebookPen /><h2>Notes</h2></div>
+          <form className="mail-search" onSubmit={(event) => event.preventDefault()}>
+            <input aria-label="Search notes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes…" />
+            <VoiceSearchButton label="Voice notes search" onTranscript={setQuery} onError={(message) => setState((current) => ({ ...current, error: message }))} />
+            <button type="submit" aria-label="Search notes"><Search /></button>
+          </form>
+          <div className="mail-account-tabs" aria-label="Notes workspace">
+            <button type="button" className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
+            {workspaces.map((workspace) => <button type="button" key={workspace.id} className={scope === workspace.id ? 'active' : ''} title={workspace.name} onClick={() => setScope(workspace.id)}>{workspace.name}</button>)}
+          </div>
+          <div className="mail-toolbar-actions">
+            <button type="button" className="primary" onClick={() => beginNote()}><Plus /><span>New note</span></button>
+            <button type="button" className={'mail-refresh ' + (state.refreshing ? 'refreshing' : '')} onClick={() => void loadNotes({ refreshing: true })} aria-label="Refresh notes"><RefreshCw /></button>
+          </div>
+          <button type="button" className="mail-close" onClick={onClose} aria-label="Close notes"><X /></button>
+        </header>
+      )}
       {state.error && <div className="service-state error">{state.error}</div>}
       {editor ? <form className="notes-editor" onSubmit={saveNote}>
-        <header><button type="button" className="mail-back" onClick={() => setEditor(null)}><ArrowLeft /> Notes</button><span>{editor.isNew ? 'New note' : 'Editing note'}</span></header>
+        <header>
+          <button type="button" className="mail-back" onClick={() => setEditor(null)}><ArrowLeft /> Notes</button>
+          <span>{editor.isNew ? 'New note' : 'Editing note'}</span>
+          <button type="button" className="mail-close" onClick={onClose} aria-label="Close notes"><X /></button>
+        </header>
         <input autoFocus aria-label="Note title" value={editor.title} onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))} placeholder="Untitled note" />
         <label><span>Workspace</span><select aria-label="Note workspace" value={editor.workspaceId || ''} onChange={(event) => setEditor((current) => ({ ...current, workspaceId: event.target.value }))}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
         <textarea aria-label="Note content" value={editor.content} onChange={(event) => setEditor((current) => ({ ...current, content: event.target.value }))} placeholder="Start writing…" />
-        <footer><span /><button type="button" onClick={() => setEditor(null)}>Cancel</button><button type="submit" className="primary" disabled={state.saving}><Save />{state.saving ? 'Saving…' : 'Save note'}</button></footer>
+        <footer>
+          <span />
+          {!editor.isNew && (
+            <button
+              type="button"
+              className={`danger notes-editor-delete${pendingDeleteId === editor.id ? ' confirming' : ''}`}
+              disabled={state.deleting}
+              onClick={() => void confirmDeleteNote(editor)}
+            >
+              <Trash2 />
+              {pendingDeleteId === editor.id ? (state.deleting ? 'Deleting…' : 'Confirm delete') : 'Delete note'}
+            </button>
+          )}
+          <button type="button" onClick={() => { setPendingDeleteId(null); setEditor(null) }}>Cancel</button>
+          <button type="submit" className="primary" disabled={state.saving || state.deleting}><Save />{state.saving ? 'Saving…' : 'Save note'}</button>
+        </footer>
       </form> : <>
         {state.loading && <div className="service-state">Loading notes…</div>}
         {!state.loading && <div className="notes-service-list">
-          {visibleNotes.map((note) => <article key={note.id}><NotebookPen /><span>{scope === 'all' && note.workspaceId && <small className="mail-account-badge">{workspaces.find((workspace) => workspace.id === note.workspaceId)?.name || 'Workspace'}</small>}<strong>{note.title}</strong><p><LinkifiedText text={String(note.content || '').slice(0, 220) || 'Empty note'} openInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} /></p></span><button type="button" className="notes-edit-note" onClick={() => beginNote(note)} aria-label={'Edit ' + note.title}><PenLine /></button></article>)}
+          {visibleNotes.map((note) => {
+            const confirming = pendingDeleteId === note.id
+            return (
+              <article key={note.id} className={confirming ? 'notes-row-confirming' : undefined} onMouseLeave={() => pendingDeleteId === note.id && !state.deleting && cancelDeleteNote()}>
+                <button type="button" className="notes-open-note" onClick={() => beginNote(note)} aria-label={`Open ${note.title}`}>
+                  <NotebookPen />
+                  <span>
+                    {scope === 'all' && note.workspaceId && <small className="mail-account-badge">{workspaces.find((workspace) => workspace.id === note.workspaceId)?.name || 'Workspace'}</small>}
+                    <strong>{note.title}</strong>
+                    <p>{String(note.content || '').slice(0, 220) || 'Empty note'}</p>
+                  </span>
+                </button>
+                <div className="notes-row-actions">
+                  <button type="button" className="notes-edit-note" onClick={() => beginNote(note)} aria-label={'Edit ' + note.title} title="Edit note"><PenLine /></button>
+                  <button
+                    type="button"
+                    className={`notes-delete-note${confirming ? ' confirming' : ''}`}
+                    disabled={state.deleting && confirming}
+                    onClick={() => void confirmDeleteNote(note)}
+                    aria-label={confirming ? `Confirm delete ${note.title}` : `Delete ${note.title}`}
+                    title={confirming ? 'Click again to delete from vault' : 'Delete note'}
+                  >
+                    <Trash2 />
+                    {confirming && <span>{state.deleting ? 'Deleting…' : 'Confirm'}</span>}
+                  </button>
+                </div>
+              </article>
+            )
+          })}
           {!visibleNotes.length && <div className="service-state">{query ? 'No notes match this search.' : scope === 'all' ? 'No notes found in the mounted vault.' : 'No notes in this workspace yet.'}</div>}
         </div>}
       </>}
@@ -1001,7 +1099,7 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
   if (kind === 'notes') {
     return (
       <section className="service-rail-view notes-service" aria-label="Notes">
-        <NotesServiceView workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} settings={notesSettings} onSettingsPatch={onNotesSettingsPatch} openLinksInNewTab={openLinksInNewTab} onOpenInline={onOpenInline} onClose={onClose} />
+        <NotesServiceView workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} settings={notesSettings} onSettingsPatch={onNotesSettingsPatch} onClose={onClose} />
       </section>
     )
   }

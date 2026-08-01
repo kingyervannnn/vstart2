@@ -3,7 +3,7 @@ import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Paperclip, S
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
-import { externalImageSearchUrl, externalSearchUrl } from '../lib/searchEngines.js'
+import { externalImageSearchUrl, externalSearchUrl, normalizeNavigableUrl } from '../lib/searchEngines.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx'
@@ -29,6 +29,7 @@ export function SearchDock({
   onWorkspaceLayoutCommit,
   onInlineResults,
   onInlineImageSearch,
+  onOpenUrl,
   onOpenShortcut,
   onLocateShortcut,
   onShortcutFilterChange,
@@ -449,6 +450,19 @@ export function SearchDock({
       }
       return
     }
+
+    // Pasted/typed web addresses open as destinations, not engine queries.
+    const navigableUrl = !imageMode ? normalizeNavigableUrl(value) : null
+    if (navigableUrl) {
+      if (inline) {
+        onOpenUrl?.(navigableUrl)
+      } else {
+        window.open(navigableUrl, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
+      }
+      setQuery('')
+      return
+    }
+
     if (inline) {
       if (imageMode) return onInlineImageSearch?.({ query: value, category: 'images', visualUrl: null })
       return onInlineResults(value)

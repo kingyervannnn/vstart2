@@ -39,6 +39,10 @@ export function deepMerge(target, patch) {
   const result = { ...(target && typeof target === 'object' && !Array.isArray(target) ? target : {}) }
   for (const [key, value] of Object.entries(patch)) {
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue
+    if (value === null) {
+      delete result[key]
+      continue
+    }
     result[key] = value && typeof value === 'object' && !Array.isArray(value)
       ? deepMerge(result[key], value)
       : value
