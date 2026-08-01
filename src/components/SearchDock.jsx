@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Paperclip, Send, Sparkles, Square, X } from 'lucide-react'
+import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Paperclip, Search, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
 import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
@@ -601,6 +601,7 @@ export function SearchDock({
   const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible)
   const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
   const clearVisible = query.length > 0 && !recording
+  const searchReady = Boolean(query.trim() || imageAttachment) && !imageBusy
   const searchBlur = Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))
   const dockStyle = agentMode
     ? { '--search-blur': `${searchBlur}px` }
@@ -649,6 +650,7 @@ export function SearchDock({
           <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
+          <button type="submit" className="search-submit" disabled={!searchReady} aria-label="Search">{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
         </>}
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
