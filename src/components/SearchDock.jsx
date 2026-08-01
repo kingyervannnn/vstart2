@@ -601,7 +601,7 @@ export function SearchDock({
   const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible)
   const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
   const clearVisible = query.length > 0 && !recording
-  const searchReady = Boolean(query.trim() || imageAttachment) && !imageBusy
+  const submitReady = Boolean(query.trim() || imageAttachment) && !imageBusy && !recording
   const searchBlur = Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))
   const dockStyle = agentMode
     ? { '--search-blur': `${searchBlur}px` }
@@ -647,10 +647,10 @@ export function SearchDock({
             ? <VoiceWaveform levels={voiceLevels} />
             : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : inline ? 'Search inline with SearXNG…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
-          <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
+          <button type="submit" className="search-submit" aria-label="Search" disabled={!submitReady}>{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
           <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
+          <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
           <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
-          <button type="submit" className="search-submit" disabled={!searchReady} aria-label="Search">{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
         </>}
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}

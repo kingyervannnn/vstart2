@@ -23,6 +23,11 @@ const baseProps = {
   onAgentToggle: vi.fn(),
 }
 
+function dropImage(container) {
+  const image = new File([new Uint8Array([1, 2, 3])], 'reference.png', { type: 'image/png' })
+  fireEvent.drop(container.querySelector('form'), { dataTransfer: { types: ['Files'], files: [image] } })
+}
+
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ suggestions: [] }) }))
 })
@@ -35,7 +40,7 @@ afterEach(() => {
 })
 
 describe('search dock submit button', () => {
-  it('stays disabled until there is something to search', () => {
+  it('stays on show but only becomes usable once there is a query', () => {
     render(<SearchDock {...baseProps} onInlineResults={vi.fn()} />)
 
     const button = screen.getByRole('button', { name: 'Search' })
@@ -46,6 +51,19 @@ describe('search dock submit button', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'weather' } })
     expect(button.disabled).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search text' }))
+    expect(button.disabled).toBe(true)
+  })
+
+  it('stays usable for an attached image with no typed query', async () => {
+    const { container } = render(<SearchDock {...baseProps} onInlineResults={vi.fn()} />)
+
+    dropImage(container)
+    await screen.findByRole('button', { name: 'Remove attached image' })
+
+    expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('')
+    expect(screen.getByRole('button', { name: 'Search' }).disabled).toBe(false)
   })
 
   it('runs the external search when clicked', () => {
