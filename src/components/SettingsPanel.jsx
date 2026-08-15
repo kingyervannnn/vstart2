@@ -10,6 +10,7 @@ import { mailBridge } from '../lib/mailBridge.js'
 import { musicApi } from '../lib/music.js'
 
 const DEFAULT_NOTES_VAULT_PATH = '/Users/vbitzx/SYNC/Vaults'
+const DEFAULT_HERMES_SERVER_URL = 'http://127.0.0.1:8788'
 
 const PAGES = [
   ['general', 'General', SlidersHorizontal],
@@ -321,15 +322,15 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <label className="setting-field"><span>Hermes connection</span>
                 <select value={settings.agent?.connectionMode || 'local'} onChange={(event) => onPatch({ agent: { connectionMode: event.target.value } })}>
                   <option value="local">Local agent bridge (spawn tui_gateway)</option>
-                  <option value="webui">Hermes WebUI / tailnet server</option>
+                  <option value="webui">Hermes WebUI server</option>
                 </select>
               </label>
               {(settings.agent?.connectionMode || 'local') === 'webui' && <>
                 <label className="setting-field"><span>Hermes server URL</span>
                   <input
                     className="text-setting-input"
-                    defaultValue={settings.agent?.remoteUrl || 'https://vahagns-macbook-pro.tail030d61.ts.net:8788'}
-                    placeholder="https://host.tailnet:8788"
+                    defaultValue={settings.agent?.remoteUrl || DEFAULT_HERMES_SERVER_URL}
+                    placeholder={DEFAULT_HERMES_SERVER_URL}
                     onBlur={(event) => {
                       const value = event.target.value.trim()
                       if (value && value !== settings.agent?.remoteUrl) onPatch({ agent: { remoteUrl: value } })
@@ -351,7 +352,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                         try {
                           const { getSharedAgentBridgeClient } = await import('../lib/agentBridge.js')
                           const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
-                          const remoteUrl = settings.agent?.remoteUrl || 'https://vahagns-macbook-pro.tail030d61.ts.net:8788'
+                          const remoteUrl = settings.agent?.remoteUrl || DEFAULT_HERMES_SERVER_URL
                           await client.configureConnection({ mode: 'webui', remoteUrl, password })
                           onPatch({ agent: { connectionMode: 'webui', remoteUrl, remoteConfigured: true } })
                           setAgentConnectionStatus({ state: 'ready', detail: 'Connected to Hermes WebUI.' })
@@ -362,7 +363,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                     }}
                   />
                 </label>
-                <p className="field-help">Password is stored only on this Mac inside the agent-bridge secret file (mode 0600), not in PostgreSQL. URL can be the Tailscale HTTPS address you already use for Hermes WebUI.</p>
+                <p className="field-help">Password is stored only on this Mac inside the agent-bridge secret file (mode 0600), not in PostgreSQL. When Hermes runs on the same Mac, use 127.0.0.1 for the fastest and most durable route; phones still connect through V Start.</p>
                 {agentConnectionStatus.state !== 'idle' && (
                   <p className={`field-help ${agentConnectionStatus.state === 'error' ? 'is-error' : ''}`} role="status">
                     {agentConnectionStatus.detail}
@@ -394,7 +395,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <Toggle label="Show tool activity" checked={settings.agent?.showToolActivity !== false} onChange={(value) => onPatch({ agent: { showToolActivity: value } })} />
               <Toggle label="Show token usage" checked={settings.agent?.showUsage} onChange={(value) => onPatch({ agent: { showUsage: value } })} />
               <Toggle label="Workspace-specific agent defaults" detail="Stores working-directory and model preferences in PostgreSQL." checked={settings.agent?.workspaceDefaultsEnabled !== false} onChange={(value) => onPatch({ agent: { workspaceDefaultsEnabled: value } })} />
-              <div className="setting-note"><strong>Provider credentials stay in Hermes.</strong><span>V Start never stores model API keys. The optional WebUI password is a host-local bridge secret used only to authenticate to your Hermes server on the tailnet.</span></div>
+              <div className="setting-note"><strong>Provider credentials stay in Hermes.</strong><span>V Start never stores model API keys. The optional WebUI password is a host-local bridge secret used only to authenticate the bridge to your Hermes server.</span></div>
             </>}
             {page === 'appearance' && <>
               <h3>Appearance</h3>

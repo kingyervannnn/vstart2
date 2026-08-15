@@ -1,11 +1,11 @@
 import { EventEmitter } from 'node:events'
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
+import { Agent as HttpAgent, request as httpRequest } from 'node:http'
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { URL } from 'node:url'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
-function requestOnce({ url, method = 'GET', headers = {}, body, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+function requestOnce({ url, method = 'GET', headers = {}, body, timeoutMs = DEFAULT_TIMEOUT_MS, agent }) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url)
     const lib = parsed.protocol === 'https:' ? httpsRequest : httpRequest
@@ -16,6 +16,7 @@ function requestOnce({ url, method = 'GET', headers = {}, body, timeoutMs = DEFA
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: `${parsed.pathname}${parsed.search}`,
       method,
+      agent,
       headers: {
         ...headers,
         ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': String(payload.length) } : {}),
@@ -65,6 +66,8 @@ export class HermesWebuiClient extends EventEmitter {
     this.cookie = ''
     this.ready = false
     this.profile = 'default'
+    this.httpAgent = new HttpAgent({ keepAlive: true, keepAliveMsecs: 30_000, maxSockets: 8, maxFreeSockets: 4 })
+    this.httpsAgent = new HttpsAgent({ keepAlive: true, keepAliveMsecs: 30_000, maxSockets: 8, maxFreeSockets: 4 })
   }
 
   get isRunning() {
@@ -89,6 +92,8 @@ export class HermesWebuiClient extends EventEmitter {
   async stop() {
     this.ready = false
     this.cookie = ''
+    this.httpAgent.destroy()
+    this.httpsAgent.destroy()
   }
 
   async login() {
@@ -97,6 +102,7 @@ export class HermesWebuiClient extends EventEmitter {
       method: 'POST',
       body: { password: this.password },
       timeoutMs: this.timeoutMs,
+      agent: this.#agentFor(this.baseUrl),
     })
     if (response.status === 401) throw new Error('Invalid Hermes WebUI password')
     if (response.status === 429) throw new Error('Hermes WebUI login rate limited')
@@ -114,6 +120,7 @@ export class HermesWebuiClient extends EventEmitter {
       method,
       body,
       timeoutMs: this.timeoutMs,
+      agent: this.#agentFor(this.baseUrl),
       headers: this.cookie ? { Cookie: this.cookie } : {},
     })
     if ((response.status === 401 || response.status === 403) && retryAuth) {
@@ -238,7 +245,7 @@ export class HermesWebuiClient extends EventEmitter {
     return this.json('POST', '/api/chat/steer', { session_id: sessionId, text })
   }
 
-  openEventStream(path) {
+  openEventStream(path, { retryAuth = true } = {}) {
     const parsed = new URL(`${this.baseUrl}${path}`)
     const lib = parsed.protocol === 'https:' ? httpsRequest : httpRequest
     return new Promise((resolve, reject) => {
@@ -248,12 +255,20 @@ export class HermesWebuiClient extends EventEmitter {
         port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
         path: `${parsed.pathname}${parsed.search}`,
         method: 'GET',
+        agent: this.#agentFor(parsed),
         headers: {
           Accept: 'text/event-stream',
           Cookie: this.cookie,
         },
       }, (response) => {
         if (response.statusCode === 401 || response.statusCode === 403) {
+          response.resume()
+          if (retryAuth) {
+            void this.login()
+              .then(() => this.openEventStream(path, { retryAuth: false }))
+              .then(resolve, reject)
+            return
+          }
           reject(Object.assign(new Error('Hermes WebUI stream unauthorized'), { status: response.statusCode }))
           return
         }
@@ -293,6 +308,11 @@ export class HermesWebuiClient extends EventEmitter {
         yield { event, data }
       }
     }
+  }
+
+  #agentFor(url) {
+    const parsed = url instanceof URL ? url : new URL(url)
+    return parsed.protocol === 'https:' ? this.httpsAgent : this.httpAgent
   }
 
   #normalizeSession(session = {}) {

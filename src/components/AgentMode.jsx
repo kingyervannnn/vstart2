@@ -221,10 +221,6 @@ export const AgentMode = forwardRef(function AgentMode({
           for (const result of results) if (result.status === 'rejected') initialControlErrors.push(result.reason?.message || 'A Hermes default could not be applied.')
         }
         if (initialControlErrors.length) setControlError(initialControlErrors.join(' · '))
-        hasConnectedRef.current = true
-        reconnectAttemptRef.current = 0
-        setConnection({ state: 'ready', message: '', health })
-
         if (targetSessionId && targetSessionId !== 'new') {
           linkedRef.current = true
           void onSessionLinked(workspace.id, targetSessionId).catch(() => {})
@@ -295,6 +291,8 @@ export const AgentMode = forwardRef(function AgentMode({
                 eventCursorRef.current = Math.max(eventCursorRef.current, cursor)
                 streamOpened = true
                 streamAttempt = 0
+                hasConnectedRef.current = true
+                reconnectAttemptRef.current = 0
                 if (!cancelled) setConnection({ state: 'ready', message: '', health })
               },
             })

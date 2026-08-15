@@ -1,15 +1,15 @@
-# Agent Mode ↔ Hermes connection (local bridge + WebUI/tailnet)
+# Agent Mode ↔ Hermes connection (local bridge + WebUI)
 
 Status: implemented  
-Last updated: 2026-07-21
+Last updated: 2026-08-15
 
 ## Goal
 
-Make V Start 2 Agent Mode attach to the same durable Hermes server you already open in the browser:
+Make V Start 2 Agent Mode attach to a durable Hermes WebUI server through the host bridge. When both services run on the same machine, the recommended upstream is:
 
-`https://vahagns-macbook-pro.tail030d61.ts.net:8788`
+`http://127.0.0.1:8788`
 
-with URL + password, instead of only spawning a private `tui_gateway` child under the agent bridge.
+This avoids tailnet DNS and TLS on the local hop. Remote browsers still reach Agent Mode through V Start's own origin; they do not need direct access to port 8788. A tailnet URL remains valid when the Hermes server truly runs on another host.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ V Start UI
   → /agent-bridge (nginx → host :3120)
   → agent-bridge (loopback typed API)
        ├─ mode=local  → spawn python -m tui_gateway.entry (stdio JSON-RPC)
-       └─ mode=webui  → HTTPS login + REST/SSE against Hermes WebUI
+       └─ mode=webui  → HTTP(S) login + REST/SSE against Hermes WebUI
 ```
 
 Important distinction:
@@ -36,7 +36,7 @@ V Start’s WebUI mode targets the **WebUI** contract (`POST /api/auth/login`, `
 
 **Settings → Agent**
 
-- Hermes connection: `Local agent bridge` or `Hermes WebUI / tailnet server`
+- Hermes connection: `Local agent bridge` or `Hermes WebUI server`
 - Hermes server URL (Postgres settings key `agent.remoteUrl`)
 - Server password (write-only; saved on host via bridge)
 
@@ -45,7 +45,7 @@ Postgres stores only:
 ```json
 {
   "connectionMode": "webui",
-  "remoteUrl": "https://vahagns-macbook-pro.tail030d61.ts.net:8788",
+  "remoteUrl": "http://127.0.0.1:8788",
   "remoteConfigured": true
 }
 ```
@@ -71,20 +71,19 @@ Bridge env overrides (optional):
 
 ```sh
 # 1) Ensure Hermes WebUI is up on :8788 (launchd com.parantoux.hermes-webui)
-# 2) Ensure Tailscale serve publishes :8788
-# 3) Save connection (password never printed)
+# 2) Save connection (password never printed)
 node -e "
 import { saveConnectionConfig } from './agent-bridge/connection-config.mjs'
 console.log(await saveConnectionConfig({
   mode: 'webui',
-  remoteUrl: 'https://vahagns-macbook-pro.tail030d61.ts.net:8788',
+  remoteUrl: 'http://127.0.0.1:8788',
   password: process.env.HERMES_WEBUI_PASSWORD,
 }))
 "
 
 npm run agent:bridge:manage -- restart
 
-# 4) Verify
+# 3) Verify
 curl -sS -X POST http://127.0.0.1:3120/v1/handshake \
   -H 'Content-Type: application/json' -H 'Origin: http://127.0.0.1:3000' -d '{}'
 # then health with nonce → backend=webui, safe=true, no tui_gateway child
@@ -95,6 +94,8 @@ Or use Settings → Agent → WebUI fields and blur-save the password.
 ## Snappiness notes
 
 - WebUI mode does **not** spawn `tui_gateway.entry`, so it avoids the slash_worker pile that was under the old local gateway child.
+- The bridge pools keep-alive connections to Hermes, retries transient WebUI startup failures with capped backoff, and renews an expired stream login once.
+- V Start prewarms inventory and a session at page load. Failed warmups retry quickly, while successful warmups refresh every four minutes.
 - 2026-07-21 cleanup killed **95** slash_workers under bridge gateway PID 24904 only. Claude, DPMS, Hermes Desktop, and `:8788` were left alone.
 - Dual runtimes can still coexist: Hermes Desktop `hermes serve`, Hermes WebUI, and V Start bridge. Prefer WebUI mode for Agent Mode when you want one warm server.
 

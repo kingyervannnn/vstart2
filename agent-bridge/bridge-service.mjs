@@ -30,6 +30,7 @@ export class AgentBridgeService {
     defaultCwd = process.cwd(),
     maxRestartAttempts = MAX_RESTART_ATTEMPTS,
     connection = null,
+    webuiFactory = (options) => new HermesWebuiClient(options),
   } = {}) {
     this.defaultCwd = resolve(defaultCwd)
     this.maxRestartAttempts = maxRestartAttempts
@@ -46,6 +47,7 @@ export class AgentBridgeService {
     this.connection = connection || (gateway
       ? { mode: 'local', remoteUrl: '', password: '', source: 'injected' }
       : null)
+    this.webuiFactory = webuiFactory
     this.backend = 'local'
     this.webui = null
     this.gateway = gateway
@@ -478,7 +480,8 @@ export class AgentBridgeService {
 
   async #startWebui() {
     try {
-      this.webui = new HermesWebuiClient({
+      await this.webui?.stop()
+      this.webui = this.webuiFactory({
         baseUrl: this.connection.remoteUrl,
         password: this.connection.password,
       })
@@ -503,6 +506,7 @@ export class AgentBridgeService {
       this.broker.publish('gateway.unavailable', {
         payload: { message: error.message || 'Hermes WebUI is unavailable', backend: 'webui' },
       })
+      this.#scheduleRestart()
     }
   }
 
@@ -529,6 +533,7 @@ export class AgentBridgeService {
       this.gatewayReady = false
       this.lastError = error.message
       this.broker.publish('gateway.unavailable', { payload: { message: 'Hermes gateway is unavailable', backend: 'local' } })
+      this.#scheduleRestart()
     }
   }
 
@@ -560,9 +565,10 @@ export class AgentBridgeService {
   }
 
   #scheduleRestart() {
-    if (this.backend !== 'local') return
-    if (this.restartTimer || this.restartAttempts >= this.maxRestartAttempts) {
-      if (this.restartAttempts >= this.maxRestartAttempts) {
+    if (this.stopping || !this.started) return
+    const restartLimitReached = this.backend === 'local' && this.restartAttempts >= this.maxRestartAttempts
+    if (this.restartTimer || restartLimitReached) {
+      if (restartLimitReached) {
         this.broker.publish('gateway.unavailable', { payload: { message: 'Hermes restart limit reached' } })
       }
       return
@@ -572,8 +578,8 @@ export class AgentBridgeService {
     this.broker.publish('gateway.restarting', { payload: { attempt: this.restartAttempts, delayMs } })
     this.restartTimer = setTimeout(async () => {
       this.restartTimer = null
-      await this.#startGateway()
-      if (!this.gatewayReady) this.#scheduleRestart()
+      if (this.stopping || !this.started) return
+      await this.#startBackend()
     }, delayMs)
     this.restartTimer.unref?.()
   }

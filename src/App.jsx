@@ -267,16 +267,32 @@ export function App() {
   useEffect(() => {
     if (!appReady || agentMode || settings.agent?.enabled === false) return undefined
     let active = true
+    let timer = 0
+    let retryAttempt = 0
     const client = getSharedAgentBridgeClient({ baseUrl: settings.agent?.bridgeUrl })
-    const warm = (force = false) => {
-      if (!active) return
-      void client.prewarm({ createSession: true, force }).catch(() => {})
+    const schedule = (delay, force) => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => void warm(force), delay)
     }
-    warm()
-    const timer = window.setInterval(() => warm(true), 4 * 60 * 1_000)
+    const warm = async (force = false) => {
+      if (!active) return
+      try {
+        const snapshot = await client.prewarm({ createSession: true, force })
+        if (!active) return
+        if (!snapshot.health?.safe) throw new Error('Hermes is not ready yet')
+        retryAttempt = 0
+        schedule(4 * 60 * 1_000, true)
+      } catch {
+        if (!active) return
+        const delay = Math.min(30_000, 1_000 * (2 ** Math.min(retryAttempt, 5)))
+        retryAttempt += 1
+        schedule(delay, true)
+      }
+    }
+    void warm()
     return () => {
       active = false
-      window.clearInterval(timer)
+      window.clearTimeout(timer)
     }
   }, [agentMode, appReady, settings.agent?.bridgeUrl, settings.agent?.enabled])
 
