@@ -125,6 +125,14 @@ function removeBackgroundReferences(document, assetId, removedCollectionIds = []
     }))
   }
   if (removedCollectionIds.includes(rotation.collectionId)) rotation.collectionId = null
+  if (rotation.workspaceSettings && typeof rotation.workspaceSettings === 'object') {
+    rotation.workspaceSettings = Object.fromEntries(Object.entries(rotation.workspaceSettings).map(([workspaceId, workspaceRotation]) => [
+      workspaceId,
+      removedCollectionIds.includes(workspaceRotation?.collectionId)
+        ? { ...workspaceRotation, collectionId: null }
+        : workspaceRotation,
+    ]))
+  }
 
   backgrounds.rotation = rotation
   next.backgrounds = backgrounds

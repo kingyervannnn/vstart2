@@ -43,7 +43,16 @@ function renderSettings(overrides = {}) {
       backgrounds: {
         workspaceSpecific: true,
         globalAssetId: 'global-image',
-        rotation: { enabled: true, scope: 'workspace', workspacePools: { home: ['home-image'], work: [] } },
+        rotation: {
+          enabled: true,
+          scope: 'all',
+          intervalMinutes: 60,
+          workspaceSettings: {
+            home: { enabled: false, scope: 'all', intervalMinutes: 15 },
+            work: { enabled: true, scope: 'workspace', intervalMinutes: 30 },
+          },
+          workspacePools: { home: ['home-image'], work: [] },
+        },
       },
     }}
     workspaces={workspaces}
@@ -94,6 +103,23 @@ describe('workspace-specific background settings', () => {
     expect(callbacks.onRotateBackground).toHaveBeenCalledWith({ workspaceId: 'work' })
   })
 
+  it('keeps rotation controls independent between workspace tabs', () => {
+    const callbacks = renderSettings()
+    expect(screen.getByRole('checkbox', { name: /Rotate backgrounds/ }).checked).toBe(false)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Work' }))
+    expect(screen.getByRole('checkbox', { name: /Rotate backgrounds/ }).checked).toBe(true)
+    expect(screen.getByRole('combobox', { name: 'Rotation pool' }).value).toBe('workspace')
+    expect(screen.getByDisplayValue('30').value).toBe('30')
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Rotate backgrounds/ }))
+    expect(callbacks.onPatch).toHaveBeenCalledWith({ backgrounds: { rotation: { workspaceSettings: { work: { enabled: false } } } } })
+
+    fireEvent.click(screen.getByRole('tab', { name: /Home/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Rotate backgrounds/ }))
+    expect(callbacks.onPatch).toHaveBeenCalledWith({ backgrounds: { rotation: { workspaceSettings: { home: { enabled: true } } } } })
+  })
+
   it('edits the global fallback independently from workspace selections', () => {
     const callbacks = renderSettings()
     fireEvent.click(screen.getByRole('tab', { name: 'Global fallback' }))
@@ -101,6 +127,8 @@ describe('workspace-specific background settings', () => {
     fireEvent.click(screen.getByTitle('Work image'))
     expect(callbacks.onSelectBackground).toHaveBeenCalledWith('work-image', null)
     expect(screen.queryByRole('button', { name: /Include in .* rotation pool/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Rotate now' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Rotate now' }).disabled).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate now' }))
+    expect(callbacks.onRotateBackground).toHaveBeenCalledWith({ workspaceId: null })
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './backgroundRotation.js'
+import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, nextBackgroundId } from './backgroundRotation.js'
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 const collections = [{ id: 'folder-1', name: 'Landscapes', assetIds: ['b', 'c', 'missing'] }]
@@ -11,9 +11,32 @@ describe('background rotation', () => {
   })
 
   it('uses a workspace pool only when workspace backgrounds are enabled', () => {
-    const rotation = { scope: 'workspace', workspacePools: { home: ['c', 'a', 'missing'] } }
+    const rotation = { workspaceSettings: { home: { scope: 'workspace' } }, workspacePools: { home: ['c', 'a', 'missing'] } }
     expect(backgroundRotationCandidates({ settings: { backgrounds: { workspaceSpecific: true, rotation } }, assets, collections, workspaceId: 'home' })).toEqual(['c', 'a'])
-    expect(backgroundRotationCandidates({ settings: { backgrounds: { workspaceSpecific: false, rotation } }, assets, collections, workspaceId: 'home' })).toEqual([])
+    expect(backgroundRotationCandidates({ settings: { backgrounds: { workspaceSpecific: false, rotation: { ...rotation, scope: 'workspace' } } }, assets, collections, workspaceId: 'home' })).toEqual([])
+  })
+
+  it('resolves independent rotation settings for every workspace', () => {
+    const settings = {
+      backgrounds: {
+        workspaceSpecific: true,
+        rotation: {
+          enabled: true,
+          scope: 'folder',
+          intervalMinutes: 60,
+          workspaceSettings: {
+            home: { enabled: false, scope: 'all', intervalMinutes: 5 },
+            work: { enabled: true, scope: 'workspace', intervalMinutes: 30 },
+          },
+          workspacePools: { work: ['a', 'b'] },
+        },
+      },
+    }
+
+    expect(backgroundRotationSettings(settings, 'home')).toMatchObject({ enabled: false, scope: 'all', intervalMinutes: 5 })
+    expect(backgroundRotationSettings(settings, 'work')).toMatchObject({ enabled: true, scope: 'workspace', intervalMinutes: 30 })
+    expect(backgroundRotationSettings(settings, 'new-workspace')).toMatchObject({ enabled: false, scope: 'all', intervalMinutes: 15 })
+    expect(backgroundRotationSettings(settings)).toMatchObject({ enabled: true, scope: 'folder', intervalMinutes: 60 })
   })
 
   it('advances cyclically and clamps user intervals', () => {

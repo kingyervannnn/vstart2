@@ -7,7 +7,7 @@ import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from './lib/viewRoute.js'
-import { backgroundRotationCandidates, backgroundRotationInterval, nextBackgroundId } from './lib/backgroundRotation.js'
+import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, nextBackgroundId } from './lib/backgroundRotation.js'
 import { backgroundLayerVariables, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
@@ -35,6 +35,7 @@ const BACKGROUND_ROTATION_LOCK = 'vstart2-background-rotation-leader'
 const BACKGROUND_ROTATION_CHANNEL = 'vstart2-background-rotation'
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const MAX_BACKGROUND_BYTES = 300 * 1024 * 1024
+const EMPTY_SETTINGS = {}
 
 function backgroundMimeType(file) {
   if (BACKGROUND_MIME_TYPES.has(file.type)) return file.type
@@ -171,7 +172,8 @@ export function App() {
   const activeWorkspace = routedWorkspace || fallbackWorkspace
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
-  const settings = bootstrap?.settings?.document || {}
+  const settings = bootstrap?.settings?.document || EMPTY_SETTINGS
+  const activeBackgroundRotation = useMemo(() => backgroundRotationSettings(settings, activeWorkspace?.id), [activeWorkspace?.id, settings])
   const appReady = bootstrapReady
   const backgroundId = settings.backgrounds?.workspaceSpecific && activeWorkspace?.backgroundAssetId
     ? activeWorkspace.backgroundAssetId
@@ -394,7 +396,7 @@ export function App() {
   }, [activeWorkspace?.id, applyRotatedBootstrap])
 
   useEffect(() => {
-    const rotation = settings.backgrounds?.rotation
+    const rotation = activeBackgroundRotation
     if (!rotation?.enabled) return undefined
     if (rotation.scope === 'workspace' && !settings.backgrounds?.workspaceSpecific) return undefined
     const lockName = `${BACKGROUND_ROTATION_LOCK}:${settings.backgrounds?.workspaceSpecific ? activeWorkspace?.id || 'workspace' : 'global'}`
@@ -429,7 +431,7 @@ export function App() {
       releaseLock?.()
       controller.abort()
     }
-  }, [activeWorkspace?.id, rotateBackground, settings.backgrounds?.rotation, settings.backgrounds?.workspaceSpecific])
+  }, [activeBackgroundRotation, activeWorkspace?.id, rotateBackground, settings.backgrounds?.workspaceSpecific])
 
   const linkAgentSession = useCallback(async (workspaceId, hermesSessionId, titleOverride = null) => {
     const result = await api.linkAgentSession({ workspaceId, hermesSessionId, titleOverride })

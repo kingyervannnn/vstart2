@@ -51,7 +51,8 @@ VALUES (
         "intervalMinutes": 15,
         "scope": "all",
         "collectionId": null,
-        "workspacePools": {}
+        "workspacePools": {},
+        "workspaceSettings": {}
       }
     },
     "workspaces": {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
-import { backgroundRotationInterval } from '../lib/backgroundRotation.js'
+import { backgroundRotationInterval, backgroundRotationSettings } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
 import { DEFAULT_EDGE_GLOW_INTENSITY, DEFAULT_ELEMENT_GLOW_INTENSITY, normalizeGlowIntensity } from '../lib/glowIntensity.js'
@@ -91,14 +91,15 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const musicSources = settings.music?.sources || []
   const weatherLocations = configuredWeatherLocations(settings.widgets)
   const secondaryLocationIds = weatherLocations.secondary.map((location) => location.id)
-  const backgroundRotation = settings.backgrounds?.rotation || {}
+  const storedBackgroundRotation = settings.backgrounds?.rotation || {}
   const backgroundZoom = normalizeBackgroundZoom(settings.backgrounds?.zoomPercent)
-  const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
   const workspaceSpecificBackgrounds = settings.backgrounds?.workspaceSpecific === true
   const backgroundWorkspace = workspaceSpecificBackgrounds && backgroundScope !== 'global'
     ? workspaces.find((workspace) => workspace.id === backgroundScope) || workspaces.find((workspace) => workspace.id === activeWorkspaceId) || workspaces[0]
     : null
   const backgroundTargetWorkspaceId = backgroundWorkspace?.id || null
+  const backgroundRotation = backgroundRotationSettings(settings, backgroundTargetWorkspaceId)
+  const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
   const selectedBackgroundId = backgroundWorkspace
     ? backgroundWorkspace.backgroundAssetId || null
     : settings.backgrounds?.globalAssetId || null
@@ -158,6 +159,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
     await onCreateWorkspace(workspaceName.trim())
     setWorkspaceName('')
   }
+
+  const patchBackgroundRotation = (patch) => onPatch({
+    backgrounds: {
+      rotation: backgroundWorkspace
+        ? { workspaceSettings: { [backgroundWorkspace.id]: patch } }
+        : patch,
+    },
+  })
 
   const updateMusicSources = (sources, activeSourceId = settings.music?.activeSourceId) => {
     const nextActiveId = sources.some((source) => source.id === activeSourceId && source.enabled !== false)
@@ -421,9 +430,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   {backgroundZoom !== BACKGROUND_ZOOM_DEFAULT && <button type="button" className="background-zoom-reset" onClick={() => onPatch({ backgrounds: { zoomPercent: BACKGROUND_ZOOM_DEFAULT } })}>Reset</button>}
                 </div>
               </div>
-              <Toggle label="Workspace-specific backgrounds" detail="Keeps one background selection and rotation pool per workspace." checked={workspaceSpecificBackgrounds} onChange={(value) => {
+              <Toggle label="Workspace-specific backgrounds" detail="Keeps the selected image and every rotation setting independent per workspace." checked={workspaceSpecificBackgrounds} onChange={(value) => {
                 if (value) setBackgroundScope(activeWorkspaceId || workspaces[0]?.id || 'global')
-                onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && rotationScope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })
+                onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && storedBackgroundRotation.scope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })
               }} />
               {workspaceSpecificBackgrounds && <section className="background-workspace-scopes">
                 <nav className="background-workspace-tabs" role="tablist" aria-label="Background workspace">
@@ -431,22 +440,22 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   {workspaces.map((workspace) => <button key={workspace.id} type="button" role="tab" aria-selected={backgroundWorkspace?.id === workspace.id} className={backgroundWorkspace?.id === workspace.id ? 'active' : ''} onClick={() => setBackgroundScope(workspace.id)}><span>{workspace.name}</span>{workspace.id === activeWorkspaceId && <small>Current</small>}</button>)}
                 </nav>
                 <div className="background-scope-summary" role="tabpanel">
-                  {backgroundWorkspace ? <><span><strong>{backgroundWorkspace.name}</strong><small>/w/{backgroundWorkspace.slug} · Background and rotation pool are independent for this workspace.</small></span>{!backgroundWorkspace.backgroundAssetId && <em>{globalBackground ? `Using global fallback: ${globalBackground.originalName || 'Background'}` : 'Using the default background'}</em>}</> : <><span><strong>Global fallback</strong><small>Used by workspaces that do not have their own background selected.</small></span><em>Shared asset library</em></>}
+                  {backgroundWorkspace ? <><span><strong>{backgroundWorkspace.name}</strong><small>/w/{backgroundWorkspace.slug} · Background, rotation state, source, interval, and pool are independent.</small></span>{!backgroundWorkspace.backgroundAssetId && <em>{globalBackground ? `Using global fallback: ${globalBackground.originalName || 'Background'}` : 'Using the default background'}</em>}</> : <><span><strong>Global fallback</strong><small>Used by workspaces that do not have their own background selected.</small></span><em>Shared asset library</em></>}
                 </div>
               </section>}
               <div className="background-rotation-settings">
-                <Toggle label="Rotate backgrounds" detail="Advances automatically and saves the selected image in PostgreSQL." checked={backgroundRotation.enabled === true} onChange={(value) => onPatch({ backgrounds: { rotation: { enabled: value } } })} />
+                <Toggle label="Rotate backgrounds" detail={backgroundWorkspace ? `Controls rotation only for ${backgroundWorkspace.name}.` : 'Controls the global fallback rotation.'} checked={backgroundRotation.enabled === true} onChange={(value) => patchBackgroundRotation({ enabled: value })} />
                 {backgroundRotation.enabled === true && <div className="background-rotation-controls">
-                  <label className="setting-field"><span>Rotation pool</span><select value={rotationScope} onChange={(event) => onPatch({ backgrounds: { rotation: { scope: event.target.value } } })}>
+                  <label className="setting-field"><span>Rotation pool</span><select value={rotationScope} onChange={(event) => patchBackgroundRotation({ scope: event.target.value })}>
                     <option value="all">All backgrounds</option>
                     <option value="folder">Imported folder</option>
                     {workspaceSpecificBackgrounds && <option value="workspace">Selected workspace pool</option>}
                   </select></label>
-                  {rotationScope === 'folder' && <label className="setting-field"><span>Folder</span><select value={backgroundRotation.collectionId || ''} onChange={(event) => onPatch({ backgrounds: { rotation: { collectionId: event.target.value || null } } })}>
+                  {rotationScope === 'folder' && <label className="setting-field"><span>Folder</span><select value={backgroundRotation.collectionId || ''} onChange={(event) => patchBackgroundRotation({ collectionId: event.target.value || null })}>
                     <option value="">Choose a folder</option>
                     {(backgroundCollections || []).map((collection) => <option key={collection.id} value={collection.id}>{collection.name} · {collection.assetIds.length}</option>)}
                   </select></label>}
-                  <label className="setting-field background-interval-field"><span>Change every</span><span><input key={backgroundRotation.intervalMinutes ?? 15} type="number" min="1" max="1440" step="1" defaultValue={backgroundRotationInterval(backgroundRotation.intervalMinutes)} onBlur={(event) => onPatch({ backgrounds: { rotation: { intervalMinutes: backgroundRotationInterval(event.target.value) } } })} onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()} /> minutes</span></label>
+                  <label className="setting-field background-interval-field"><span>Change every</span><span><input key={`${backgroundTargetWorkspaceId || 'global'}-${backgroundRotation.intervalMinutes ?? 15}`} type="number" min="1" max="1440" step="1" defaultValue={backgroundRotationInterval(backgroundRotation.intervalMinutes)} onBlur={(event) => patchBackgroundRotation({ intervalMinutes: backgroundRotationInterval(event.target.value) })} onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()} /> minutes</span></label>
                   <button type="button" className="background-rotate-now" disabled={!rotationAppliesToBackgroundScope} onClick={async () => {
                     setBackgroundError('')
                     try {

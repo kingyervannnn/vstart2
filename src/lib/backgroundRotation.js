@@ -4,9 +4,24 @@ export function backgroundRotationInterval(value) {
   return Math.max(1, Math.min(1440, Math.round(minutes)))
 }
 
-export function backgroundRotationCandidates({ settings, assets, collections, workspaceId }) {
+export function backgroundRotationSettings(settings, workspaceId) {
   const backgrounds = settings?.backgrounds || {}
   const rotation = backgrounds.rotation || {}
+  if (!backgrounds.workspaceSpecific || !workspaceId) return rotation
+  const workspaceRotation = rotation.workspaceSettings?.[workspaceId] || {}
+  return {
+    enabled: false,
+    intervalMinutes: 15,
+    scope: 'all',
+    collectionId: null,
+    ...workspaceRotation,
+    workspacePools: rotation.workspacePools || {},
+  }
+}
+
+export function backgroundRotationCandidates({ settings, assets, collections, workspaceId }) {
+  const backgrounds = settings?.backgrounds || {}
+  const rotation = backgroundRotationSettings(settings, workspaceId)
   const available = new Set((assets || []).map((asset) => asset.id))
   let ids
 
