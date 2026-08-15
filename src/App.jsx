@@ -356,25 +356,28 @@ export function App() {
     backgroundChannelRef.current?.postMessage({ type: 'background-bootstrap', bootstrap: next })
   }, [applyBootstrap])
 
-  const rotateBackground = useCallback(async ({ automatic = false } = {}) => {
+  const rotateBackground = useCallback(async ({ automatic = false, workspaceId } = {}) => {
     const current = bootstrapRef.current
     const currentSettings = current?.settings?.document || {}
-    const workspace = current?.workspaces?.find((item) => item.id === activeWorkspace?.id)
-    if (!workspace) return { rotated: false, count: 0 }
+    const workspaceSpecific = currentSettings.backgrounds?.workspaceSpecific === true
+    const targetWorkspaceId = workspaceId === undefined ? activeWorkspace?.id : workspaceId
+    const workspace = targetWorkspaceId ? current?.workspaces?.find((item) => item.id === targetWorkspaceId) : null
+    const targetsWorkspace = workspaceSpecific && targetWorkspaceId !== null
+    if (targetsWorkspace && !workspace) return { rotated: false, count: 0 }
     const candidates = backgroundRotationCandidates({
       settings: currentSettings,
       assets: current.backgroundAssets || [],
       collections: current.backgroundCollections || [],
-      workspaceId: workspace.id,
+      workspaceId: targetsWorkspace ? workspace.id : undefined,
     })
-    const currentId = currentSettings.backgrounds?.workspaceSpecific && workspace.backgroundAssetId
+    const currentId = targetsWorkspace && workspace.backgroundAssetId
       ? workspace.backgroundAssetId
       : currentSettings.backgrounds?.globalAssetId
     const nextId = nextBackgroundId(candidates, currentId)
     if (!nextId || nextId === currentId) return { rotated: false, count: candidates.length }
 
     try {
-      if (currentSettings.backgrounds?.workspaceSpecific) {
+      if (targetsWorkspace) {
         const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: nextId, version: workspace.version })
         applyRotatedBootstrap(result.bootstrap)
       } else {
@@ -903,7 +906,7 @@ export function App() {
     applyBootstrap(result.bootstrap)
   }
 
-  const uploadBackgrounds = async (files, collectionName = null) => {
+  const uploadBackgrounds = async (files, collectionName = null, workspaceId = activeWorkspace.id) => {
     const images = Array.from(files || []).filter((file) => backgroundMimeType(file))
     if (!images.length) throw new Error('That selection does not contain a supported image.')
     const oversized = images.find((file) => file.size > MAX_BACKGROUND_BYTES)
@@ -918,8 +921,8 @@ export function App() {
       const uniqueAssetIds = [...new Set(assetIds)]
       const current = bootstrapRef.current
       const currentSettings = current.settings.document
-      const workspace = current.workspaces.find((item) => item.id === activeWorkspace.id)
-      if (currentSettings.backgrounds?.workspaceSpecific) {
+      const workspace = workspaceId ? current.workspaces.find((item) => item.id === workspaceId) : null
+      if (currentSettings.backgrounds?.workspaceSpecific && workspace) {
         const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: uniqueAssetIds[0], version: workspace.version })
         applyBootstrap(result.bootstrap)
         const pools = currentSettings.backgrounds?.rotation?.workspacePools || {}
@@ -935,17 +938,20 @@ export function App() {
     }
   }
 
-  const selectBackground = async (assetId) => {
+  const selectBackground = async (assetId, workspaceId = activeWorkspace.id) => {
     setSavingCount((value) => value + 1)
     try {
-      if (settings.backgrounds?.workspaceSpecific) {
-        const result = await api.updateWorkspace(activeWorkspace.id, { backgroundAssetId: assetId, version: activeWorkspace.version })
+      const current = bootstrapRef.current
+      const currentSettings = current.settings.document
+      const workspace = workspaceId ? current.workspaces.find((item) => item.id === workspaceId) : null
+      if (currentSettings.backgrounds?.workspaceSpecific && workspace) {
+        const result = await api.updateWorkspace(workspace.id, { backgroundAssetId: assetId, version: workspace.version })
         applyBootstrap(result.bootstrap)
         if (assetId) {
           const pools = bootstrapRef.current.settings.document.backgrounds?.rotation?.workspacePools || {}
-          const workspacePool = pools[activeWorkspace.id] || []
+          const workspacePool = pools[workspace.id] || []
           if (!workspacePool.includes(assetId)) {
-            await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [activeWorkspace.id]: [...workspacePool, assetId] } } } })
+            await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [workspace.id]: [...workspacePool, assetId] } } } })
           }
         }
       } else {
@@ -956,14 +962,14 @@ export function App() {
     }
   }
 
-  const toggleWorkspaceBackground = async (assetId) => {
+  const toggleWorkspaceBackground = async (assetId, workspaceId = activeWorkspace.id) => {
     const currentSettings = bootstrapRef.current.settings.document
     const pools = currentSettings.backgrounds?.rotation?.workspacePools || {}
-    const currentPool = pools[activeWorkspace.id] || []
+    const currentPool = pools[workspaceId] || []
     const nextPool = currentPool.includes(assetId)
       ? currentPool.filter((id) => id !== assetId)
       : [...currentPool, assetId]
-    await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [activeWorkspace.id]: nextPool } } } })
+    await patchSettings({ backgrounds: { rotation: { workspacePools: { ...pools, [workspaceId]: nextPool } } } })
   }
 
   const deleteBackground = async (assetId) => {
@@ -1180,7 +1186,7 @@ export function App() {
         onDelete={requestDeleteWorkspace}
       />}
       {workspaceDialog && <WorkspaceDialog workspace={workspaceDialog.workspace} busy={busy} onClose={() => setWorkspaceDialog(null)} onSubmit={saveWorkspaceDialog} />}
-      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} backgroundCollections={bootstrap.backgroundCollections || []} activeBackgroundId={backgroundId || null} activeWorkspaceId={activeWorkspace.id} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={(id) => requestDeleteWorkspace(workspaces.find((workspace) => workspace.id === id))} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackgrounds={uploadBackgrounds} onSelectBackground={selectBackground} onDeleteBackground={deleteBackground} onToggleWorkspaceBackground={toggleWorkspaceBackground} onRotateBackground={rotateBackground} />}
+      {settingsOpen && <SettingsPanel settings={settings} workspaces={workspaces} backgroundAssets={bootstrap.backgroundAssets || []} backgroundCollections={bootstrap.backgroundCollections || []} activeWorkspaceId={activeWorkspace.id} saving={savingCount > 0} onClose={() => setSettingsOpen(false)} onPatch={patchSettings} onCreateWorkspace={createWorkspace} onDeleteWorkspace={(id) => requestDeleteWorkspace(workspaces.find((workspace) => workspace.id === id))} onUpdateWorkspace={updateWorkspace} onReorderWorkspace={reorderWorkspace} onUploadBackgrounds={uploadBackgrounds} onSelectBackground={selectBackground} onDeleteBackground={deleteBackground} onToggleWorkspaceBackground={toggleWorkspaceBackground} onRotateBackground={rotateBackground} />}
       {confirmation && <ConfirmDialog {...confirmation} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={() => void runConfirmation()} />}
       {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
       {busy && <div className="busy-indicator" aria-live="polite">Saving…</div>}

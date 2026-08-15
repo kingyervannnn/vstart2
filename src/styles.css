@@ -1318,6 +1318,18 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .background-zoom-settings input { width: 39px; border: 0; outline: 0; padding: 0; color: inherit; background: transparent; font-size: 10px; text-align: right; }
 .background-zoom-settings label span { opacity: .5; font-size: 9px; }
 .background-zoom-settings .background-zoom-reset { min-width: 46px; font-size: 8px; }
+.background-workspace-scopes { margin-top: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
+.background-workspace-tabs { display: flex; gap: 5px; overflow-x: auto; padding: 8px; border-bottom: 1px solid rgba(255,255,255,.08); scrollbar-width: none; }
+.background-workspace-tabs::-webkit-scrollbar { display: none; }
+.background-workspace-tabs button { min-width: max-content; height: 31px; display: flex; align-items: center; gap: 7px; border: 1px solid transparent; border-radius: 9px; padding: 0 10px; color: color-mix(in srgb, var(--app-text) 52%, transparent); background: transparent; cursor: pointer; font-size: 9px; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+.background-workspace-tabs button:hover { color: color-mix(in srgb, var(--app-text) 82%, transparent); background: rgba(255,255,255,.04); }
+.background-workspace-tabs button.active { color: var(--app-text); border-color: color-mix(in srgb, var(--app-accent) 34%, transparent); background: color-mix(in srgb, var(--app-accent) 11%, transparent); }
+.background-workspace-tabs button small { padding: 2px 5px; border-radius: 99px; color: color-mix(in srgb, var(--app-accent) 72%, white 8%); background: color-mix(in srgb, var(--app-accent) 12%, transparent); font-size: 6px; letter-spacing: .08em; text-transform: uppercase; }
+.background-scope-summary { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 13px; }
+.background-scope-summary > span { min-width: 0; display: grid; gap: 3px; }
+.background-scope-summary strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.background-scope-summary small { opacity: .48; font-size: 8px; line-height: 1.4; }
+.background-scope-summary em { flex: none; max-width: 42%; overflow: hidden; color: color-mix(in srgb, var(--app-text) 56%, transparent); font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .background-rotation-settings { margin-top: 14px; padding: 0 14px 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.025); }
 .background-rotation-settings .setting-row { min-height: 54px; }
 .background-rotation-controls { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; align-items: end; }
@@ -1327,6 +1339,7 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .background-interval-field input { width: 76px; height: 34px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 0 8px; color: #eef2ff; background: rgba(255,255,255,.055); }
 .background-rotate-now { justify-self: end; height: 34px; display: flex; align-items: center; gap: 6px; margin-bottom: 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 0 11px; color: inherit; background: rgba(255,255,255,.055); cursor: pointer; font-size: 9px; }
 .background-rotate-now:hover { border-color: color-mix(in srgb, var(--app-accent) 52%, transparent); background: color-mix(in srgb, var(--app-accent) 12%, transparent); }
+.background-rotate-now:disabled { cursor: default; opacity: .34; }
 .background-rotate-now svg { width: 12px; }
 .background-upload-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 17px; }
 .background-upload { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; padding: 14px; border: 1px dashed rgba(255,255,255,.22); border-radius: 14px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
@@ -1346,7 +1359,8 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .background-card-select > span:not(.background-large-preview), .background-card-select > small { position: absolute; z-index: 1; left: 10px; right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .background-card-select > span:not(.background-large-preview) { bottom: 20px; font-size: 9px; font-weight: 700; }
 .background-card-select > small { bottom: 7px; font-size: 7px; opacity: .6; }
-.background-library > button.empty { display: grid; place-items: center; border: 1px solid rgba(255,255,255,.14); background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 8px, rgba(255,255,255,.015) 8px 16px); }
+.background-library > button.empty { display: grid; place-content: center; justify-items: center; gap: 4px; border: 1px solid rgba(255,255,255,.14); background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 8px, rgba(255,255,255,.015) 8px 16px); }
+.background-library > button.empty small { max-width: calc(100% - 18px); overflow: hidden; opacity: .5; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .background-library > button.empty:hover { border-color: rgba(255,255,255,.34); }
 .background-library > button.empty.active { border-color: var(--app-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 32%, transparent); }
 .background-card-actions { position: absolute; z-index: 3; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transform: translateY(-3px); transition: opacity 140ms ease, transform 140ms ease; }
@@ -1433,6 +1447,8 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
   .mirrored .page-controls { right: auto; left: 8px; }
   .background-zoom-settings { align-items: stretch; flex-direction: column; gap: 10px; }
   .background-zoom-settings > div { flex-wrap: wrap; }
+  .background-scope-summary { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .background-scope-summary em { max-width: 100%; }
 }
 
 @media (hover: none) {

@@ -52,9 +52,10 @@ function Toggle({ label, detail, checked, onChange }) {
   )
 }
 
-export function SettingsPanel({ settings, workspaces, backgroundAssets, backgroundCollections, activeBackgroundId, activeWorkspaceId, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackgrounds, onSelectBackground, onDeleteBackground, onToggleWorkspaceBackground, onRotateBackground }) {
+export function SettingsPanel({ settings, workspaces, backgroundAssets, backgroundCollections, activeWorkspaceId, saving, onClose, onPatch, onCreateWorkspace, onDeleteWorkspace, onUpdateWorkspace, onReorderWorkspace, onUploadBackgrounds, onSelectBackground, onDeleteBackground, onToggleWorkspaceBackground, onRotateBackground }) {
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
+  const [backgroundScope, setBackgroundScope] = useState(activeWorkspaceId)
   const [backgroundError, setBackgroundError] = useState('')
   const [pendingBackgroundDeleteId, setPendingBackgroundDeleteId] = useState('')
   const [mailAccounts, setMailAccounts] = useState(() => mailBridge.peekAccounts())
@@ -93,7 +94,17 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const backgroundRotation = settings.backgrounds?.rotation || {}
   const backgroundZoom = normalizeBackgroundZoom(settings.backgrounds?.zoomPercent)
   const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
-  const workspaceBackgroundPool = backgroundRotation.workspacePools?.[activeWorkspaceId] || []
+  const workspaceSpecificBackgrounds = settings.backgrounds?.workspaceSpecific === true
+  const backgroundWorkspace = workspaceSpecificBackgrounds && backgroundScope !== 'global'
+    ? workspaces.find((workspace) => workspace.id === backgroundScope) || workspaces.find((workspace) => workspace.id === activeWorkspaceId) || workspaces[0]
+    : null
+  const backgroundTargetWorkspaceId = backgroundWorkspace?.id || null
+  const selectedBackgroundId = backgroundWorkspace
+    ? backgroundWorkspace.backgroundAssetId || null
+    : settings.backgrounds?.globalAssetId || null
+  const globalBackground = backgroundAssets.find((asset) => asset.id === settings.backgrounds?.globalAssetId)
+  const workspaceBackgroundPool = backgroundRotation.workspacePools?.[backgroundTargetWorkspaceId] || []
+  const rotationAppliesToBackgroundScope = rotationScope !== 'workspace' || Boolean(backgroundWorkspace)
 
   useEffect(() => {
     let live = true
@@ -110,6 +121,11 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   useEffect(() => {
     setNotesVaultDraft(settings.notes?.vaultPath || DEFAULT_NOTES_VAULT_PATH)
   }, [settings.notes?.vaultPath])
+
+  useEffect(() => {
+    if (backgroundScope === 'global' || workspaces.some((workspace) => workspace.id === backgroundScope)) return
+    setBackgroundScope(activeWorkspaceId || workspaces[0]?.id || 'global')
+  }, [activeWorkspaceId, backgroundScope, workspaces])
 
   useEffect(() => {
     if (page !== 'widgets') return undefined
@@ -405,46 +421,59 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   {backgroundZoom !== BACKGROUND_ZOOM_DEFAULT && <button type="button" className="background-zoom-reset" onClick={() => onPatch({ backgrounds: { zoomPercent: BACKGROUND_ZOOM_DEFAULT } })}>Reset</button>}
                 </div>
               </div>
-              <Toggle label="Workspace-specific backgrounds" checked={settings.backgrounds?.workspaceSpecific} onChange={(value) => onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && rotationScope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })} />
+              <Toggle label="Workspace-specific backgrounds" detail="Keeps one background selection and rotation pool per workspace." checked={workspaceSpecificBackgrounds} onChange={(value) => {
+                if (value) setBackgroundScope(activeWorkspaceId || workspaces[0]?.id || 'global')
+                onPatch({ backgrounds: { workspaceSpecific: value, ...(!value && rotationScope === 'workspace' ? { rotation: { scope: 'all' } } : {}) } })
+              }} />
+              {workspaceSpecificBackgrounds && <section className="background-workspace-scopes">
+                <nav className="background-workspace-tabs" role="tablist" aria-label="Background workspace">
+                  <button type="button" role="tab" aria-selected={backgroundScope === 'global'} className={backgroundScope === 'global' ? 'active' : ''} onClick={() => setBackgroundScope('global')}>Global fallback</button>
+                  {workspaces.map((workspace) => <button key={workspace.id} type="button" role="tab" aria-selected={backgroundWorkspace?.id === workspace.id} className={backgroundWorkspace?.id === workspace.id ? 'active' : ''} onClick={() => setBackgroundScope(workspace.id)}><span>{workspace.name}</span>{workspace.id === activeWorkspaceId && <small>Current</small>}</button>)}
+                </nav>
+                <div className="background-scope-summary" role="tabpanel">
+                  {backgroundWorkspace ? <><span><strong>{backgroundWorkspace.name}</strong><small>/w/{backgroundWorkspace.slug} · Background and rotation pool are independent for this workspace.</small></span>{!backgroundWorkspace.backgroundAssetId && <em>{globalBackground ? `Using global fallback: ${globalBackground.originalName || 'Background'}` : 'Using the default background'}</em>}</> : <><span><strong>Global fallback</strong><small>Used by workspaces that do not have their own background selected.</small></span><em>Shared asset library</em></>}
+                </div>
+              </section>}
               <div className="background-rotation-settings">
                 <Toggle label="Rotate backgrounds" detail="Advances automatically and saves the selected image in PostgreSQL." checked={backgroundRotation.enabled === true} onChange={(value) => onPatch({ backgrounds: { rotation: { enabled: value } } })} />
                 {backgroundRotation.enabled === true && <div className="background-rotation-controls">
                   <label className="setting-field"><span>Rotation pool</span><select value={rotationScope} onChange={(event) => onPatch({ backgrounds: { rotation: { scope: event.target.value } } })}>
                     <option value="all">All backgrounds</option>
                     <option value="folder">Imported folder</option>
-                    {settings.backgrounds?.workspaceSpecific && <option value="workspace">Current workspace pool</option>}
+                    {workspaceSpecificBackgrounds && <option value="workspace">Selected workspace pool</option>}
                   </select></label>
                   {rotationScope === 'folder' && <label className="setting-field"><span>Folder</span><select value={backgroundRotation.collectionId || ''} onChange={(event) => onPatch({ backgrounds: { rotation: { collectionId: event.target.value || null } } })}>
                     <option value="">Choose a folder</option>
                     {(backgroundCollections || []).map((collection) => <option key={collection.id} value={collection.id}>{collection.name} · {collection.assetIds.length}</option>)}
                   </select></label>}
                   <label className="setting-field background-interval-field"><span>Change every</span><span><input key={backgroundRotation.intervalMinutes ?? 15} type="number" min="1" max="1440" step="1" defaultValue={backgroundRotationInterval(backgroundRotation.intervalMinutes)} onBlur={(event) => onPatch({ backgrounds: { rotation: { intervalMinutes: backgroundRotationInterval(event.target.value) } } })} onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()} /> minutes</span></label>
-                  <button type="button" className="background-rotate-now" onClick={async () => {
+                  <button type="button" className="background-rotate-now" disabled={!rotationAppliesToBackgroundScope} onClick={async () => {
                     setBackgroundError('')
                     try {
-                      const result = await onRotateBackground()
+                      const result = await onRotateBackground({ workspaceId: backgroundTargetWorkspaceId })
                       if (!result.rotated) setBackgroundError(result.count ? 'Add at least two backgrounds to this rotation pool.' : 'This rotation pool is empty.')
                     } catch (error) { setBackgroundError(error.message) }
                   }}><Play /> Rotate now</button>
-                  {rotationScope === 'workspace' && <p className="field-help">Use the check buttons on background cards to build this workspace’s pool. Selecting or uploading a background adds it automatically.</p>}
+                  {rotationScope === 'workspace' && <p className="field-help">{backgroundWorkspace ? `Use the check buttons below to build ${backgroundWorkspace.name}’s pool. Selecting or uploading a background adds it automatically.` : 'Choose a workspace tab to edit or rotate its independent pool.'}</p>}
                 </div>}
               </div>
               <div className="background-library" aria-label="Background library">
-                <button type="button" className={!activeBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null)} aria-pressed={!activeBackgroundId}>
-                  <span>None</span>
+                <button type="button" className={!selectedBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null, backgroundTargetWorkspaceId)} aria-pressed={!selectedBackgroundId}>
+                  <span>{backgroundWorkspace ? 'Use global' : 'None'}</span>
+                  {backgroundWorkspace && <small>{globalBackground?.originalName || 'Default background'}</small>}
                 </button>
                 {backgroundAssets.map((asset) => {
                   const collections = (backgroundCollections || []).filter((collection) => collection.assetIds.includes(asset.id))
                   const inWorkspacePool = workspaceBackgroundPool.includes(asset.id)
                   const pendingDelete = pendingBackgroundDeleteId === asset.id
-                  return <article key={asset.id} className={`background-card ${activeBackgroundId === asset.id ? 'active' : ''}`}>
-                    <button type="button" className="background-card-select" onClick={() => onSelectBackground(asset.id)} aria-pressed={activeBackgroundId === asset.id} title={asset.originalName || 'Background'}>
+                  return <article key={asset.id} className={`background-card ${selectedBackgroundId === asset.id ? 'active' : ''}`}>
+                    <button type="button" className="background-card-select" onClick={() => onSelectBackground(asset.id, backgroundTargetWorkspaceId)} aria-pressed={selectedBackgroundId === asset.id} title={asset.originalName || 'Background'}>
                       <img src={`/api/assets/${asset.id}/preview`} alt="" loading="lazy" decoding="async" />
                       <span>{asset.originalName || 'Background'}</span>
                       <small>{collections[0]?.name || `${Math.max(1, Math.round(asset.byteLength / 1024))} KiB`}</small>
                     </button>
                     <div className="background-card-actions">
-                      {settings.backgrounds?.workspaceSpecific && <button type="button" className={inWorkspacePool ? 'included' : ''} onClick={() => onToggleWorkspaceBackground(asset.id)} title={inWorkspacePool ? 'Remove from this workspace rotation pool' : 'Include in this workspace rotation pool'} aria-label={inWorkspacePool ? 'Remove from workspace rotation pool' : 'Include in workspace rotation pool'}>{inWorkspacePool ? <Check /> : <Plus />}</button>}
+                      {backgroundWorkspace && <button type="button" className={inWorkspacePool ? 'included' : ''} onClick={() => onToggleWorkspaceBackground(asset.id, backgroundWorkspace.id)} title={inWorkspacePool ? `Remove from ${backgroundWorkspace.name} rotation pool` : `Include in ${backgroundWorkspace.name} rotation pool`} aria-label={inWorkspacePool ? `Remove from ${backgroundWorkspace.name} rotation pool` : `Include in ${backgroundWorkspace.name} rotation pool`}>{inWorkspacePool ? <Check /> : <Plus />}</button>}
                       <button type="button" className={`background-delete ${pendingDelete ? 'confirming' : ''}`} onClick={async () => {
                         if (!pendingDelete) { setPendingBackgroundDeleteId(asset.id); return }
                         setBackgroundError('')
@@ -456,9 +485,9 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                 })}
               </div>
               <div className="background-upload-options">
-                <label className="background-upload"><Upload /><strong>Upload images</strong><span>{settings.backgrounds?.workspaceSpecific ? 'Adds them to the active workspace.' : 'Adds them to the global library.'}</span><input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" disabled={saving} onChange={async (event) => {
+                <label className="background-upload"><Upload /><strong>Upload images</strong><span>{backgroundWorkspace ? `Selects the first for ${backgroundWorkspace.name}.` : 'Selects the first as the global background.'}</span><input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" disabled={saving} onChange={async (event) => {
                   setBackgroundError('')
-                  try { await onUploadBackgrounds(event.target.files) }
+                  try { await onUploadBackgrounds(event.target.files, null, backgroundTargetWorkspaceId) }
                   catch (error) { setBackgroundError(error.message) }
                   event.target.value = ''
                 }} /></label>
@@ -466,7 +495,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   setBackgroundError('')
                   const files = Array.from(event.target.files || [])
                   const collectionName = files[0]?.webkitRelativePath?.split('/')[0] || 'Imported backgrounds'
-                  try { await onUploadBackgrounds(files, collectionName) }
+                  try { await onUploadBackgrounds(files, collectionName, backgroundTargetWorkspaceId) }
                   catch (error) { setBackgroundError(error.message) }
                   event.target.value = ''
                 }} /></label>
