@@ -3,6 +3,9 @@ import { Folder, Pencil, Plus } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
 
+const DRAG_START_THRESHOLD = 7
+const CLICK_SUPPRESSION_MS = 420
+
 export function DialCanvas({
   workspace,
   items,
@@ -26,6 +29,7 @@ export function DialCanvas({
 }) {
   const canvasRef = useRef(null)
   const dragRef = useRef(null)
+  const suppressedClickRef = useRef(null)
   const [preview, setPreview] = useState(null)
   const rootItems = items.filter((item) => item.workspaceId === workspace.id && !item.parentFolderId)
   const rootPlacements = placements.filter((value) => value.workspaceId === workspace.id && value.containerKey === 'root' && value.profile === profile)
@@ -44,13 +48,12 @@ export function DialCanvas({
   const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
 
   const beginDrag = (event, item, value) => {
-    if (!editMode || event.button !== 0) return
+    if (event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
     const point = logicalPoint(event)
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = { item, value, start: point, pointerId: event.pointerId, moved: false, candidate: value, target: null, invalid: false }
-    setPreview({ itemId: item.id, value, targetId: null, invalid: false })
   }
 
   const moveDrag = (event) => {
@@ -66,8 +69,9 @@ export function DialCanvas({
       point.x >= value.x && point.x <= value.x + value.width &&
       point.y >= value.y && point.y <= value.y + value.height)
     const invalid = !target && collides(candidate, rootPlacements, drag.item.id)
-    dragRef.current = { ...drag, moved: drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 4, candidate, target, invalid }
-    setPreview({ itemId: drag.item.id, value: candidate, targetId: target?.itemId || null, invalid })
+    const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > DRAG_START_THRESHOLD
+    dragRef.current = { ...drag, moved, candidate, target, invalid }
+    if (moved) setPreview({ itemId: drag.item.id, value: candidate, targetId: target?.itemId || null, invalid })
   }
 
   const endDrag = async (event) => {
@@ -76,12 +80,25 @@ export function DialCanvas({
     dragRef.current = null
     setPreview(null)
     if (!drag.moved) return
+    suppressedClickRef.current = { itemId: drag.item.id, until: Date.now() + CLICK_SUPPRESSION_MS }
     if (drag.target) {
       const targetItem = rootItems.find((item) => item.id === drag.target.itemId)
       if (targetItem) await onDropOnItem(drag.item, targetItem)
       return
     }
     if (!drag.invalid) await onMove(drag.item, drag.candidate)
+  }
+
+  const cancelDrag = () => {
+    dragRef.current = null
+    setPreview(null)
+  }
+
+  const consumeSuppressedClick = (itemId) => {
+    const suppressed = suppressedClickRef.current
+    if (!suppressed || suppressed.itemId !== itemId || suppressed.until < Date.now()) return false
+    suppressedClickRef.current = null
+    return true
   }
 
   const handleKeyboardMove = async (event, item, value) => {
@@ -137,13 +154,18 @@ export function DialCanvas({
             onPointerDown={(event) => beginDrag(event, item, stored)}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
-            onPointerCancel={endDrag}
+            onPointerCancel={cancelDrag}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !editMode) item.kind === 'folder' ? onOpenFolder(item, event.currentTarget) : window.open(item.url, openInNewTab ? '_blank' : '_self')
               if (event.key === 'Enter' && editMode) onEdit(item)
               handleKeyboardMove(event, item, stored)
             }}
             onClick={(event) => {
+              if (consumeSuppressedClick(item.id)) {
+                event.preventDefault()
+                event.stopPropagation()
+                return
+              }
               if (editMode || dragRef.current) return
               if (item.kind === 'folder') onOpenFolder(item, event.currentTarget)
               else window.open(item.url, openInNewTab ? '_blank' : '_self')
@@ -161,7 +183,7 @@ export function DialCanvas({
                   className="shortcut-name shortcut-inline-label"
                   title={`Open ${item.title} inline`}
                   aria-label={`Open ${item.title} inline`}
-                  onPointerDown={(event) => { if (!editMode) event.stopPropagation() }}
+                  onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     if (editMode) return

@@ -420,7 +420,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   padding: 8px;
   border: 1px solid transparent;
   border-radius: 18px;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   outline: 0;
   transition: opacity 180ms ease, filter 180ms ease, transform 180ms cubic-bezier(.16,1,.3,1);
 }
@@ -432,7 +433,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 0%, transparent); filter: brightness(1); }
   45% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-accent) 20%, transparent), 0 0 28px color-mix(in srgb, var(--app-accent) 58%, transparent); filter: brightness(1.18); }
 }
-.shortcut-tile.dragging { z-index: 30; filter: drop-shadow(0 13px 20px rgba(0,0,0,.28)); transform: scale(1.035); }
+.shortcut-tile.dragging { z-index: 30; cursor: grabbing; filter: drop-shadow(0 13px 20px rgba(0,0,0,.28)); transform: scale(1.035); }
 .shortcut-tile.invalid { border-color: #ff5c69; background: rgba(255, 30, 58, .18); }
 .shortcut-tile.drop-target { border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 22%, transparent); transform: scale(1.06); }
 .shortcut-icon-shell { flex: 0 0 auto; width: min(var(--shortcut-icon-size, 78%), 92px); height: auto; aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
@@ -1182,8 +1183,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .folder-popover header .folder-add-shortcut { width: 31px; height: 31px; display: grid; place-items: center; padding: 0; }
 .folder-popover header .folder-add-shortcut svg { width: 15px; height: 15px; }
 .folder-canvas { position: relative; height: calc(100% - 58px); }
-.folder-child { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 8px; color: inherit; text-decoration: none; }
-.folder-child.dragging { z-index: 10; background: rgba(255,255,255,.08); border-radius: 14px; }
+.folder-child { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 8px; color: inherit; text-decoration: none; cursor: grab; touch-action: none; }
+.folder-child.dragging { z-index: 10; border-radius: 14px; background: rgba(255,255,255,.08); cursor: grabbing; }
 .folder-child.invalid { outline: 1px solid #ff6572; background: rgba(255,58,77,.14); }
 .folder-child img, .folder-child .generated-icon { width: min(65%, 68px); aspect-ratio: 1; object-fit: contain; }
 .folder-child-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; white-space: nowrap; }

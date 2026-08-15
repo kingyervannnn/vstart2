@@ -51,7 +51,7 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
         {menu.folder && <div className="context-menu-heading"><strong>{menu.folder.title}</strong><span>Folder space</span></div>}
         <MenuButton icon={Plus} onClick={run(() => onCreate(menu.point, menu.folder?.id || null))}>Create shortcut{menu.folder ? ' here' : ''}</MenuButton>
         {!menu.folder && <MenuButton icon={FolderPlus} onClick={run(() => onCreateFolder(menu.point))}>Create folder</MenuButton>}
-        <MenuButton icon={Pencil} onClick={run(onToggleEdit)}>{editMode ? 'Finish editing' : 'Enter edit mode'}</MenuButton>
+        <MenuButton icon={Pencil} onClick={run(onToggleEdit)}>{editMode ? 'Finish layout editing' : 'Edit search and workspace layout'}</MenuButton>
       </> : <>
         <div className="context-menu-heading"><strong>{item.title}</strong><span>{item.kind === 'folder' ? 'Folder' : item.pinGroupId ? 'Pinned shortcut' : 'Shortcut'}</span></div>
         <MenuButton icon={Pencil} onClick={run(() => onEditItem(item))}>{item.kind === 'folder' ? 'Rename folder' : 'Rename / change icon'}</MenuButton>

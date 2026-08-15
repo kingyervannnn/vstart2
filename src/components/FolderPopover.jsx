@@ -4,10 +4,14 @@ import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
 import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
 import { folderPopoverPosition } from '../lib/folderPopover.js'
 
+const DRAG_START_THRESHOLD = 7
+const CLICK_SUPPRESSION_MS = 420
+
 export function FolderPopover({ folder, children, placements, profile, anchorRect, editMode, openInNewTab, labelOpensInline, spotlightItemId, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
   const canvasRef = useRef(null)
   const popoverRef = useRef(null)
   const dragRef = useRef(null)
+  const suppressedClickRef = useRef(null)
   const [preview, setPreview] = useState(null)
   const [widePosition, setWidePosition] = useState(null)
 
@@ -41,13 +45,12 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
   const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
 
   const beginDrag = (event, child, value) => {
-    if (!editMode || event.button !== 0) return
+    if (event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     const bounds = canvasRef.current.getBoundingClientRect()
     dragRef.current = { child, value, pointerId: event.pointerId, start: pointToLogical(event.clientX, event.clientY, bounds, profile), bounds, moved: false }
-    setPreview({ itemId: child.id, value, invalid: false })
   }
 
   const moveDrag = (event) => {
@@ -56,8 +59,9 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
     const point = pointToLogical(event.clientX, event.clientY, drag.bounds, profile)
     const candidate = clampPlacement({ ...drag.value, x: drag.value.x + point.x - drag.start.x, y: drag.value.y + point.y - drag.start.y }, profile)
     const invalid = collides(candidate, childPlacements, drag.child.id)
-    dragRef.current = { ...drag, candidate, invalid, moved: drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 4 }
-    setPreview({ itemId: drag.child.id, value: candidate, invalid })
+    const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > DRAG_START_THRESHOLD
+    dragRef.current = { ...drag, candidate, invalid, moved }
+    if (moved) setPreview({ itemId: drag.child.id, value: candidate, invalid })
   }
 
   const endDrag = async (event) => {
@@ -66,9 +70,22 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
     dragRef.current = null
     setPreview(null)
     if (!drag.moved) return
+    suppressedClickRef.current = { itemId: drag.child.id, until: Date.now() + CLICK_SUPPRESSION_MS }
     const outside = event.clientX < drag.bounds.left || event.clientX > drag.bounds.right || event.clientY < drag.bounds.top || event.clientY > drag.bounds.bottom
     if (outside) return onMoveOut(drag.child)
     if (!drag.invalid) await onMove(drag.child, drag.candidate)
+  }
+
+  const cancelDrag = () => {
+    dragRef.current = null
+    setPreview(null)
+  }
+
+  const consumeSuppressedClick = (itemId) => {
+    const suppressed = suppressedClickRef.current
+    if (!suppressed || suppressed.itemId !== itemId || suppressed.until < Date.now()) return false
+    suppressedClickRef.current = null
+    return true
   }
 
   return createPortal(
@@ -105,8 +122,15 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
                 onPointerDown={(event) => beginDrag(event, child, childPlacement)}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                onClick={() => !editMode && window.open(child.url, openInNewTab ? '_blank' : '_self')}
+                onPointerCancel={cancelDrag}
+                onClick={(event) => {
+                  if (consumeSuppressedClick(child.id)) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    return
+                  }
+                  if (!editMode) window.open(child.url, openInNewTab ? '_blank' : '_self')
+                }}
                 onKeyDown={(event) => {
                   if (event.target.closest('.shortcut-inline-label')) return
                   if (event.key === 'Enter') editMode ? onEdit(child) : window.open(child.url, openInNewTab ? '_blank' : '_self')
@@ -119,7 +143,7 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
                       className="folder-child-name shortcut-inline-label"
                       title={`Open ${child.title} inline`}
                       aria-label={`Open ${child.title} inline`}
-                      onPointerDown={(event) => { if (!editMode) event.stopPropagation() }}
+                      onPointerDown={(event) => event.stopPropagation()}
                       onKeyDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         if (editMode) return
