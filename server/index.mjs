@@ -810,7 +810,6 @@ async function handleRequest(request, response) {
       if (!item.rowCount) throw new HttpError(404, 'Item not found')
       const row = item.rows[0]
       if (Number(row.version) !== data.version) throw new HttpError(409, 'Item changed elsewhere')
-      if (row.parent_folder_id) throw new HttpError(409, 'Move this shortcut out of its folder first')
       if (row.pin_group_id) throw new HttpError(409, 'Unpin this shortcut before moving it to one workspace')
       if (row.workspace_id === data.destinationWorkspaceId) throw new HttpError(400, 'Choose a different workspace')
       const destination = await client.query('SELECT 1 FROM workspaces WHERE id = $1', [data.destinationWorkspaceId])
@@ -821,9 +820,11 @@ async function handleRequest(request, response) {
       `, [match[0]])
       const itemIds = members.rows.map((value) => value.id)
       await client.query(`
-        UPDATE shortcut_items SET workspace_id = $2, version = version + 1, updated_at = now()
+        UPDATE shortcut_items SET workspace_id = $2,
+          parent_folder_id = CASE WHEN id = $3 THEN NULL ELSE parent_folder_id END,
+          version = version + 1, updated_at = now()
         WHERE id = ANY($1::uuid[])
-      `, [itemIds, data.destinationWorkspaceId])
+      `, [itemIds, data.destinationWorkspaceId, match[0]])
       await client.query(`
         UPDATE item_placements SET workspace_id = $2, version = version + 1, updated_at = now()
         WHERE item_id = ANY($1::uuid[])

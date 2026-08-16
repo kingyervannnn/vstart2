@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, nextBackgroundId } from './backgroundRotation.js'
+import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, millisecondsUntilNextBackgroundSlot, nextBackgroundId, scheduledBackgroundId } from './backgroundRotation.js'
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 const collections = [{ id: 'folder-1', name: 'Landscapes', assetIds: ['b', 'c', 'missing'] }]
@@ -8,6 +8,7 @@ describe('background rotation', () => {
   it('supports broad and folder-specific candidate pools', () => {
     expect(backgroundRotationCandidates({ settings: {}, assets, collections })).toEqual(['a', 'b', 'c'])
     expect(backgroundRotationCandidates({ settings: { backgrounds: { rotation: { scope: 'folder', collectionId: 'folder-1' } } }, assets, collections })).toEqual(['b', 'c'])
+    expect(backgroundRotationCandidates({ settings: { backgrounds: { rotation: { scope: 'loose' } } }, assets, collections })).toEqual(['a'])
   })
 
   it('uses a workspace pool only when workspace backgrounds are enabled', () => {
@@ -46,5 +47,14 @@ describe('background rotation', () => {
     expect(backgroundRotationInterval(0)).toBe(1)
     expect(backgroundRotationInterval('30')).toBe(30)
     expect(backgroundRotationInterval(9999)).toBe(1440)
+  })
+
+  it('selects a deterministic image on shared wall-clock boundaries', () => {
+    const halfHour = 30 * 60 * 1000
+    expect(scheduledBackgroundId(['a', 'b', 'c'], 30, 0)).toBe('a')
+    expect(scheduledBackgroundId(['a', 'b', 'c'], 30, halfHour)).toBe('b')
+    expect(scheduledBackgroundId(['a', 'b', 'c'], 30, halfHour * 3)).toBe('a')
+    expect(millisecondsUntilNextBackgroundSlot(30, halfHour + 250)).toBe(halfHour - 250)
+    expect(millisecondsUntilNextBackgroundSlot(30, halfHour * 2)).toBe(halfHour)
   })
 })

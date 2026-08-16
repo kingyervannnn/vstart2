@@ -8,12 +8,39 @@ const DRAG_START_THRESHOLD = 7
 const CLICK_SUPPRESSION_MS = 420
 
 export function FolderPopover({ folder, children, placements, profile, anchorRect, editMode, openInNewTab, labelOpensInline, spotlightItemId, onClose, onEdit, onMove, onMoveOut, onOpenInline, onCreate, onBlankContextMenu, onItemContextMenu }) {
+  const folderIdentity = folder?.id
   const canvasRef = useRef(null)
   const popoverRef = useRef(null)
   const dragRef = useRef(null)
   const suppressedClickRef = useRef(null)
+  const closeTimerRef = useRef(null)
+  const openFrameRef = useRef(null)
+  const revealFrameRef = useRef(null)
   const [preview, setPreview] = useState(null)
   const [widePosition, setWidePosition] = useState(null)
+  const [entered, setEntered] = useState(false)
+  const [closing, setClosing] = useState(false)
+
+  useEffect(() => () => {
+    window.clearTimeout(closeTimerRef.current)
+    window.cancelAnimationFrame(openFrameRef.current)
+    window.cancelAnimationFrame(revealFrameRef.current)
+  }, [])
+
+  useLayoutEffect(() => {
+    setEntered(false)
+    setClosing(false)
+    window.cancelAnimationFrame(openFrameRef.current)
+    window.cancelAnimationFrame(revealFrameRef.current)
+    if (!folderIdentity) return undefined
+    openFrameRef.current = window.requestAnimationFrame(() => {
+      revealFrameRef.current = window.requestAnimationFrame(() => setEntered(true))
+    })
+    return () => {
+      window.cancelAnimationFrame(openFrameRef.current)
+      window.cancelAnimationFrame(revealFrameRef.current)
+    }
+  }, [folderIdentity])
 
   useLayoutEffect(() => {
     if (!folder || profile === 'compact') {
@@ -29,7 +56,12 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
         width: window.visualViewport?.width || document.documentElement.clientWidth,
         height: window.visualViewport?.height || document.documentElement.clientHeight,
       }
-      setWidePosition(folderPopoverPosition(anchor, viewport, popover))
+      const position = folderPopoverPosition(anchor, viewport, popover)
+      setWidePosition({
+        ...position,
+        '--folder-origin-x': `${Math.max(0, Math.min(popover.width, anchor.left + anchor.width / 2 - position.left))}px`,
+        '--folder-origin-y': `${Math.max(0, Math.min(popover.height, anchor.top + anchor.height / 2 - position.top))}px`,
+      })
     }
     update()
     window.addEventListener('resize', update)
@@ -43,6 +75,13 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
   if (!folder) return null
   const childPlacements = placements.filter((value) => value.containerKey === folder.id && value.profile === profile)
   const logicalPoint = (event) => pointToLogical(event.clientX, event.clientY, canvasRef.current.getBoundingClientRect(), profile)
+  const requestClose = (afterClose = onClose) => {
+    if (closing) return
+    setClosing(true)
+    setEntered(false)
+    closeTimerRef.current = window.setTimeout(afterClose, 230)
+  }
+  const editFolder = () => requestClose(() => onEdit(folder))
 
   const beginDrag = (event, child, value) => {
     if (event.button !== 0) return
@@ -89,9 +128,9 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
   }
 
   return createPortal(
-    <div className={`folder-backdrop ${profile === 'compact' ? 'folder-backdrop-centered' : 'folder-backdrop-anchored'}`} onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section ref={popoverRef} className="folder-popover" style={widePosition || undefined} role="dialog" aria-modal="true" aria-label={folder.title}>
-        <header><FolderOpen /><h2>{folder.title}</h2><button type="button" className="folder-add-shortcut" onClick={() => onCreate(null)} aria-label="Add shortcut" title="Add shortcut"><Plus /></button>{editMode && <button type="button" onClick={() => onEdit(folder)}>Edit folder</button>}<button type="button" onClick={onClose} aria-label="Close"><X /></button></header>
+    <div className={`folder-backdrop ${entered ? 'open' : ''} ${closing ? 'closing' : ''} ${profile === 'compact' ? 'folder-backdrop-centered' : 'folder-backdrop-anchored'}`} onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
+      <section ref={popoverRef} className={`folder-popover ${entered ? 'open' : ''} ${closing ? 'closing' : ''}`} style={widePosition || undefined} role="dialog" aria-modal="true" aria-label={folder.title}>
+        <header onDoubleClick={(event) => !event.target.closest('button') && editFolder()}><FolderOpen /><button type="button" className="folder-title-edit" onClick={editFolder} aria-label={`Rename ${folder.title}`} title="Rename folder">{folder.title}</button><button type="button" className="folder-add-shortcut" onClick={() => requestClose(() => onCreate(null))} aria-label="Add shortcut" title="Add shortcut"><Plus /></button>{editMode && <button type="button" onClick={editFolder}>Edit folder</button>}<button type="button" onClick={() => requestClose()} aria-label="Close"><X /></button></header>
         <div
           ref={canvasRef}
           className="folder-canvas"

@@ -7,7 +7,7 @@ import { mailBridge } from './lib/mailBridge.js'
 import { CANVASES, collides, findOpenPlacement, projectPlacement } from './lib/canvas.js'
 import { useCompactMode } from './lib/useCompactMode.js'
 import { buildViewSearch, parseViewSearch, resolveInlinePresentation, toggledServiceView } from './lib/viewRoute.js'
-import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, nextBackgroundId } from './lib/backgroundRotation.js'
+import { backgroundRotationCandidates, backgroundRotationInterval, backgroundRotationSettings, millisecondsUntilNextBackgroundSlot, nextBackgroundId, scheduledBackgroundId } from './lib/backgroundRotation.js'
 import { backgroundLayerVariables, preloadBackgroundAsset, preloadBootstrapBackground, startupBackgroundUrl } from './lib/backgroundStartup.js'
 import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
@@ -388,10 +388,13 @@ export function App() {
       collections: current.backgroundCollections || [],
       workspaceId: targetsWorkspace ? workspace.id : undefined,
     })
+    const targetRotation = backgroundRotationSettings(currentSettings, targetsWorkspace ? workspace.id : undefined)
     const currentId = targetsWorkspace && workspace.backgroundAssetId
       ? workspace.backgroundAssetId
       : currentSettings.backgrounds?.globalAssetId
-    const nextId = nextBackgroundId(candidates, currentId)
+    const nextId = automatic
+      ? scheduledBackgroundId(candidates, targetRotation.intervalMinutes)
+      : nextBackgroundId(candidates, currentId)
     if (!nextId || nextId === currentId) return { rotated: false, count: candidates.length }
 
     try {
@@ -417,12 +420,19 @@ export function App() {
     if (rotation.scope === 'workspace' && !settings.backgrounds?.workspaceSpecific) return undefined
     const lockName = `${BACKGROUND_ROTATION_LOCK}:${settings.backgrounds?.workspaceSpecific ? activeWorkspace?.id || 'workspace' : 'global'}`
     let timer = null
+    let boundaryTimer = null
     let releaseLock = null
     let live = true
     const run = () => void rotateBackground({ automatic: true }).catch((error) => setToast({ type: 'error', message: error.message }))
     const start = () => {
-      if (!live || timer) return
-      timer = window.setInterval(run, backgroundRotationInterval(rotation.intervalMinutes) * 60_000)
+      if (!live || timer || boundaryTimer) return
+      const intervalMs = backgroundRotationInterval(rotation.intervalMinutes) * 60_000
+      run()
+      boundaryTimer = window.setTimeout(() => {
+        boundaryTimer = null
+        run()
+        timer = window.setInterval(run, intervalMs)
+      }, millisecondsUntilNextBackgroundSlot(rotation.intervalMinutes))
     }
 
     if (!navigator.locks?.request) {
@@ -430,6 +440,7 @@ export function App() {
       return () => {
         live = false
         window.clearInterval(timer)
+        window.clearTimeout(boundaryTimer)
       }
     }
 
@@ -444,6 +455,7 @@ export function App() {
     return () => {
       live = false
       window.clearInterval(timer)
+      window.clearTimeout(boundaryTimer)
       releaseLock?.()
       controller.abort()
     }
@@ -634,7 +646,7 @@ export function App() {
       const result = await api.deleteItem(item.id, action)
       applyBootstrap(result.bootstrap)
       setDialog(null)
-      setFolderId(null)
+      if (item.kind === 'folder') setFolderId(null)
       setToast({ type: 'success', message: `${item.title} deleted.` })
     } catch (error) {
       setToast({ type: 'error', message: error.message })

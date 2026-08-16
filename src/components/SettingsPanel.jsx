@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Bot, Check, Database, FolderUp, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Bot, Check, Database, Folder, FolderUp, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { backgroundRotationInterval, backgroundRotationSettings } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
@@ -57,6 +57,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const [page, setPage] = useState('general')
   const [workspaceName, setWorkspaceName] = useState('')
   const [backgroundScope, setBackgroundScope] = useState(activeWorkspaceId)
+  const [openBackgroundCollectionId, setOpenBackgroundCollectionId] = useState('')
   const [backgroundError, setBackgroundError] = useState('')
   const [pendingBackgroundDeleteId, setPendingBackgroundDeleteId] = useState('')
   const [mailAccounts, setMailAccounts] = useState(() => mailBridge.peekAccounts())
@@ -100,13 +101,29 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
     : null
   const backgroundTargetWorkspaceId = backgroundWorkspace?.id || null
   const backgroundRotation = backgroundRotationSettings(settings, backgroundTargetWorkspaceId)
-  const rotationScope = ['all', 'folder', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
+  const rotationScope = ['all', 'folder', 'loose', 'workspace'].includes(backgroundRotation.scope) ? backgroundRotation.scope : 'all'
   const selectedBackgroundId = backgroundWorkspace
     ? backgroundWorkspace.backgroundAssetId || null
     : settings.backgrounds?.globalAssetId || null
   const globalBackground = backgroundAssets.find((asset) => asset.id === settings.backgrounds?.globalAssetId)
   const workspaceBackgroundPool = backgroundRotation.workspacePools?.[backgroundTargetWorkspaceId] || []
   const rotationAppliesToBackgroundScope = rotationScope !== 'workspace' || Boolean(backgroundWorkspace)
+  const macDesktopSyncEnabled = settings.backgrounds?.macDesktopSync?.enabled === true
+  const homeWorkspace = workspaces.find((workspace) => workspace.slug === 'home')
+  const homeBackgroundRotation = backgroundRotationSettings(settings, homeWorkspace?.id)
+  const macSyncedCollectionId = macDesktopSyncEnabled && homeBackgroundRotation.enabled === true && homeBackgroundRotation.scope === 'folder'
+    ? homeBackgroundRotation.collectionId
+    : null
+  const collectedBackgroundIds = new Set((backgroundCollections || []).flatMap((collection) => collection.assetIds || []))
+  const looseBackgrounds = backgroundAssets.filter((asset) => !collectedBackgroundIds.has(asset.id))
+  const openBackgroundCollection = (backgroundCollections || []).find((collection) => collection.id === openBackgroundCollectionId)
+  const visibleBackgroundAssets = openBackgroundCollectionId === 'all'
+    ? backgroundAssets
+    : openBackgroundCollectionId === 'loose'
+      ? looseBackgrounds
+      : openBackgroundCollection
+        ? backgroundAssets.filter((asset) => openBackgroundCollection.assetIds.includes(asset.id))
+        : looseBackgrounds
 
   useEffect(() => {
     let live = true
@@ -128,6 +145,15 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
     if (backgroundScope === 'global' || workspaces.some((workspace) => workspace.id === backgroundScope)) return
     setBackgroundScope(activeWorkspaceId || workspaces[0]?.id || 'global')
   }, [activeWorkspaceId, backgroundScope, workspaces])
+
+  useEffect(() => {
+    setOpenBackgroundCollectionId('')
+  }, [backgroundScope])
+
+  useEffect(() => {
+    if (!openBackgroundCollectionId || openBackgroundCollectionId === 'all' || openBackgroundCollectionId === 'loose') return
+    if (!(backgroundCollections || []).some((collection) => collection.id === openBackgroundCollectionId)) setOpenBackgroundCollectionId('')
+  }, [backgroundCollections, openBackgroundCollectionId])
 
   useEffect(() => {
     if (page !== 'widgets') return undefined
@@ -445,11 +471,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                 </div>
               </section>}
               <div className="background-rotation-settings">
+                {backgroundWorkspace?.slug === 'home' && <Toggle label="Sync Home with Mac desktop" detail="Uses Home’s existing rotation toggle, imported folder, and interval. Turn this off to stop Mac coordination without disabling V Start rotation." checked={macDesktopSyncEnabled} onChange={(value) => onPatch({ backgrounds: { macDesktopSync: { enabled: value } } })} />}
                 <Toggle label="Rotate backgrounds" detail={backgroundWorkspace ? `Controls rotation only for ${backgroundWorkspace.name}.` : 'Controls the global fallback rotation.'} checked={backgroundRotation.enabled === true} onChange={(value) => patchBackgroundRotation({ enabled: value })} />
+                {backgroundWorkspace?.slug === 'home' && macDesktopSyncEnabled && (backgroundRotation.enabled !== true || rotationScope !== 'folder' || !backgroundRotation.collectionId) && <p className="form-error">Mac desktop sync is paused until Home rotation is enabled with an imported folder selected.</p>}
                 {backgroundRotation.enabled === true && <div className="background-rotation-controls">
                   <label className="setting-field"><span>Rotation pool</span><select value={rotationScope} onChange={(event) => patchBackgroundRotation({ scope: event.target.value })}>
-                    <option value="all">All backgrounds</option>
+                    <option value="all">All backgrounds · folders + loose</option>
                     <option value="folder">Imported folder</option>
+                    <option value="loose">Loose backgrounds only</option>
                     {workspaceSpecificBackgrounds && <option value="workspace">Selected workspace pool</option>}
                   </select></label>
                   {rotationScope === 'folder' && <label className="setting-field"><span>Folder</span><select value={backgroundRotation.collectionId || ''} onChange={(event) => patchBackgroundRotation({ collectionId: event.target.value || null })}>
@@ -467,12 +496,53 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
                   {rotationScope === 'workspace' && <p className="field-help">{backgroundWorkspace ? `Use the check buttons below to build ${backgroundWorkspace.name}’s pool. Selecting or uploading a background adds it automatically.` : 'Choose a workspace tab to edit or rotate its independent pool.'}</p>}
                 </div>}
               </div>
+              {!openBackgroundCollectionId ? <section className="background-collection-browser" aria-label="Background folders">
+                <header><span><strong>Collections</strong><small>Open a folder to view its images, or make any collection the active rotation source.</small></span></header>
+                <div className="background-collection-grid">
+                  <article className={rotationScope === 'all' ? 'active' : ''}>
+                    <button type="button" className="background-collection-open" onClick={() => setOpenBackgroundCollectionId('all')}>
+                      <span className="background-collection-preview">{backgroundAssets.slice(0, 4).map((asset) => <img key={asset.id} src={`/api/assets/${asset.id}/preview`} alt="" loading="lazy" decoding="async" />)}</span>
+                      <span><strong>All backgrounds</strong><small>{backgroundAssets.length} images · folders and loose</small></span>
+                    </button>
+                    <button type="button" className="background-collection-rotate" onClick={() => patchBackgroundRotation({ enabled: true, scope: 'all' })}>{rotationScope === 'all' ? <><Check /> Rotating</> : <><Play /> Use for rotation</>}</button>
+                  </article>
+                  {looseBackgrounds.length > 0 && <article className={rotationScope === 'loose' ? 'active' : ''}>
+                    <button type="button" className="background-collection-open" onClick={() => setOpenBackgroundCollectionId('loose')}>
+                      <span className="background-collection-preview">{looseBackgrounds.slice(0, 4).map((asset) => <img key={asset.id} src={`/api/assets/${asset.id}/preview`} alt="" loading="lazy" decoding="async" />)}</span>
+                      <span><strong>Loose backgrounds</strong><small>{looseBackgrounds.length} images outside folders</small></span>
+                    </button>
+                    <button type="button" className="background-collection-rotate" onClick={() => patchBackgroundRotation({ enabled: true, scope: 'loose' })}>{rotationScope === 'loose' ? <><Check /> Rotating</> : <><Play /> Use for rotation</>}</button>
+                  </article>}
+                  {(backgroundCollections || []).map((collection) => {
+                    const collectionAssets = collection.assetIds.map((id) => backgroundAssets.find((asset) => asset.id === id)).filter(Boolean)
+                    const rotating = rotationScope === 'folder' && backgroundRotation.collectionId === collection.id
+                    const synced = macSyncedCollectionId === collection.id
+                    return <article key={collection.id} className={rotating ? 'active' : ''}>
+                      <button type="button" className="background-collection-open" onClick={() => setOpenBackgroundCollectionId(collection.id)}>
+                        <span className="background-collection-preview">{collectionAssets.slice(0, 4).map((asset) => <img key={asset.id} src={`/api/assets/${asset.id}/preview`} alt="" loading="lazy" decoding="async" />)}{collectionAssets.length === 0 && <Folder />}</span>
+                        <span><strong><Folder /> {collection.name}</strong><small>{collectionAssets.length} images{synced ? ' · Mac synced' : ''}</small></span>
+                      </button>
+                      <button type="button" className="background-collection-rotate" onClick={() => patchBackgroundRotation({ enabled: true, scope: 'folder', collectionId: collection.id })}>{rotating ? <><Check /> Rotating</> : <><Play /> Use for rotation</>}</button>
+                      {synced && <em className="background-collection-sync">Mac synced</em>}
+                    </article>
+                  })}
+                </div>
+              </section> : <header className="background-collection-detail-header">
+                <button type="button" onClick={() => setOpenBackgroundCollectionId('')}><ArrowLeft /> Collections</button>
+                <span><strong>{openBackgroundCollectionId === 'all' ? 'All backgrounds' : openBackgroundCollectionId === 'loose' ? 'Loose backgrounds' : openBackgroundCollection?.name}</strong><small>{visibleBackgroundAssets.length} images</small></span>
+                <button type="button" className="background-collection-detail-rotate" onClick={() => patchBackgroundRotation(openBackgroundCollectionId === 'all'
+                  ? { enabled: true, scope: 'all' }
+                  : openBackgroundCollectionId === 'loose'
+                    ? { enabled: true, scope: 'loose' }
+                    : { enabled: true, scope: 'folder', collectionId: openBackgroundCollectionId })}><Play /> Use for rotation</button>
+                {macSyncedCollectionId === openBackgroundCollectionId && <em>Mac synced</em>}
+              </header>}
               <div className="background-library" aria-label="Background library">
-                <button type="button" className={!selectedBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null, backgroundTargetWorkspaceId)} aria-pressed={!selectedBackgroundId}>
+                {!openBackgroundCollectionId && <button type="button" className={!selectedBackgroundId ? 'active empty' : 'empty'} onClick={() => onSelectBackground(null, backgroundTargetWorkspaceId)} aria-pressed={!selectedBackgroundId}>
                   <span>{backgroundWorkspace ? 'Use global' : 'None'}</span>
                   {backgroundWorkspace && <small>{globalBackground?.originalName || 'Default background'}</small>}
-                </button>
-                {backgroundAssets.map((asset) => {
+                </button>}
+                {visibleBackgroundAssets.map((asset) => {
                   const collections = (backgroundCollections || []).filter((collection) => collection.assetIds.includes(asset.id))
                   const inWorkspacePool = workspaceBackgroundPool.includes(asset.id)
                   const pendingDelete = pendingBackgroundDeleteId === asset.id

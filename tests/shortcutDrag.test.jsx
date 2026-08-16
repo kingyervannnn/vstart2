@@ -134,4 +134,31 @@ describe('direct shortcut dragging', () => {
     fireEvent.click(tile)
     expect(open).not.toHaveBeenCalled()
   })
+
+  it('opens folder editing by clicking the folder title', async () => {
+    const child = { ...source, parentFolderId: 'folder' }
+    const folder = { id: 'folder', workspaceId: 'home', kind: 'folder', title: 'My folder' }
+    const onEdit = vi.fn()
+    render(<FolderPopover
+      folder={folder}
+      children={[child]}
+      placements={[{ id: 'child-compact', itemId: child.id, workspaceId: 'home', containerKey: folder.id, profile: 'compact', x: 80, y: 80, width: 104, height: 104 }]}
+      profile="compact"
+      editMode={false}
+      openInNewTab={true}
+      labelOpensInline={false}
+      onClose={vi.fn()}
+      onEdit={onEdit}
+      onMove={vi.fn()}
+      onMoveOut={vi.fn()}
+      onOpenInline={vi.fn()}
+      onCreate={vi.fn()}
+      onBlankContextMenu={vi.fn()}
+      onItemContextMenu={vi.fn()}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename My folder' }))
+    expect(document.querySelector('.folder-popover').className).toContain('closing')
+    await waitFor(() => expect(onEdit).toHaveBeenCalledWith(folder))
+  })
 })

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderInput, FolderPlus, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 
 function MenuButton({ children, icon: Icon, danger = false, disabled = false, onClick }) {
@@ -43,9 +44,9 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
     action()
   }
   const item = menu.item
-  const destinations = item && !item.parentFolderId ? workspaces.filter((workspace) => workspace.id !== item.workspaceId) : []
+  const destinations = item ? workspaces.filter((workspace) => workspace.id !== item.workspaceId) : []
 
-  return (
+  return createPortal(
     <div ref={ref} className="app-context-menu" role="menu" aria-label={item ? `${item.title} options` : 'Speed dial options'} style={position}>
       {!item ? <>
         {menu.folder && <div className="context-menu-heading"><strong>{menu.folder.title}</strong><span>Folder space</span></div>}
@@ -71,6 +72,7 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
         <div className="context-menu-separator" />
         <MenuButton icon={Trash2} danger onClick={run(() => onDeleteItem(item))}>{item.pinGroupId ? 'Delete from this workspace' : 'Delete'}</MenuButton>
       </>}
-    </div>
+    </div>,
+    document.body,
   )
 }

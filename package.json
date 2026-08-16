@@ -26,6 +26,7 @@
     "environment:bridge": "node environment-bridge/index.mjs",
     "environment:bridge:manage": "node environment-bridge/launchd.mjs",
     "test:environment-bridge": "vitest run environment-bridge",
+    "background:sync:manage": "node background-sync/launchd.mjs",
     "test:watch": "vitest",
     "check:persistence": "node scripts/check-browser-persistence.mjs",
     "verify": "npm run lint && npm run check:persistence && npm test && npm run build"

@@ -79,7 +79,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .vstart-app.animated-overlay::after { opacity: .45; animation: ambient-overlay 28s linear infinite; }
 @keyframes ambient-overlay { to { transform: rotate(360deg) scale(1.05); } }
 
-.vstart-app.edge-effect { border-radius: 13px; border: 1px solid rgba(255, 255, 255, .3); }
+.vstart-app.edge-effect { border-radius: 13px; }
 .vstart-app.edge-glow { box-shadow: inset 0 0 25px color-mix(in srgb, var(--app-glow) calc(62% * var(--edge-glow-strength)), transparent), 0 0 22px color-mix(in srgb, var(--app-glow) calc(35% * var(--edge-glow-strength)), transparent); }
 .vstart-app.compact-mode.edge-glow { box-shadow: inset 0 17px 32px -17px color-mix(in srgb, var(--app-glow) calc(88% * var(--edge-glow-strength)), transparent), inset 0 0 31px color-mix(in srgb, var(--app-glow) calc(70% * var(--edge-glow-strength)), transparent), 0 0 26px color-mix(in srgb, var(--app-glow) calc(42% * var(--edge-glow-strength)), transparent); }
 .vstart-app.mirrored { flex-direction: row-reverse; }
@@ -434,7 +434,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
   45% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-accent) 20%, transparent), 0 0 28px color-mix(in srgb, var(--app-accent) 58%, transparent); filter: brightness(1.18); }
 }
 .shortcut-tile.dragging { z-index: 30; cursor: grabbing; filter: drop-shadow(0 13px 20px rgba(0,0,0,.28)); transform: scale(1.035); }
-.shortcut-tile.invalid { border-color: #ff5c69; background: rgba(255, 30, 58, .18); }
 .shortcut-tile.drop-target { border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 22%, transparent); transform: scale(1.06); }
 .shortcut-icon-shell { flex: 0 0 auto; width: min(var(--shortcut-icon-size, 78%), 92px); height: auto; aspect-ratio: 1; display: grid; place-items: center; filter: drop-shadow(0 5px 9px rgba(0,0,0,.18)); }
 .shortcut-icon-shell img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; }
@@ -1134,6 +1133,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .app-context-menu .workspace-icon-grid button svg { width: 16px; height: 16px; }
 
 .modal-backdrop, .settings-backdrop, .folder-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(4,7,12,.48); backdrop-filter: blur(11px); }
+.folder-backdrop { opacity: 0; background: rgba(4,7,12,0); backdrop-filter: blur(0) saturate(1); -webkit-backdrop-filter: blur(0) saturate(1); transition: opacity 300ms ease, background-color 320ms ease, backdrop-filter 360ms ease, -webkit-backdrop-filter 360ms ease; will-change: opacity, background-color, backdrop-filter; }
+.folder-backdrop.open { opacity: 1; background: rgba(4,7,12,.28); backdrop-filter: blur(9px) saturate(1.08); -webkit-backdrop-filter: blur(9px) saturate(1.08); }
+.folder-backdrop.closing { pointer-events: none; transition-duration: 210ms; }
 .folder-backdrop-anchored .folder-popover { position: fixed; }
 .shortcut-dialog { width: min(470px, 100%); padding: 21px; border: 1px solid rgba(255,255,255,.2); border-radius: 22px; color: #f6f8ff; background: rgba(16,21,31,.9); box-shadow: 0 28px 80px rgba(0,0,0,.4); }
 .shortcut-dialog header, .shortcut-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -1176,16 +1178,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .workspace-dialog-icon-grid button.active { color: #fff; border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 24%, transparent); }
 .workspace-dialog-icon-grid svg { width: 16px; height: 16px; }
 
-.folder-popover { width: min(680px, calc(100vw - 44px)); height: min(590px, calc(100vh - 64px)); overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: 25px; color: #f4f6ff; background: rgba(15,20,30,.78); box-shadow: 0 28px 80px rgba(0,0,0,.42); backdrop-filter: blur(24px); }
+.folder-popover { width: min(680px, calc(100vw - 44px)); height: min(590px, calc(100vh - 64px)); overflow: hidden; opacity: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 25px; color: #f4f6ff; background: linear-gradient(145deg, rgba(42,49,63,.48), rgba(12,18,28,.36)); box-shadow: 0 28px 80px rgba(0,0,0,.32), inset 0 1px rgba(255,255,255,.12); backdrop-filter: blur(34px) saturate(1.42) brightness(1.05); -webkit-backdrop-filter: blur(34px) saturate(1.42) brightness(1.05); transform: scale(.84) translateY(9px); transform-origin: var(--folder-origin-x, 50%) var(--folder-origin-y, 50%); transition: opacity 260ms ease, transform 330ms cubic-bezier(.16,1,.3,1); will-change: opacity, transform; }
+.folder-popover.open { opacity: 1; transform: scale(1) translateY(0); }
+.folder-popover.closing { transition-duration: 190ms; transition-timing-function: cubic-bezier(.7,0,.84,0); }
 .folder-popover > header { height: 58px; display: flex; align-items: center; gap: 10px; padding: 0 17px; border-bottom: 1px solid rgba(255,255,255,.14); }
-.folder-popover h2 { flex: 1; margin: 0; font-size: 16px; }
 .folder-popover header button { border: 0; border-radius: 9px; padding: 7px 9px; background: rgba(255,255,255,.08); cursor: pointer; }
-.folder-popover header .folder-add-shortcut { width: 31px; height: 31px; display: grid; place-items: center; padding: 0; }
+.folder-popover header .folder-title-edit { flex: 1; min-width: 0; padding: 7px 0; overflow: hidden; border-radius: 0; color: inherit; background: transparent; font: inherit; font-size: 16px; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.folder-popover header .folder-title-edit:hover, .folder-popover header .folder-title-edit:focus-visible { outline: 0; color: var(--app-accent); background: transparent; }
+.folder-popover header .folder-add-shortcut { width: 31px; height: 31px; display: grid; place-items: center; padding: 0; background: transparent; }
+.folder-popover header .folder-add-shortcut:hover, .folder-popover header .folder-add-shortcut:focus-visible { outline: 0; background: rgba(255,255,255,.07); }
 .folder-popover header .folder-add-shortcut svg { width: 15px; height: 15px; }
 .folder-canvas { position: relative; height: calc(100% - 58px); }
 .folder-child { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 8px; color: inherit; text-decoration: none; cursor: grab; touch-action: none; }
 .folder-child.dragging { z-index: 10; border-radius: 14px; background: rgba(255,255,255,.08); cursor: grabbing; }
-.folder-child.invalid { outline: 1px solid #ff6572; background: rgba(255,58,77,.14); }
 .folder-child img, .folder-child .generated-icon { width: min(65%, 68px); aspect-ratio: 1; object-fit: contain; }
 .folder-child-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; white-space: nowrap; }
 .folder-child-actions { position: absolute; top: 1px; right: 1px; display: flex; gap: 3px; }
@@ -1341,6 +1346,35 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .background-rotate-now:hover { border-color: color-mix(in srgb, var(--app-accent) 52%, transparent); background: color-mix(in srgb, var(--app-accent) 12%, transparent); }
 .background-rotate-now:disabled { cursor: default; opacity: .34; }
 .background-rotate-now svg { width: 12px; }
+.background-collection-browser { margin-top: 16px; }
+.background-collection-browser > header { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+.background-collection-browser > header > span { display: grid; gap: 3px; }
+.background-collection-browser > header strong { font-size: 12px; }
+.background-collection-browser > header small { color: color-mix(in srgb, var(--app-text) 48%, transparent); font-size: 8px; line-height: 1.4; }
+.background-collection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; }
+.background-collection-grid > article { position: relative; min-width: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(255,255,255,.025); transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+.background-collection-grid > article:hover { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.04); }
+.background-collection-grid > article.active { border-color: color-mix(in srgb, var(--app-accent) 48%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent); }
+.background-collection-open { width: 100%; display: grid; gap: 8px; border: 0; padding: 8px 8px 40px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.background-collection-preview { height: 66px; display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); gap: 2px; overflow: hidden; border-radius: 9px; color: color-mix(in srgb, var(--app-text) 42%, transparent); background: rgba(255,255,255,.045); }
+.background-collection-preview img { width: 100%; height: 100%; min-height: 0; object-fit: cover; }
+.background-collection-preview > svg { grid-column: 1 / -1; grid-row: 1 / -1; align-self: center; justify-self: center; width: 25px; }
+.background-collection-open > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.background-collection-open strong { display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.background-collection-open strong svg { width: 12px; flex: none; }
+.background-collection-open small { overflow: hidden; color: color-mix(in srgb, var(--app-text) 48%, transparent); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.background-collection-rotate { position: absolute; left: 8px; bottom: 8px; height: 25px; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 8px; padding: 0 8px; color: color-mix(in srgb, var(--app-text) 62%, transparent); background: rgba(7,11,18,.48); cursor: pointer; font-size: 7px; }
+.background-collection-grid > article.active .background-collection-rotate { color: color-mix(in srgb, var(--app-accent) 80%, white 8%); border-color: color-mix(in srgb, var(--app-accent) 36%, transparent); }
+.background-collection-rotate svg { width: 10px; }
+.background-collection-sync { position: absolute; top: 13px; right: 13px; padding: 3px 6px; border: 1px solid color-mix(in srgb, var(--app-accent) 32%, transparent); border-radius: 99px; color: color-mix(in srgb, var(--app-accent) 78%, white 8%); background: rgba(7,11,18,.68); font-size: 6px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(8px); }
+.background-collection-detail-header { min-height: 52px; display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.025); }
+.background-collection-detail-header > button { height: 30px; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; padding: 0 9px; color: inherit; background: rgba(255,255,255,.04); cursor: pointer; font-size: 8px; }
+.background-collection-detail-header > button svg { width: 12px; }
+.background-collection-detail-header > span { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.background-collection-detail-header strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.background-collection-detail-header small { opacity: .48; font-size: 7px; }
+.background-collection-detail-header > button.background-collection-detail-rotate { color: color-mix(in srgb, var(--app-accent) 78%, white 8%); }
+.background-collection-detail-header > em { padding: 3px 6px; border-radius: 99px; color: color-mix(in srgb, var(--app-accent) 78%, white 8%); background: color-mix(in srgb, var(--app-accent) 11%, transparent); font-size: 6px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
 .background-upload-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 17px; }
 .background-upload { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; padding: 14px; border: 1px dashed rgba(255,255,255,.22); border-radius: 14px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
 .background-upload:hover { border-color: color-mix(in srgb, var(--app-accent) 48%, transparent); background: rgba(255,255,255,.025); }
@@ -1463,4 +1497,8 @@ kbd { padding: 1px 5px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
   .app-background-layer.background-custom::after { transition-duration: 480ms !important; }
   .scrolling-header-track { animation-duration: var(--header-scroll-duration, 32s) !important; animation-iteration-count: infinite !important; }
   .workspace-switcher-active { transition: transform 440ms cubic-bezier(.16,1,.3,1) !important; }
+  .folder-backdrop { transition-duration: 300ms, 320ms, 360ms, 360ms !important; }
+  .folder-backdrop.closing { transition-duration: 210ms !important; }
+  .folder-popover { transition-duration: 260ms, 330ms !important; }
+  .folder-popover.closing { transition-duration: 190ms !important; }
 }

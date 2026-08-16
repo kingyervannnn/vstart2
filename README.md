@@ -133,6 +133,13 @@ one-percent steps. It overscans a dedicated viewport background layer without sc
 the interface, which covers rounded-browser edge seams while preserving layout and drag
 coordinates.
 
+To keep the Home workspace and the macOS desktop on the same imported-folder image and
+wall-clock rotation boundary, install the optional native
+[Background Sync](background-sync/README.md) service with
+`npm run background:sync:manage -- install`. It uses the existing database collection and
+rotation interval; the independent **Sync Home with Mac desktop** toggle leaves ordinary
+V Start rotation behavior intact and does not add browser-side persistence.
+
 ## Verify it
 
 ```sh
