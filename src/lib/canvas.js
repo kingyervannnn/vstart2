@@ -36,6 +36,42 @@ export function findOpenPlacement(placements, profile, preferred = {}) {
   return null
 }
 
+export function nearestOpenPlacement(value, placements, profile, ignoredItemId = null) {
+  const canvas = CANVASES[profile]
+  const preferred = clampPlacement(value, profile)
+  if (!collides(preferred, placements, ignoredItemId)) return preferred
+
+  const occupied = placements.filter((placement) => placement.itemId !== ignoredItemId)
+  const maximumX = canvas.width - preferred.width
+  const maximumY = canvas.height - preferred.height
+  const clampX = (x) => Math.max(0, Math.min(maximumX, x))
+  const clampY = (y) => Math.max(0, Math.min(maximumY, y))
+  const xPositions = new Set([preferred.x, 0, maximumX])
+  const yPositions = new Set([preferred.y, 0, maximumY])
+
+  for (const placement of occupied) {
+    xPositions.add(clampX(placement.x - preferred.width))
+    xPositions.add(clampX(placement.x + placement.width))
+    yPositions.add(clampY(placement.y - preferred.height))
+    yPositions.add(clampY(placement.y + placement.height))
+  }
+
+  let nearest = null
+  let nearestDistance = Number.POSITIVE_INFINITY
+  for (const y of yPositions) {
+    for (const x of xPositions) {
+      const candidate = { ...preferred, x, y }
+      if (collides(candidate, occupied)) continue
+      const distance = (x - preferred.x) ** 2 + (y - preferred.y) ** 2
+      if (distance < nearestDistance) {
+        nearest = candidate
+        nearestDistance = distance
+      }
+    }
+  }
+  return nearest
+}
+
 export function projectPlacement(value, fromProfile, toProfile) {
   const from = CANVASES[fromProfile]
   const to = CANVASES[toProfile]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampPlacement, findOpenPlacement, intersects, projectPlacement } from '../src/lib/canvas.js'
+import { clampPlacement, findOpenPlacement, intersects, nearestOpenPlacement, projectPlacement } from '../src/lib/canvas.js'
 
 describe('continuous placement canvas', () => {
   it('treats touching edges as non-overlapping', () => {
@@ -24,5 +24,25 @@ describe('continuous placement canvas', () => {
     const open = findOpenPlacement(occupied, 'wide', { x: 80, y: 120 })
     expect(open).not.toBeNull()
     expect(intersects(open, occupied[0])).toBe(false)
+  })
+
+  it('resolves a colliding drop to the nearest continuous open position', () => {
+    const occupied = [{ itemId: 'target', x: 400, y: 100, width: 120, height: 120 }]
+    expect(nearestOpenPlacement({ itemId: 'source', x: 330, y: 100, width: 120, height: 120 }, occupied, 'wide', 'source')).toEqual({
+      itemId: 'source',
+      x: 280,
+      y: 100,
+      width: 120,
+      height: 120,
+    })
+  })
+
+  it('finds the closest legal corner when several shortcuts block the drop', () => {
+    const occupied = [
+      { itemId: 'right', x: 390, y: 100, width: 120, height: 120 },
+      { itemId: 'left', x: 160, y: 100, width: 120, height: 120 },
+    ]
+    const open = nearestOpenPlacement({ itemId: 'source', x: 300, y: 100, width: 120, height: 120 }, occupied, 'wide', 'source')
+    expect(open).toEqual({ itemId: 'source', x: 300, y: 220, width: 120, height: 120 })
   })
 })

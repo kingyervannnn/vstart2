@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Folder, Pencil, Plus } from 'lucide-react'
-import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
+import { clampPlacement, collides, nearestOpenPlacement, placementStyle, pointToLogical } from '../lib/canvas.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
 
 const DRAG_START_THRESHOLD = 7
@@ -53,7 +53,7 @@ export function DialCanvas({
     event.stopPropagation()
     const point = logicalPoint(event)
     event.currentTarget.setPointerCapture(event.pointerId)
-    dragRef.current = { item, value, start: point, pointerId: event.pointerId, moved: false, candidate: value, target: null, invalid: false }
+    dragRef.current = { item, value, start: point, pointerId: event.pointerId, moved: false, candidate: value, resolved: value, target: null, invalid: false }
   }
 
   const moveDrag = (event) => {
@@ -69,9 +69,10 @@ export function DialCanvas({
       point.x >= value.x && point.x <= value.x + value.width &&
       point.y >= value.y && point.y <= value.y + value.height)
     const invalid = !target && collides(candidate, rootPlacements, drag.item.id)
+    const resolved = invalid ? nearestOpenPlacement(candidate, rootPlacements, profile, drag.item.id) : candidate
     const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > DRAG_START_THRESHOLD
-    dragRef.current = { ...drag, moved, candidate, target, invalid }
-    if (moved) setPreview({ itemId: drag.item.id, value: candidate, targetId: target?.itemId || null, invalid })
+    dragRef.current = { ...drag, moved, candidate, resolved, target, invalid }
+    if (moved) setPreview({ itemId: drag.item.id, value: target ? candidate : resolved || candidate, targetId: target?.itemId || null, invalid })
   }
 
   const endDrag = async (event) => {
@@ -86,7 +87,7 @@ export function DialCanvas({
       if (targetItem) await onDropOnItem(drag.item, targetItem)
       return
     }
-    if (!drag.invalid) await onMove(drag.item, drag.candidate)
+    if (drag.resolved) await onMove(drag.item, drag.resolved)
   }
 
   const cancelDrag = () => {

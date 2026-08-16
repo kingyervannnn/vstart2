@@ -100,6 +100,22 @@ describe('direct shortcut dragging', () => {
     expect(onMove).not.toHaveBeenCalled()
   })
 
+  it('snaps an overlapping non-target drop to the nearest open position', async () => {
+    const onDropOnItem = vi.fn()
+    const onMove = vi.fn()
+    render(<DialCanvas {...dialProps({ onDropOnItem, onMove })} />)
+    const canvas = screen.getByRole('region', { name: 'Home speed dial' })
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(bounds)
+    const tile = screen.getByRole('link', { name: 'Source' })
+
+    fireEvent.pointerDown(tile, { button: 0, pointerId: 5, clientX: 100, clientY: 100 })
+    fireEvent.pointerMove(tile, { pointerId: 5, clientX: 350, clientY: 120 })
+    fireEvent.pointerUp(tile, { pointerId: 5, clientX: 350, clientY: 120 })
+
+    await waitFor(() => expect(onMove).toHaveBeenCalledWith(source, expect.objectContaining({ x: 280, y: 100 })))
+    expect(onDropOnItem).not.toHaveBeenCalled()
+  })
+
   it('rearranges shortcuts inside a folder without edit mode', async () => {
     const child = { ...source, parentFolderId: 'folder' }
     const folder = { id: 'folder', workspaceId: 'home', kind: 'folder', title: 'Folder' }

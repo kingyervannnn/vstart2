@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, FolderOpen, Pencil, Plus, X } from 'lucide-react'
-import { clampPlacement, collides, placementStyle, pointToLogical } from '../lib/canvas.js'
+import { clampPlacement, collides, nearestOpenPlacement, placementStyle, pointToLogical } from '../lib/canvas.js'
 import { folderPopoverPosition } from '../lib/folderPopover.js'
 
 const DRAG_START_THRESHOLD = 7
@@ -98,9 +98,10 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
     const point = pointToLogical(event.clientX, event.clientY, drag.bounds, profile)
     const candidate = clampPlacement({ ...drag.value, x: drag.value.x + point.x - drag.start.x, y: drag.value.y + point.y - drag.start.y }, profile)
     const invalid = collides(candidate, childPlacements, drag.child.id)
+    const resolved = invalid ? nearestOpenPlacement(candidate, childPlacements, profile, drag.child.id) : candidate
     const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > DRAG_START_THRESHOLD
-    dragRef.current = { ...drag, candidate, invalid, moved }
-    if (moved) setPreview({ itemId: drag.child.id, value: candidate, invalid })
+    dragRef.current = { ...drag, candidate, resolved, invalid, moved }
+    if (moved) setPreview({ itemId: drag.child.id, value: resolved || candidate, invalid })
   }
 
   const endDrag = async (event) => {
@@ -112,7 +113,7 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
     suppressedClickRef.current = { itemId: drag.child.id, until: Date.now() + CLICK_SUPPRESSION_MS }
     const outside = event.clientX < drag.bounds.left || event.clientX > drag.bounds.right || event.clientY < drag.bounds.top || event.clientY > drag.bounds.bottom
     if (outside) return onMoveOut(drag.child)
-    if (!drag.invalid) await onMove(drag.child, drag.candidate)
+    if (drag.resolved) await onMove(drag.child, drag.resolved)
   }
 
   const cancelDrag = () => {
