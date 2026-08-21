@@ -1075,6 +1075,8 @@ export function App() {
           <MapSearchView
             key={location.search}
             query={routedView.query}
+            mode={routedView.mode}
+            bounds={routedView.bounds}
             fullScreen={routedView.fullScreen}
             compact={compact}
             resultsHost={mapResultsHost}

@@ -9,6 +9,15 @@ function safeHttpUrl(value) {
   }
 }
 
+function safeMapBounds(value) {
+  const coordinates = String(value || '').split(',').map(Number)
+  if (coordinates.length !== 4 || !coordinates.every(Number.isFinite)) return null
+  const [west, south, east, north] = coordinates
+  if (west < -180 || east > 180 || south < -90 || north > 90 || east <= west || north <= south) return null
+  if (east - west > 0.5 || north - south > 0.5) return null
+  return { west, south, east, north }
+}
+
 export function parseViewSearch(search = '') {
   const params = new URLSearchParams(search)
   const view = params.get('view') || ''
@@ -20,7 +29,14 @@ export function parseViewSearch(search = '') {
   }
   if (view === 'map') {
     const query = (params.get('q') || '').trim().slice(0, 300)
-    return query ? { type: 'map', query, fullScreen: params.get('full') === '1' } : { type: 'dial' }
+    const bounds = safeMapBounds(params.get('bbox'))
+    const mode = params.get('mode') === 'nearby' && bounds ? 'nearby' : 'search'
+    return query ? {
+      type: 'map',
+      query,
+      ...(mode === 'nearby' ? { mode, bounds } : {}),
+      fullScreen: params.get('full') === '1',
+    } : { type: 'dial' }
   }
   if (view === 'frame') {
     const url = safeHttpUrl(params.get('url') || '')
@@ -55,6 +71,11 @@ export function buildViewSearch(view) {
   } else if (view.type === 'map' && String(view.query || '').trim()) {
     params.set('view', 'map')
     params.set('q', String(view.query).trim().slice(0, 300))
+    const bounds = safeMapBounds(view.bounds ? [view.bounds.west, view.bounds.south, view.bounds.east, view.bounds.north].join(',') : '')
+    if (view.mode === 'nearby' && bounds) {
+      params.set('mode', 'nearby')
+      params.set('bbox', [bounds.west, bounds.south, bounds.east, bounds.north].join(','))
+    }
     if (view.fullScreen) params.set('full', '1')
   } else {
     return ''

@@ -22,6 +22,7 @@ services:
       SEARXNG_URL: http://searxng:8080
       MUSIC_LOOPBACK_HOST: host.docker.internal
       NOMINATIM_URL: ${VSTART2_NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+      OVERPASS_URL: ${VSTART2_OVERPASS_URL:-https://overpass-api.de}
       MAP_SEARCH_USER_AGENT: ${VSTART2_MAP_SEARCH_USER_AGENT:-VStart2/0.1 (+https://github.com/kingyervannnn/vstart2)}
     ports:
       - "3110:3110"

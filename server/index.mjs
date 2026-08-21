@@ -1059,6 +1059,15 @@ async function handleRequest(request, response) {
     return sendJson(response, 200, await mapSearch.search(url.searchParams.get('q') || ''))
   }
 
+  if (request.method === 'GET' && pathname === '/api/maps/nearby') {
+    return sendJson(response, 200, await mapSearch.nearby(url.searchParams.get('q') || '', {
+      west: url.searchParams.get('west'),
+      south: url.searchParams.get('south'),
+      east: url.searchParams.get('east'),
+      north: url.searchParams.get('north'),
+    }))
+  }
+
   if (request.method === 'GET' && pathname === '/api/suggestions') {
     const query = url.searchParams.get('q')?.trim()
     if (!query) return sendJson(response, 200, { suggestions: [] })

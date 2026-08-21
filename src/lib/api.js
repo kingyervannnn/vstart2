@@ -69,6 +69,11 @@ export const api = {
   deleteBackground: (id) => mutation(`/api/assets/${id}`, 'DELETE', {}, 'background-delete'),
   search: (query, category = 'general') => request(`/api/search?q=${encodeURIComponent(query)}&category=${category === 'images' ? 'images' : 'general'}`),
   mapSearch: (query) => request(`/api/maps/search?q=${encodeURIComponent(query)}`),
+  mapNearby: (query, bounds) => {
+    const params = new URLSearchParams({ q: query })
+    for (const key of ['west', 'south', 'east', 'north']) params.set(key, String(bounds[key]))
+    return request(`/api/maps/nearby?${params}`)
+  },
   suggestions: (query) => request(`/api/suggestions?q=${encodeURIComponent(query)}`),
   shortcutMetadata: (url, signal) => request(`/api/shortcut-metadata?url=${encodeURIComponent(url)}`, { signal }),
 }

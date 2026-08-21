@@ -8,6 +8,7 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch(buildViewSearch({ type: 'search', query: 'mountains', category: 'images' }))).toEqual({ type: 'search', query: 'mountains', category: 'images', fullScreen: false })
     expect(parseViewSearch(buildViewSearch({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' } }))).toEqual({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' }, fullScreen: false })
     expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Central Park', fullScreen: true }))).toEqual({ type: 'map', query: 'Central Park', fullScreen: true })
+    expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Coffee', mode: 'nearby', bounds: { west: -74.02, south: 40.69, east: -73.91, north: 40.82 } }))).toEqual({ type: 'map', query: 'Coffee', mode: 'nearby', bounds: { west: -74.02, south: 40.69, east: -73.91, north: 40.82 }, fullScreen: false })
   })
 
   it('restores services and rejects unsafe frame URLs', () => {
@@ -15,6 +16,7 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch('?view=weather')).toEqual({ type: 'service', kind: 'weather' })
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
     expect(parseViewSearch('?view=map')).toEqual({ type: 'dial' })
+    expect(parseViewSearch('?view=map&q=Coffee&mode=nearby&bbox=-80%2C30%2C-70%2C40')).toEqual({ type: 'map', query: 'Coffee', fullScreen: false })
   })
 
   it('closes the active widget and switches directly to a different widget', () => {
