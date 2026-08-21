@@ -18,6 +18,10 @@ export function parseViewSearch(search = '') {
     const category = params.get('category') === 'images' ? 'images' : 'general'
     return query ? { type: 'search', query, category, fullScreen: params.get('full') === '1' } : { type: 'dial' }
   }
+  if (view === 'map') {
+    const query = (params.get('q') || '').trim().slice(0, 300)
+    return query ? { type: 'map', query, fullScreen: params.get('full') === '1' } : { type: 'dial' }
+  }
   if (view === 'frame') {
     const url = safeHttpUrl(params.get('url') || '')
     if (!url) return { type: 'dial' }
@@ -47,6 +51,10 @@ export function buildViewSearch(view) {
     if (view.category === 'images') params.set('category', 'images')
     params.set('url', url)
     if (String(view.result?.title || '').trim()) params.set('title', String(view.result.title).trim().slice(0, 200))
+    if (view.fullScreen) params.set('full', '1')
+  } else if (view.type === 'map' && String(view.query || '').trim()) {
+    params.set('view', 'map')
+    params.set('q', String(view.query).trim().slice(0, 300))
     if (view.fullScreen) params.set('full', '1')
   } else {
     return ''

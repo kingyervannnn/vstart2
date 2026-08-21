@@ -36,6 +36,12 @@ export function parseShortcutSearch(value) {
   }
 }
 
+export function parseMapCommand(value) {
+  const text = String(value || '').trim()
+  const match = text.match(/^(?:map\s*:|\/map(?:\s+|$))\s*(.*)$/i)
+  return match ? { active: true, query: match[1].trim() } : { active: false, query: text }
+}
+
 function shortcutMatchScore(item, folder, query) {
   if (!query) return 0
   const title = normalizeSearchText(item.title)

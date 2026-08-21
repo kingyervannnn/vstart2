@@ -72,6 +72,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const shortcutSize = Math.max(56, Math.min(92, Number(settings.speedDial?.shortcutSize) || 78))
   const wheelResistance = Math.max(0, Math.min(100, Number(settings.speedDial?.wheelResistance) || 0))
   const searchAppearance = settings.search?.appearance || {}
+  const searchControls = settings.search?.controls || {}
   const searchBlur = Math.max(0, Math.min(40, Number(searchAppearance.blur) || 0))
   const searchGlowStyle = GLOW_OPTIONS.some(([value]) => value === searchAppearance.glowStyle)
     ? searchAppearance.glowStyle
@@ -329,16 +330,22 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <label className="setting-field"><span>External search engine</span><select value={settings.search?.engine || 'google'} onChange={(event) => onPatch({ search: { engine: event.target.value } })}><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave</option><option value="searxng">SearXNG (local)</option></select></label>
               <p className="field-help">Used only when Inline Results is off. This selection never changes the inline provider.</p>
               <div className="setting-note"><strong>Inline search provider · SearXNG</strong><span>Inline text and image results always use the private SearXNG service bundled with V Start.</span></div>
-              <Toggle label="Inline results" checked={settings.search?.inlineEnabled !== false} onChange={(value) => onPatch({ search: { inlineEnabled: value } })} />
               <label className="setting-field"><span>Result click behavior</span><select value={settings.search?.inlineLinkBehavior || 'inline'} onChange={(event) => onPatch({ search: { inlineLinkBehavior: event.target.value } })}><option value="inline">Open inline in right rail</option><option value="inline-fullscreen">Open inline full screen</option><option value="external">Open in a new tab</option></select></label>
               <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
-              <Toggle label="Image search" checked={settings.search?.imageSearchEnabled !== false} onChange={(value) => onPatch({ search: { imageSearchEnabled: value } })} />
+              <div className="setting-subsection search-control-settings">
+                <h4>Search bar controls</h4>
+                <Toggle label="Inline results" detail="Show the globe control." checked={searchControls.inline ?? (settings.search?.inlineEnabled !== false)} onChange={(value) => onPatch({ search: { controls: { inline: value } } })} />
+                <Toggle label="Voice" detail="Show the microphone control." checked={searchControls.voice !== false} onChange={(value) => onPatch({ search: { controls: { voice: value } } })} />
+                <Toggle label="Image search" detail="Show the image-search control." checked={searchControls.image ?? (settings.search?.imageSearchEnabled !== false)} onChange={(value) => onPatch({ search: { controls: { image: value } } })} />
+                <Toggle label="Map search" detail="Show the map control between Image and AI." checked={searchControls.map !== false} onChange={(value) => onPatch({ search: { controls: { map: value } } })} />
+                <Toggle label="AI" detail="Show the Hermes Agent Mode control." checked={searchControls.agent !== false} onChange={(value) => onPatch({ search: { controls: { agent: value } } })} />
+              </div>
               <Toggle label="Search bar outline" checked={searchAppearance.outline !== false} onChange={(value) => onPatch({ search: { appearance: { outline: value } } })} />
               <label className="setting-field"><span>Search bar glow</span><select value={searchGlowStyle} onChange={(event) => onPatch({ search: { appearance: { glowStyle: event.target.value } } })}>{GLOW_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               {searchGlowStyle !== 'off' && <label className="setting-field"><span>Show search glow</span><select value={searchGlowTrigger} onChange={(event) => onPatch({ search: { appearance: { glowTrigger: event.target.value } } })}>{SEARCH_GLOW_TRIGGERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
               <label className="setting-field range-setting"><span>Search bar blur <output aria-hidden="true">{searchBlur}px</output></span><input type="range" min="0" max="40" step="1" value={searchBlur} aria-label="Search bar blur" onChange={(event) => onPatch({ search: { appearance: { blur: Number(event.target.value) } } })} /></label>
               <p className="field-help">In edit mode, drag the handle beside the workspace buttons to set their horizontal relationship to the search bar.</p>
-              <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search</span></div>
+              <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search · <kbd>⌘ ⇧ M</kbd> primes map search</span></div>
               <div className="setting-note"><strong>AI control</strong><span>The V Start 1 glyph opens the local Hermes Agent Mode. Search never stores provider credentials.</span></div>
             </>}
             {page === 'agent' && <>

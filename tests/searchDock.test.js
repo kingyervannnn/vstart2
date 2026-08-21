@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../src/lib/searchDock.js'
+import { clampDockGeometry, findShortcutMatches, parseMapCommand, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../src/lib/searchDock.js'
 
 describe('search dock placement', () => {
   it('keeps the dock fully inside its normalized rail', () => {
@@ -22,6 +22,12 @@ describe('search dock placement', () => {
   it('recognizes @ as a shortcut-only scope without changing ordinary queries', () => {
     expect(parseShortcutSearch('@ mail')).toEqual({ shortcutOnly: true, query: 'mail' })
     expect(parseShortcutSearch('mail')).toEqual({ shortcutOnly: false, query: 'mail' })
+  })
+
+  it('recognizes explicit map commands without claiming ordinary searches', () => {
+    expect(parseMapCommand('map: coffee near me')).toEqual({ active: true, query: 'coffee near me' })
+    expect(parseMapCommand('/map Central Park')).toEqual({ active: true, query: 'Central Park' })
+    expect(parseMapCommand('map projection')).toEqual({ active: false, query: 'map projection' })
   })
 
   it('ranks current-workspace shortcuts first and includes folder and URL matches', () => {

@@ -16,6 +16,7 @@ import { glowStrength } from './lib/glowIntensity.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
+import { MapSearchView } from './components/MapSearchView.jsx'
 import { ScrollingHeader } from './components/ScrollingHeader.jsx'
 import { SearchDock } from './components/SearchDock.jsx'
 import { ServiceRailView } from './components/ServiceRailView.jsx'
@@ -193,7 +194,7 @@ export function App() {
     || settings.mail?.defaultAccount
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
-  const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
+  const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'map' && !routedView.fullScreen ? 'map' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
   const renderedViewVeil = viewVeil || lastViewVeil
 
   useEffect(() => {
@@ -823,6 +824,7 @@ export function App() {
   }
 
   const runInlineSearch = (query) => navigateView({ type: 'search', query, category: 'general' })
+  const runMapSearch = (query) => navigateView({ type: 'map', query, fullScreen: false })
   const openSearchBarUrl = useCallback((url) => {
     let title = url
     try {
@@ -1048,6 +1050,7 @@ export function App() {
   const showCompactInnerRing = compact
     && settings.general?.innerOutline
     && !routedInline
+    && routedView.type !== 'map'
     && routedView.type !== 'service'
     && !agentMode
 
@@ -1055,7 +1058,7 @@ export function App() {
     {previousBackgroundStyle && <div className={`app-background-layer background-previous ${backgroundLayers.previousId ? 'background-custom' : 'background-default'}`} style={previousBackgroundStyle} aria-hidden="true" />}
     <div key={displayedBackgroundId || 'default'} className={`app-background-layer background-current ${displayedBackgroundId ? 'background-custom' : 'background-default'} ${previousBackgroundStyle ? 'background-fading-in' : ''}`} style={currentBackgroundStyle} aria-hidden="true" />
     <main
-      className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
+      className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${routedView.type === 'map' ? 'map-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
     >
       <div
@@ -1067,7 +1070,18 @@ export function App() {
       <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
-        {routedInline ? (
+        {routedView.type === 'map' ? (
+          <MapSearchView
+            key={location.search}
+            query={routedView.query}
+            fullScreen={routedView.fullScreen}
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspace.id}
+            onNavigate={navigateView}
+            onCreateShortcut={quickShortcutFromResult}
+            onClose={() => navigateView({ type: 'dial' })}
+          />
+        ) : routedInline ? (
           <InlineResults
             key={location.search}
             {...routedInline}
@@ -1138,7 +1152,7 @@ export function App() {
             onItemContextMenu={({ x, y, item }) => { setWorkspaceMenu(null); setContextMenu({ x, y, point: null, item }) }}
           />
         )}
-        {routedView.type !== 'service' && <SearchDock
+        {routedView.type !== 'service' && routedView.type !== 'map' && <SearchDock
           settings={settings}
           profile={profile}
           compact={compact}
@@ -1151,6 +1165,7 @@ export function App() {
           onWorkspaceLayoutCommit={(profileName, layout) => patchSettings({ search: { workspaceOffset: { [profileName]: layout.offset }, workspaceSide: { [profileName]: layout.side } } })}
           onGeometryCommit={(profileName, geometry) => patchSettings({ search: { dock: { [profileName]: geometry } } })}
           onInlineResults={runInlineSearch}
+          onMapSearch={runMapSearch}
           onInlineImageSearch={runInlineImageSearch}
           onOpenUrl={openSearchBarUrl}
           onOpenShortcut={openShortcutFromSearch}

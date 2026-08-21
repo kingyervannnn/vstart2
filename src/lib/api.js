@@ -68,6 +68,7 @@ export const api = {
   },
   deleteBackground: (id) => mutation(`/api/assets/${id}`, 'DELETE', {}, 'background-delete'),
   search: (query, category = 'general') => request(`/api/search?q=${encodeURIComponent(query)}&category=${category === 'images' ? 'images' : 'general'}`),
+  mapSearch: (query) => request(`/api/maps/search?q=${encodeURIComponent(query)}`),
   suggestions: (query) => request(`/api/suggestions?q=${encodeURIComponent(query)}`),
   shortcutMetadata: (url, signal) => request(`/api/shortcut-metadata?url=${encodeURIComponent(url)}`, { signal }),
 }

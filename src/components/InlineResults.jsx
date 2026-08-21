@@ -10,7 +10,7 @@ function requiresFrameAssist(url) {
   }
 }
 
-function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcut }) {
+export function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreateShortcut }) {
   const [workspaceId, setWorkspaceId] = useState(activeWorkspaceId)
   const [state, setState] = useState('idle')
 

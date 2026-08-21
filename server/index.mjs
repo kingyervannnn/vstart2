@@ -9,8 +9,10 @@ import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
 import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from './validation.mjs'
 import { BACKGROUND_MIME_TYPES, createBackgroundPreview, ensureBackgroundPreview, MAX_BACKGROUND_BYTES, storeBackgroundAsset, warmBackgroundPreviews } from './backgrounds.mjs'
+import { createMapSearchService } from './map-search.mjs'
 
 const PORT = Number(process.env.PORT || 3110)
+const mapSearch = createMapSearchService({ database: pool })
 const CANVASES = {
   wide: { width: 1600, height: 1000 },
   compact: { width: 820, height: 1000 },
@@ -1051,6 +1053,10 @@ async function handleRequest(request, response) {
     } catch (error) {
       return sendJson(response, 503, { error: 'Inline search is temporarily unavailable', details: error.message })
     }
+  }
+
+  if (request.method === 'GET' && pathname === '/api/maps/search') {
+    return sendJson(response, 200, await mapSearch.search(url.searchParams.get('q') || ''))
   }
 
   if (request.method === 'GET' && pathname === '/api/suggestions') {

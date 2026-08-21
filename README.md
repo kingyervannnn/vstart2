@@ -37,6 +37,7 @@ state.
 - [Settings organization](docs/SETTINGS.md)
 - [Implementation sequence](docs/IMPLEMENTATION_SEQUENCE.md)
 - [Hermes Agent Mode](docs/AGENT_MODE.md)
+- [Map Search](docs/MAP_SEARCH.md)
 
 ## Run it
 
@@ -132,6 +133,11 @@ Settings → Backgrounds also provides a database-backed 100–120% wallpaper zo
 one-percent steps. It overscans a dedicated viewport background layer without scaling
 the interface, which covers rounded-browser edge seams while preserving layout and drag
 coordinates.
+
+Map Search is available from the Map control between Image and AI: click it with current
+text, type `map:` or `/map`, use Command/Ctrl+Shift+M, or choose **Show on map** from suggestions. Search settings can hide each optional dock control independently. It opens a
+native, refresh-restorable MapLibre view backed by a rate-controlled, PostgreSQL-cached
+Nominatim proxy. See [Map Search](docs/MAP_SEARCH.md) for service and attribution details.
 
 To keep the Home workspace and the macOS desktop on the same imported-folder image and
 wall-clock rotation boundary, install the optional native

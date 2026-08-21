@@ -7,12 +7,14 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch(buildViewSearch({ type: 'frame', query: 'open ai', result: { title: 'OpenAI', url: 'https://openai.com' }, fullScreen: true }))).toEqual({ type: 'frame', query: 'open ai', category: 'general', result: { title: 'OpenAI', url: 'https://openai.com/' }, fullScreen: true })
     expect(parseViewSearch(buildViewSearch({ type: 'search', query: 'mountains', category: 'images' }))).toEqual({ type: 'search', query: 'mountains', category: 'images', fullScreen: false })
     expect(parseViewSearch(buildViewSearch({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' } }))).toEqual({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' }, fullScreen: false })
+    expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Central Park', fullScreen: true }))).toEqual({ type: 'map', query: 'Central Park', fullScreen: true })
   })
 
   it('restores services and rejects unsafe frame URLs', () => {
     expect(parseViewSearch('?view=mail')).toEqual({ type: 'service', kind: 'mail' })
     expect(parseViewSearch('?view=weather')).toEqual({ type: 'service', kind: 'weather' })
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
+    expect(parseViewSearch('?view=map')).toEqual({ type: 'dial' })
   })
 
   it('closes the active widget and switches directly to a different widget', () => {

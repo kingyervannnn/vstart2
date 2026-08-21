@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, Mic, Paperclip, Search, Send, Sparkles, Square, X } from 'lucide-react'
+import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, MapPinned, Mic, Paperclip, Search, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
-import { clampDockGeometry, findShortcutMatches, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
+import { clampDockGeometry, findShortcutMatches, parseMapCommand, parseShortcutSearch, shouldDropSuggestionsUp, shouldHideWorkspaceSwitcher } from '../lib/searchDock.js'
 import { externalImageSearchUrl, externalSearchUrl, normalizeNavigableUrl } from '../lib/searchEngines.js'
 import { deriveVoiceWaveform, quietVoiceWaveform } from '../lib/voiceWaveform.js'
 import { ShortcutIcon } from './FolderPopover.jsx'
@@ -28,6 +28,7 @@ export function SearchDock({
   onGeometryCommit,
   onWorkspaceLayoutCommit,
   onInlineResults,
+  onMapSearch,
   onInlineImageSearch,
   onOpenUrl,
   onOpenShortcut,
@@ -63,6 +64,12 @@ export function SearchDock({
   const configuredWorkspaceOffset = Number(settings.search?.workspaceOffset?.[profile]) || 0
   const configuredWorkspaceSide = settings.search?.workspaceSide?.[profile] === 'bottom' ? 'bottom' : 'top'
   const searchAppearance = settings.search?.appearance || {}
+  const searchControls = settings.search?.controls || {}
+  const showInlineControl = searchControls.inline ?? (settings.search?.inlineEnabled !== false)
+  const showVoiceControl = searchControls.voice !== false
+  const showImageControl = searchControls.image ?? (settings.search?.imageSearchEnabled !== false)
+  const showMapControl = searchControls.map !== false
+  const showAgentControl = searchControls.agent !== false && settings.agent?.enabled !== false
   const searchGlowStyle = ['off', 'bottom', 'full'].includes(searchAppearance.glowStyle)
     ? searchAppearance.glowStyle
     : searchAppearance.outerGlow ? 'full' : 'bottom'
@@ -89,13 +96,15 @@ export function SearchDock({
   const [voiceLevels, setVoiceLevels] = useState(quietVoiceWaveform)
   const imageDragDepthRef = useRef(0)
   const shortcutSearch = parseShortcutSearch(query)
+  const mapCommand = parseMapCommand(query)
   const shortcutSearchActive = shortcutSearch.shortcutOnly || shortcutSearch.query.length >= 2
   const shortcutResults = useMemo(() => shortcutSearchActive
     ? findShortcutMatches({ items, workspaces, activeWorkspaceId, query: shortcutSearch.query })
     : [], [activeWorkspaceId, items, shortcutSearch.query, shortcutSearchActive, workspaces])
   const visibleShortcutResults = shortcutResults.slice(0, shortcutSearch.shortcutOnly ? 8 : 5)
   const shortcutPanelVisible = !agentMode && suggestionsOpen && (shortcutSearch.shortcutOnly || visibleShortcutResults.length > 0)
-  const suggestionRowCount = suggestions.length + visibleShortcutResults.length + (shortcutPanelVisible ? 1 : 0)
+  const mapSuggestionVisible = !agentMode && suggestionsOpen && !imageAttachment && !imageMode && !shortcutSearch.shortcutOnly && mapCommand.query.length >= 2
+  const suggestionRowCount = suggestions.length + visibleShortcutResults.length + (shortcutPanelVisible ? 1 : 0) + (mapSuggestionVisible ? 1 : 0)
 
   const stopVoiceAnalysis = useCallback((reset = true) => {
     if (voiceFrameRef.current) cancelAnimationFrame(voiceFrameRef.current)
@@ -200,6 +209,12 @@ export function SearchDock({
       if (!agentMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
         event.preventDefault()
         setImageMode((value) => !value)
+        inputRef.current?.focus()
+      }
+      if (!agentMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'm') {
+        event.preventDefault()
+        setQuery((value) => parseMapCommand(value).active ? value : `map: ${value}`)
+        setSuggestionsOpen(true)
         inputRef.current?.focus()
       }
       if (!agentMode && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -384,12 +399,18 @@ export function SearchDock({
   const submit = async (event, selectedQuery = null) => {
     event?.preventDefault()
     const value = String(selectedQuery ?? query).trim()
+    const submittedMapCommand = parseMapCommand(value)
     if ((!value && !imageAttachment) || imageBusy) return
     setSuggestionsOpen(false)
     setImageError('')
     if (!agentMode && shortcutSearch.shortcutOnly && !imageAttachment) {
       openShortcutMatch(shortcutResults[0])
       return
+    }
+    if (!agentMode && submittedMapCommand.active && !imageAttachment && !imageMode) {
+      if (!submittedMapCommand.query) return
+      setQuery('')
+      return onMapSearch?.(submittedMapCommand.query)
     }
     if (agentMode) {
       if (!agentReady || (agentRunning && imageAttachment)) return
@@ -471,6 +492,20 @@ export function SearchDock({
       ? externalImageSearchUrl(settings.search?.engine, value)
       : externalSearchUrl(settings.search?.engine, value)
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
+  }
+
+  const openMapSearch = () => {
+    const command = parseMapCommand(query)
+    const value = command.active ? command.query : query.trim()
+    if (!value) {
+      setQuery('map: ')
+      setSuggestionsOpen(true)
+      inputRef.current?.focus()
+      return
+    }
+    setQuery('')
+    setSuggestionsOpen(false)
+    onMapSearch?.(value)
   }
 
   const attachImage = async (file) => {
@@ -598,7 +633,7 @@ export function SearchDock({
   }
 
   const effectiveWorkspaceSide = compact ? 'top' : workspaceSide
-  const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible)
+  const suggestionsVisible = !agentMode && suggestionsOpen && (suggestions.length > 0 || shortcutPanelVisible || mapSuggestionVisible)
   const workspaceHiddenBySuggestions = shouldHideWorkspaceSwitcher(effectiveWorkspaceSide, suggestionsDropUp, suggestionsVisible)
   const clearVisible = query.length > 0 && !recording
   const submitReady = Boolean(query.trim() || imageAttachment) && !imageBusy && !recording
@@ -636,21 +671,22 @@ export function SearchDock({
             : <textarea ref={inputRef} rows="1" value={query} onChange={(event) => { setQuery(event.target.value); resizeAgentComposer(event.currentTarget) }} onPaste={onImagePaste} onKeyDown={submitFromAgentComposer} placeholder={agentReady ? agentRunning ? 'Steer Hermes…' : 'Message Hermes…' : 'Type while Hermes connects…'} aria-label={agentRunning ? 'Steer Hermes' : 'Message Hermes'} maxLength="12000" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="button" className="agent-attachment-button" onClick={chooseImage} aria-label={imageAttachment ? 'Replace attached image' : 'Attach image'} title={imageAttachment ? 'Replace attached image' : 'Attach image'} disabled={imageBusy || agentRunning}><Paperclip size={16} /></button>
-          <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
+          {showVoiceControl && <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice message'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>}
           {agentRunning
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
             : <button type="submit" disabled={!agentReady || (!query.trim() && !imageAttachment) || imageBusy} aria-label="Send to Hermes">{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Send size={18} />}</button>}
         </> : <>
-          <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>
+          {showInlineControl && <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>}
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
             : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : inline ? 'Search inline with SearXNG…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="submit" className="search-submit" aria-label="Search" disabled={!submitReady}>{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
-          <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>
-          <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>
-          <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>
+          {showVoiceControl && <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>}
+          {showImageControl && <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>}
+          {showMapControl && <button type="button" className={mapCommand.active ? 'active' : ''} onClick={openMapSearch} aria-label="Search map" title="Search map"><MapPinned size={17} /></button>}
+          {showAgentControl && <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>}
         </>}
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
@@ -664,6 +700,12 @@ export function SearchDock({
           <button className="shortcut-suggestion-locate" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => locateShortcutMatch(result)} aria-label={`Locate ${result.item.title} in ${result.workspace?.name || 'workspace'}`} title="Locate shortcut"><LocateFixed /></button>
         </li>)}
         {shortcutSearch.shortcutOnly && !visibleShortcutResults.length && <li className="shortcut-suggestion-empty" role="status">No matching shortcuts</li>}
+        {mapSuggestionVisible && <li className="map-suggestion">
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(''); setSuggestionsOpen(false); onMapSearch?.(mapCommand.query) }}>
+            <MapPinned />
+            <span><strong>Show on map</strong><small>{mapCommand.query}</small></span>
+          </button>
+        </li>}
         {!!suggestions.length && !!visibleShortcutResults.length && <li className="search-suggestion-heading" role="presentation"><span>WEB SUGGESTIONS</span></li>}
         {suggestions.map((suggestion) => <li key={suggestion}><button className="web-suggestion" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); void submit(null, suggestion) }}>{suggestion}</button></li>)}
       </ul>}
