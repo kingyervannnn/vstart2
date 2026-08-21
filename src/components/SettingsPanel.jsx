@@ -345,7 +345,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               {searchGlowStyle !== 'off' && <label className="setting-field"><span>Show search glow</span><select value={searchGlowTrigger} onChange={(event) => onPatch({ search: { appearance: { glowTrigger: event.target.value } } })}>{SEARCH_GLOW_TRIGGERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
               <label className="setting-field range-setting"><span>Search bar blur <output aria-hidden="true">{searchBlur}px</output></span><input type="range" min="0" max="40" step="1" value={searchBlur} aria-label="Search bar blur" onChange={(event) => onPatch({ search: { appearance: { blur: Number(event.target.value) } } })} /></label>
               <p className="field-help">In edit mode, drag the handle beside the workspace buttons to set their horizontal relationship to the search bar.</p>
-              <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search · <kbd>⌘ ⇧ M</kbd> primes map search</span></div>
+              <div className="setting-note"><strong>Keyboard shortcuts</strong><span><kbd>/</kbd> focuses search · <kbd>⌘ Enter</kbd> enables inline · <kbd>⌘ ⇧ I</kbd> toggles image search · <kbd>⌘ ⇧ M</kbd> toggles map search</span></div>
               <div className="setting-note"><strong>AI control</strong><span>The V Start 1 glyph opens the local Hermes Agent Mode. Search never stores provider credentials.</span></div>
             </>}
             {page === 'agent' && <>

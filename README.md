@@ -134,8 +134,8 @@ one-percent steps. It overscans a dedicated viewport background layer without sc
 the interface, which covers rounded-browser edge seams while preserving layout and drag
 coordinates.
 
-Map Search is available from the Map control between Image and AI: click it with current
-text, type `map:` or `/map`, use Command/Ctrl+Shift+M, or choose **Show on map** from suggestions. Search settings can hide each optional dock control independently. It opens a
+Map Search is available from the Map control between Image and AI: toggle the mode and
+press Enter, type `map:` or `/map`, use Command/Ctrl+Shift+M, or choose **Show on map** from suggestions. The mode toggle preserves the field and a second click returns to ordinary search. Search settings can hide each optional dock control independently. It opens a
 native, refresh-restorable MapLibre view backed by a rate-controlled, PostgreSQL-cached
 Nominatim proxy. See [Map Search](docs/MAP_SEARCH.md) for service and attribution details.
 

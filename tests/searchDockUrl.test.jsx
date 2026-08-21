@@ -95,26 +95,40 @@ describe('Search dock URL navigation', () => {
     expect(baseProps.onMapSearch).toHaveBeenCalledWith('Central Park')
   })
 
-  it('opens the current text from the map button', () => {
+  it('selects map mode without changing the current text, then maps it on submit', () => {
     render(<SearchDock {...baseProps} />)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+    const input = screen.getByRole('textbox', { name: 'Search' })
+    fireEvent.change(input, {
       target: { value: 'Statue of Liberty' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Search map' }))
+    const mapToggle = screen.getByRole('button', { name: 'Toggle map search' })
+    fireEvent.click(mapToggle)
 
+    expect(input.value).toBe('Statue of Liberty')
+    expect(mapToggle.getAttribute('aria-pressed')).toBe('true')
+    expect(baseProps.onMapSearch).not.toHaveBeenCalled()
+
+    fireEvent.submit(input.form)
     expect(baseProps.onMapSearch).toHaveBeenCalledWith('Statue of Liberty')
   })
 
-  it('primes the map command when the map button is clicked with an empty field', () => {
+  it('toggles map mode off again without inserting or clearing text', () => {
     render(<SearchDock {...baseProps} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Search map' }))
-    expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('map: ')
+    const input = screen.getByRole('textbox', { name: 'Search' })
+    const mapToggle = screen.getByRole('button', { name: 'Toggle map search' })
+    fireEvent.change(input, { target: { value: 'Yerevan' } })
+
+    fireEvent.click(mapToggle)
+    fireEvent.click(mapToggle)
+
+    expect(input.value).toBe('Yerevan')
+    expect(mapToggle.getAttribute('aria-pressed')).toBe('false')
     expect(baseProps.onMapSearch).not.toHaveBeenCalled()
   })
 
   it('honors database-backed search control visibility', () => {
     render(<SearchDock {...baseProps} settings={{ ...baseProps.settings, search: { ...baseProps.settings.search, controls: { map: false, voice: false, image: false, agent: false, inline: false } } }} />)
-    expect(screen.queryByRole('button', { name: 'Search map' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Toggle map search' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Voice search' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Toggle image search' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open Agent Mode' })).toBeNull()

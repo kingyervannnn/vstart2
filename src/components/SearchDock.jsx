@@ -80,6 +80,7 @@ export function SearchDock({
   const [query, setQuery] = useState('')
   const [inline, setInline] = useState(false)
   const [imageMode, setImageMode] = useState(false)
+  const [mapMode, setMapMode] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [suggestions, setSuggestions] = useState([])
@@ -103,7 +104,7 @@ export function SearchDock({
     : [], [activeWorkspaceId, items, shortcutSearch.query, shortcutSearchActive, workspaces])
   const visibleShortcutResults = shortcutResults.slice(0, shortcutSearch.shortcutOnly ? 8 : 5)
   const shortcutPanelVisible = !agentMode && suggestionsOpen && (shortcutSearch.shortcutOnly || visibleShortcutResults.length > 0)
-  const mapSuggestionVisible = !agentMode && suggestionsOpen && !imageAttachment && !imageMode && !shortcutSearch.shortcutOnly && mapCommand.query.length >= 2
+  const mapSuggestionVisible = !agentMode && !mapMode && suggestionsOpen && !imageAttachment && !imageMode && !shortcutSearch.shortcutOnly && mapCommand.query.length >= 2
   const suggestionRowCount = suggestions.length + visibleShortcutResults.length + (shortcutPanelVisible ? 1 : 0) + (mapSuggestionVisible ? 1 : 0)
 
   const stopVoiceAnalysis = useCallback((reset = true) => {
@@ -183,6 +184,10 @@ export function SearchDock({
   }, [agentMode, draftRequest, onDraftConsumed, resizeAgentComposer])
 
   useEffect(() => {
+    if (agentMode || !showMapControl) setMapMode(false)
+  }, [agentMode, showMapControl])
+
+  useEffect(() => {
     if (!agentMode) return undefined
     const frame = requestAnimationFrame(resizeAgentComposer)
     return () => cancelAnimationFrame(frame)
@@ -208,12 +213,14 @@ export function SearchDock({
       }
       if (!agentMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
         event.preventDefault()
+        setMapMode(false)
         setImageMode((value) => !value)
         inputRef.current?.focus()
       }
       if (!agentMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'm') {
         event.preventDefault()
-        setQuery((value) => parseMapCommand(value).active ? value : `map: ${value}`)
+        setImageMode(false)
+        setMapMode((value) => !value)
         setSuggestionsOpen(true)
         inputRef.current?.focus()
       }
@@ -412,6 +419,11 @@ export function SearchDock({
       setQuery('')
       return onMapSearch?.(submittedMapCommand.query)
     }
+    if (!agentMode && mapMode && !imageAttachment && !imageMode) {
+      if (!value) return
+      setQuery('')
+      return onMapSearch?.(value)
+    }
     if (agentMode) {
       if (!agentReady || (agentRunning && imageAttachment)) return
       const text = value || 'Analyze this image.'
@@ -494,25 +506,21 @@ export function SearchDock({
     window.open(target, settings.general?.openLinksInNewTab === false ? '_self' : '_blank')
   }
 
-  const openMapSearch = () => {
-    const command = parseMapCommand(query)
-    const value = command.active ? command.query : query.trim()
-    if (!value) {
-      setQuery('map: ')
-      setSuggestionsOpen(true)
-      inputRef.current?.focus()
-      return
-    }
-    setQuery('')
-    setSuggestionsOpen(false)
-    onMapSearch?.(value)
+  const toggleMapMode = () => {
+    setImageMode(false)
+    setMapMode((value) => !value)
+    setSuggestionsOpen(true)
+    inputRef.current?.focus()
   }
 
   const attachImage = async (file) => {
     setImageError('')
     try {
       setImageAttachment(await prepareImageAttachment(file))
-      if (!agentMode) setImageMode(true)
+      if (!agentMode) {
+        setMapMode(false)
+        setImageMode(true)
+      }
       inputRef.current?.focus()
     } catch (error) {
       setImageAttachment(null)
@@ -680,12 +688,12 @@ export function SearchDock({
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
-            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : inline ? 'Search inline with SearXNG…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
+            : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : mapMode ? 'Search places, businesses, or landmarks…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : inline ? 'Search inline with SearXNG…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="submit" className="search-submit" aria-label="Search" disabled={!submitReady}>{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
           {showVoiceControl && <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>}
-          {showImageControl && <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => setImageMode((value) => !value)} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>}
-          {showMapControl && <button type="button" className={mapCommand.active ? 'active' : ''} onClick={openMapSearch} aria-label="Search map" title="Search map"><MapPinned size={17} /></button>}
+          {showImageControl && <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => { setMapMode(false); setImageMode((value) => !value) }} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>}
+          {showMapControl && <button type="button" className={mapMode ? 'active' : ''} onClick={toggleMapMode} aria-label="Toggle map search" aria-pressed={mapMode} title={mapMode ? 'Turn off map search' : 'Turn on map search'}><MapPinned size={17} /></button>}
           {showAgentControl && <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>}
         </>}
       </form>

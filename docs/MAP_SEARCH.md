@@ -13,9 +13,10 @@ restore the same map presentation without browser-side persistence.
 ## Entering Map Search
 
 - Type `map: Central Park` or `/map Central Park`, then press Enter.
-- Click the Map button to open the current search text, or prime `map:` when empty.
+- Click the Map button to select Map Search, then type and press Enter. Click it again
+  to return to ordinary search; selecting the mode never rewrites or clears the field.
 - Select **Show on map** from the normal search suggestion panel.
-- Press Command/Ctrl+Shift+M to focus the dock with the map command prefix.
+- Press Command/Ctrl+Shift+M to toggle Map Search and focus the dock.
 
 Ordinary Enter behavior remains unchanged. Settings → Search → Search bar controls can
 hide Map, Inline, Voice, Image, or AI independently when a narrower dock is preferred.
@@ -44,10 +45,24 @@ data connections. Mirrored layouts move the results with the widget column. Comp
 keeps a bottom result sheet, and fullscreen uses an over-map drawer because neither mode
 has an available widget column.
 
-## Later expansion
+## Recommended expansion sequence
 
 The present slice handles named places, businesses, cities, and natural features returned
-by Nominatim. Complete category-in-area queries such as “all coffee shops near me” should
-be added as a separate bounded Overpass adapter with an explicit **Search this area**
-action. Autocomplete should use a replaceable Photon-compatible service rather than the
-public Nominatim endpoint.
+by Nominatim. Its ranked geocoding results are not a complete business directory.
+
+1. Add a bounded Overpass adapter for nearby/category queries and expose **Search this
+   area** after the user pans the map. Keep named-place geocoding on Nominatim.
+2. Add an optional local Overture Places index for materially broader business discovery,
+   deduplicated against OpenStreetMap results and ranked by map bounds and distance.
+3. Add a replaceable Photon-compatible autocomplete service so suggestions can be fast
+   without treating the public Nominatim endpoint as a typeahead service.
+4. Add a Valhalla route adapter behind V Start's API, initially supporting Drive, Walk,
+   and Bike. Public demo routing is suitable only for a bounded spike; durable use should
+   point to a controlled service.
+
+Map interaction modes should live in the map header as **Search**, **Nearby**, and
+**Directions**, not as more search-dock buttons. Directions can reveal its travel-mode
+choices only while active. Basemap appearance belongs in a compact layers menu; the
+current OpenFreeMap source already provides Liberty, Positron, Bright, Dark, Fiord, and
+3D styles. Satellite imagery would require a separate imagery provider and is not implied
+by those styles.
