@@ -1077,6 +1077,7 @@ export function App() {
             query={routedView.query}
             mode={routedView.mode}
             bounds={routedView.bounds}
+            route={routedView.route}
             fullScreen={routedView.fullScreen}
             compact={compact}
             resultsHost={mapResultsHost}

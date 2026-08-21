@@ -11,7 +11,8 @@ The URL also carries `full=1` for fullscreen mode, so refresh and browser naviga
 restore the same map presentation without browser-side persistence.
 
 Nearby searches additionally carry `mode=nearby` and a bounded `bbox`, preserving the
-searched viewport through refresh and browser navigation.
+searched viewport through refresh and browser navigation. Directions carry both route
+points, their display labels, and the Drive, Walk, or Bike mode in the URL as well.
 
 ## Entering Map Search
 
@@ -24,11 +25,14 @@ searched viewport through refresh and browser navigation.
 Ordinary Enter behavior remains unchanged. Settings → Search → Search bar controls can
 hide Map, Inline, Voice, Image, or AI independently when a narrower dock is preferred.
 
-Inside Map Search, the header switches between two interaction modes:
+Inside Map Search, the header switches between three interaction modes:
 
 - **Search** finds a named place, address, business, city, or natural feature.
 - **Nearby** searches the visible map area. Choose a common category or type a business
   name/category, zoom to the desired area, and choose **Search this area**.
+- **Directions** resolves a starting point and destination, then draws a Drive, Walk, or
+  Bike route with distance, duration, and turn-by-turn instructions. The location button
+  can use the browser's current location as the starting point.
 
 Nearby deliberately refuses viewports wider or taller than 0.5 degrees. Zooming in keeps
 category requests responsive and prevents accidentally issuing an unbounded area query.
@@ -38,16 +42,19 @@ category requests responsive and prevents accidentally issuing an unbounded area
 - MapLibre GL JS renders the interactive vector map and controls.
 - OpenFreeMap supplies the initial Liberty basemap style.
 - The storage API proxies named-place searches to Nominatim and bounded nearby/category
-  searches to Overpass.
+  searches to Overpass. It sends route requests to a Valhalla-compatible service.
 - PostgreSQL caches normalized Nominatim results for 24 hours and Overpass results for six
-  hours in `map_search_cache`.
+  hours in `map_search_cache`. Routes are cached for 30 minutes in `map_route_cache`.
 - Uncached upstream requests are serialized at slightly over one request per second.
 - MapLibre is lazy-loaded only when Map Search opens, keeping it out of the ordinary
   start-page JavaScript path.
 
 `VSTART2_NOMINATIM_URL` and `VSTART2_OVERPASS_URL` can replace either endpoint with a
 compatible self-hosted instance. `VSTART2_MAP_SEARCH_USER_AGENT` can override the
-identifying request header.
+identifying request header. `VSTART2_VALHALLA_URL` selects the routing service and
+`VSTART2_VALHALLA_CLIENT_ID` identifies V Start to it. The default public Valhalla demo
+is useful for personal testing but has no durable availability guarantee; point the URL
+at a controlled Valhalla deployment for dependable use.
 
 Map and search attribution remains visible in the interface. Selected results can open
 their website, open their OpenStreetMap object, or use V Start's existing database-backed
@@ -70,13 +77,12 @@ Overpass. Neither source is a complete global business directory.
    deduplicated against OpenStreetMap results and ranked by map bounds and distance.
 2. Add a replaceable Photon-compatible autocomplete service so suggestions can be fast
    without treating the public Nominatim endpoint as a typeahead service.
-3. Add a Valhalla route adapter behind V Start's API, initially supporting Drive, Walk,
-   and Bike. Public demo routing is suitable only for a bounded spike; durable use should
-   point to a controlled service.
+3. Add a replaceable higher-availability or self-hosted Valhalla deployment when route
+   volume or reliability requires it.
 
-The remaining **Directions** mode should join Search and Nearby in the map header, not
-become another search-dock button. Directions can reveal its travel-mode choices only
-while active. Basemap appearance belongs in a compact layers menu; the
+Directions lives beside Search and Nearby in the map header rather than adding another
+search-dock button; its travel-mode choices appear only while it is active. Basemap
+appearance belongs in a compact layers menu; the
 current OpenFreeMap source already provides Liberty, Positron, Bright, Dark, Fiord, and
 3D styles. Satellite imagery would require a separate imagery provider and is not implied
 by those styles.

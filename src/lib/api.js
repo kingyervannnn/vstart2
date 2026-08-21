@@ -74,6 +74,7 @@ export const api = {
     for (const key of ['west', 'south', 'east', 'north']) params.set(key, String(bounds[key]))
     return request(`/api/maps/nearby?${params}`)
   },
+  mapRoute: (route) => request('/api/maps/route', { method: 'POST', body: JSON.stringify(route) }),
   suggestions: (query) => request(`/api/suggestions?q=${encodeURIComponent(query)}`),
   shortcutMetadata: (url, signal) => request(`/api/shortcut-metadata?url=${encodeURIComponent(url)}`, { signal }),
 }

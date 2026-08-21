@@ -23,6 +23,8 @@ services:
       MUSIC_LOOPBACK_HOST: host.docker.internal
       NOMINATIM_URL: ${VSTART2_NOMINATIM_URL:-https://nominatim.openstreetmap.org}
       OVERPASS_URL: ${VSTART2_OVERPASS_URL:-https://overpass-api.de}
+      VALHALLA_URL: ${VSTART2_VALHALLA_URL:-https://valhalla1.openstreetmap.de}
+      VALHALLA_CLIENT_ID: ${VSTART2_VALHALLA_CLIENT_ID:-vstart2-local}
       MAP_SEARCH_USER_AGENT: ${VSTART2_MAP_SEARCH_USER_AGENT:-VStart2/0.1 (+https://github.com/kingyervannnn/vstart2)}
     ports:
       - "3110:3110"

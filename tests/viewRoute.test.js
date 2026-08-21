@@ -9,6 +9,7 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch(buildViewSearch({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' } }))).toEqual({ type: 'frame', query: '', category: 'images', result: { title: 'Visual search results', url: 'https://yandex.com/images/search?rpt=imageview' }, fullScreen: false })
     expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Central Park', fullScreen: true }))).toEqual({ type: 'map', query: 'Central Park', fullScreen: true })
     expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Coffee', mode: 'nearby', bounds: { west: -74.02, south: 40.69, east: -73.91, north: 40.82 } }))).toEqual({ type: 'map', query: 'Coffee', mode: 'nearby', bounds: { west: -74.02, south: 40.69, east: -73.91, north: 40.82 }, fullScreen: false })
+    expect(parseViewSearch(buildViewSearch({ type: 'map', query: 'Republic Square → Cascade', mode: 'directions', route: { origin: { latitude: 40.1772, longitude: 44.5035, label: 'Republic Square' }, destination: { latitude: 40.1919, longitude: 44.5156, label: 'Cascade' }, costing: 'pedestrian' }, fullScreen: true }))).toEqual({ type: 'map', query: 'Republic Square → Cascade', mode: 'directions', route: { origin: { latitude: 40.1772, longitude: 44.5035, label: 'Republic Square' }, destination: { latitude: 40.1919, longitude: 44.5156, label: 'Cascade' }, costing: 'pedestrian' }, fullScreen: true })
   })
 
   it('restores services and rejects unsafe frame URLs', () => {
@@ -17,6 +18,7 @@ describe('URL-backed active views', () => {
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
     expect(parseViewSearch('?view=map')).toEqual({ type: 'dial' })
     expect(parseViewSearch('?view=map&q=Coffee&mode=nearby&bbox=-80%2C30%2C-70%2C40')).toEqual({ type: 'map', query: 'Coffee', fullScreen: false })
+    expect(parseViewSearch('?view=map&q=Directions&mode=directions&from=bad&to=40%2C44')).toEqual({ type: 'map', query: 'Directions', fullScreen: false })
   })
 
   it('closes the active widget and switches directly to a different widget', () => {

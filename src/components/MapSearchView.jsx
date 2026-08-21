@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Crosshair, ExternalLink, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Search, X } from 'lucide-react'
+import { ArrowRight, Bike, Car, Crosshair, ExternalLink, Footprints, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Route, Search, X } from 'lucide-react'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '../lib/api.js'
 import { ShortcutTarget } from './InlineResults.jsx'
@@ -13,6 +13,15 @@ const NEARBY_CLUSTERS = 'vstart-nearby-clusters'
 const NEARBY_CLUSTER_COUNT = 'vstart-nearby-cluster-count'
 const NEARBY_POINTS = 'vstart-nearby-points'
 const NEARBY_POINT_LABELS = 'vstart-nearby-point-labels'
+const ROUTE_SOURCE = 'vstart-route'
+const ROUTE_CASING = 'vstart-route-casing'
+const ROUTE_LINE = 'vstart-route-line'
+
+const ROUTE_MODES = [
+  ['auto', 'Drive', Car],
+  ['pedestrian', 'Walk', Footprints],
+  ['bicycle', 'Bike', Bike],
+]
 
 function resultSubtitle(result) {
   const kind = [result.type, result.category].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' · ')
@@ -51,6 +60,38 @@ function MapResultsPanel({ query, mode, search, selectedId, onSelect, workspaces
   )
 }
 
+function durationLabel(seconds) {
+  const minutes = Math.max(1, Math.round(Number(seconds || 0) / 60))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`
+}
+
+function RouteResultsPanel({ routeState }) {
+  const result = routeState.result
+  const modeLabel = ROUTE_MODES.find(([value]) => value === result?.costing)?.[1] || 'Route'
+  return <aside className="map-results-panel map-route-panel" aria-label="Map directions">
+    <div className="map-results-heading">
+      <div><small>DIRECTIONS</small><strong>{result ? `${result.origin.label} → ${result.destination.label}` : 'Plan a route'}</strong></div>
+      {result && <span>{modeLabel}</span>}
+    </div>
+    {routeState.loading && <div className="map-results-state"><LoaderCircle className="spin" /> Calculating route</div>}
+    {routeState.error && <div className="map-results-state error">{routeState.error}</div>}
+    {result && <>
+      <div className="map-route-summary"><strong>{durationLabel(result.durationSeconds)}</strong><span>{result.distanceKilometers.toFixed(1)} km</span><small>{modeLabel}</small></div>
+      <ol className="map-route-maneuvers">
+        {result.maneuvers.map((maneuver, index) => <li key={`${maneuver.legIndex}:${index}`}>
+          <span>{index + 1}</span>
+          <div><strong>{maneuver.instruction}</strong><small>{maneuver.distanceKilometers >= 0.1 ? `${maneuver.distanceKilometers.toFixed(1)} km` : `${Math.max(1, Math.round(maneuver.distanceKilometers * 1000))} m`} · {durationLabel(maneuver.durationSeconds)}</small></div>
+        </li>)}
+      </ol>
+    </>}
+    {!routeState.loading && !routeState.error && !result && <div className="map-results-state">Enter a starting point and destination above.</div>}
+    <footer>Routing by {result?.provider || 'Valhalla'} · Map © OpenStreetMap contributors</footer>
+  </aside>
+}
+
 function currentNearbyBounds(map) {
   if (!map) return null
   const bounds = map.getBounds()
@@ -79,25 +120,49 @@ function fitMapToResults(map, results) {
   ], { padding: 100, maxZoom: 15, duration: 900 })
 }
 
-export function MapSearchView({ query, mode = 'search', bounds = null, fullScreen = false, compact = false, resultsHost = null, workspaces, activeWorkspaceId, onNavigate, onCreateShortcut, onClose }) {
+export function MapSearchView({ query, mode = 'search', bounds = null, route: routeRequest = null, fullScreen = false, compact = false, resultsHost = null, workspaces, activeWorkspaceId, onNavigate, onCreateShortcut, onClose }) {
   const mapNodeRef = useRef(null)
   const mapRef = useRef(null)
   const maplibreRef = useRef(null)
   const markerRefs = useRef([])
+  const routeMarkerRefs = useRef([])
   const selectedNearbyRef = useRef('')
   const [draft, setDraft] = useState(query)
   const [activeMode, setActiveMode] = useState(mode)
   const [search, setSearch] = useState({ loading: true, error: '', results: [], provider: '', cached: false })
+  const [routeState, setRouteState] = useState({ loading: false, error: '', result: null })
+  const [routeDraft, setRouteDraft] = useState({
+    originLabel: routeRequest?.origin?.label || '',
+    destinationLabel: routeRequest?.destination?.label || '',
+    originPoint: routeRequest?.origin || null,
+    destinationPoint: routeRequest?.destination || null,
+    costing: routeRequest?.costing || 'auto',
+  })
+  const [routeResolving, setRouteResolving] = useState(false)
+  const [routeFormError, setRouteFormError] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
     setDraft(query)
     setActiveMode(mode)
-  }, [mode, query])
+    setRouteDraft({
+      originLabel: routeRequest?.origin?.label || '',
+      destinationLabel: routeRequest?.destination?.label || '',
+      originPoint: routeRequest?.origin || null,
+      destinationPoint: routeRequest?.destination || null,
+      costing: routeRequest?.costing || 'auto',
+    })
+    setRouteFormError('')
+  }, [mode, query, routeRequest])
 
   useEffect(() => {
     let live = true
+    if (mode === 'directions') {
+      setSearch({ loading: false, error: '', results: [], provider: '', cached: false })
+      setSelectedId('')
+      return () => { live = false }
+    }
     setSearch({ loading: true, error: '', results: [], provider: '', cached: false })
     setSelectedId('')
     const pending = mode === 'nearby' && bounds
@@ -111,6 +176,21 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
     })
     return () => { live = false }
   }, [bounds, mode, query])
+
+  useEffect(() => {
+    let live = true
+    if (mode !== 'directions' || !routeRequest) {
+      setRouteState({ loading: false, error: '', result: null })
+      return () => { live = false }
+    }
+    setRouteState({ loading: true, error: '', result: null })
+    void api.mapRoute(routeRequest).then((result) => {
+      if (live) setRouteState({ loading: false, error: '', result })
+    }).catch((error) => {
+      if (live) setRouteState({ loading: false, error: error.message, result: null })
+    })
+    return () => { live = false }
+  }, [mode, routeRequest])
 
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return undefined
@@ -135,7 +215,9 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
     return () => {
       live = false
       markerRefs.current.forEach((marker) => marker.remove())
+      routeMarkerRefs.current.forEach((marker) => marker.remove())
       markerRefs.current = []
+      routeMarkerRefs.current = []
       map?.remove()
       mapRef.current = null
       maplibreRef.current = null
@@ -147,6 +229,7 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
     const maplibregl = maplibreRef.current
     if (!map || !maplibregl || !mapReady) return undefined
     markerRefs.current.forEach((marker) => marker.remove())
+    if (mode === 'directions') return undefined
     if (mode === 'nearby' && bounds) {
       const accent = getComputedStyle(mapNodeRef.current).getPropertyValue('--app-accent').trim() || '#8ba6ff'
       const data = {
@@ -266,6 +349,56 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
   }, [bounds, mapReady, mode, search.results])
 
   useEffect(() => {
+    const map = mapRef.current
+    const maplibregl = maplibreRef.current
+    const result = routeState.result
+    if (!map || !maplibregl || !mapReady || mode !== 'directions' || !result?.coordinates?.length) return undefined
+    const accent = getComputedStyle(mapNodeRef.current).getPropertyValue('--app-accent').trim() || '#8ba6ff'
+    map.addSource(ROUTE_SOURCE, {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: result.coordinates } },
+    })
+    map.addLayer({
+      id: ROUTE_CASING,
+      type: 'line',
+      source: ROUTE_SOURCE,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': 'rgba(7,11,17,.76)', 'line-width': 9, 'line-opacity': 0.78 },
+    })
+    map.addLayer({
+      id: ROUTE_LINE,
+      type: 'line',
+      source: ROUTE_SOURCE,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': accent, 'line-width': 5, 'line-opacity': 0.96 },
+    })
+    routeMarkerRefs.current = [
+      ['A', result.origin],
+      ['B', result.destination],
+    ].map(([label, point]) => {
+      const node = document.createElement('div')
+      node.className = `vstart-route-marker route-${label.toLocaleLowerCase()}`
+      const markerLabel = document.createElement('span')
+      markerLabel.textContent = label
+      node.append(markerLabel)
+      node.setAttribute('aria-label', label === 'A' ? `Route start: ${point.label}` : `Route destination: ${point.label}`)
+      return new maplibregl.Marker({ element: node, anchor: 'center' })
+        .setLngLat([point.longitude, point.latitude])
+        .addTo(map)
+    })
+    if (result.bounds) {
+      map.fitBounds([[result.bounds.west, result.bounds.south], [result.bounds.east, result.bounds.north]], { padding: 85, maxZoom: 16, duration: 800 })
+    }
+    return () => {
+      routeMarkerRefs.current.forEach((marker) => marker.remove())
+      routeMarkerRefs.current = []
+      if (mapRef.current !== map) return
+      for (const layer of [ROUTE_LINE, ROUTE_CASING]) if (map.getLayer(layer)) map.removeLayer(layer)
+      if (map.getSource(ROUTE_SOURCE)) map.removeSource(ROUTE_SOURCE)
+    }
+  }, [mapReady, mode, routeState.result])
+
+  useEffect(() => {
     markerRefs.current.forEach((marker) => {
       const result = search.results.find((candidate) => candidate.longitude === marker.getLngLat().lng && candidate.latitude === marker.getLngLat().lat)
       marker.getElement().dataset.selected = result?.id === selectedId ? 'true' : 'false'
@@ -303,14 +436,70 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
     if (value !== query || mode !== 'search') onNavigate({ type: 'map', query: value, fullScreen })
   }
 
+  const chooseMode = (nextMode) => {
+    setActiveMode(nextMode)
+    setRouteFormError('')
+    if (nextMode !== 'directions' || routeDraft.destinationLabel) return
+    const selected = search.results.find((result) => result.id === selectedId)
+    setRouteDraft((current) => ({
+      ...current,
+      destinationLabel: selected?.title || (mode === 'directions' ? '' : query),
+      destinationPoint: selected ? { latitude: selected.latitude, longitude: selected.longitude, label: selected.title } : null,
+    }))
+  }
+
+  const resolveRoutePoint = async (label, existing) => {
+    if (existing) return existing
+    const payload = await api.mapSearch(label)
+    const match = payload.results?.[0]
+    if (!match) throw new Error(`No map match found for “${label}”.`)
+    return { latitude: match.latitude, longitude: match.longitude, label: match.title || label }
+  }
+
+  const submitDirections = async (event) => {
+    event.preventDefault()
+    const originLabel = routeDraft.originLabel.trim()
+    const destinationLabel = routeDraft.destinationLabel.trim()
+    if (!originLabel || !destinationLabel || routeResolving) return
+    setRouteResolving(true)
+    setRouteFormError('')
+    try {
+      const [origin, destination] = await Promise.all([
+        resolveRoutePoint(originLabel, routeDraft.originPoint),
+        resolveRoutePoint(destinationLabel, routeDraft.destinationPoint),
+      ])
+      onNavigate({
+        type: 'map',
+        query: `${origin.label} → ${destination.label}`,
+        mode: 'directions',
+        route: { origin, destination, costing: routeDraft.costing },
+        fullScreen,
+      })
+    } catch (error) {
+      setRouteFormError(error.message || 'The route endpoints could not be resolved.')
+    } finally {
+      setRouteResolving(false)
+    }
+  }
+
   const locate = () => {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(({ coords }) => {
+      if (activeMode === 'directions') {
+        setRouteDraft((current) => ({
+          ...current,
+          originLabel: 'Current location',
+          originPoint: { latitude: coords.latitude, longitude: coords.longitude, label: 'Current location' },
+        }))
+        return
+      }
       mapRef.current?.flyTo({ center: [coords.longitude, coords.latitude], zoom: 14, duration: 900 })
     })
   }
 
-  const resultsPanel = <MapResultsPanel query={query} mode={mode} search={search} selectedId={selectedId} onSelect={selectResult} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
+  const resultsPanel = activeMode === 'directions'
+    ? <RouteResultsPanel routeState={mode === 'directions' ? routeState : { loading: false, error: '', result: null }} />
+    : <MapResultsPanel query={query} mode={mode} search={search} selectedId={selectedId} onSelect={selectResult} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
 
   return (
     <section className={`map-search-view${fullScreen ? ' full-screen' : ''}`} aria-label="Map search">
@@ -318,22 +507,32 @@ export function MapSearchView({ query, mode = 'search', bounds = null, fullScree
       <header className="map-toolbar">
         <MapPinned aria-hidden="true" />
         <div className="map-mode-switcher" role="group" aria-label="Map mode">
-          <button type="button" className={activeMode === 'search' ? 'active' : ''} onClick={() => setActiveMode('search')} aria-pressed={activeMode === 'search'} title="Place search"><Search /><span>Search</span></button>
-          <button type="button" className={activeMode === 'nearby' ? 'active' : ''} onClick={() => setActiveMode('nearby')} aria-pressed={activeMode === 'nearby'} title="Search this area"><LocateFixed /><span>Nearby</span></button>
+          <button type="button" className={activeMode === 'search' ? 'active' : ''} onClick={() => chooseMode('search')} aria-pressed={activeMode === 'search'} title="Place search"><Search /><span>Search</span></button>
+          <button type="button" className={activeMode === 'nearby' ? 'active' : ''} onClick={() => chooseMode('nearby')} aria-pressed={activeMode === 'nearby'} title="Search this area"><LocateFixed /><span>Nearby</span></button>
+          <button type="button" className={activeMode === 'directions' ? 'active' : ''} onClick={() => chooseMode('directions')} aria-pressed={activeMode === 'directions'} title="Directions"><Route /><span>Directions</span></button>
         </div>
         {activeMode === 'nearby' && <select className="map-nearby-presets" aria-label="Nearby category" value={NEARBY_PRESETS.find((preset) => preset.toLocaleLowerCase() === draft.toLocaleLowerCase()) || ''} onChange={(event) => event.target.value && setDraft(event.target.value)}>
           <option value="">Category</option>
           {NEARBY_PRESETS.map((preset) => <option key={preset} value={preset}>{preset}</option>)}
         </select>}
-        <form onSubmit={submit}>
+        {activeMode === 'directions' ? <form className="map-directions-form" onSubmit={submitDirections}>
+          <input value={routeDraft.originLabel} onChange={(event) => setRouteDraft((current) => ({ ...current, originLabel: event.target.value, originPoint: null }))} aria-label="Route origin" placeholder="From…" autoComplete="off" />
+          <ArrowRight aria-hidden="true" />
+          <input value={routeDraft.destinationLabel} onChange={(event) => setRouteDraft((current) => ({ ...current, destinationLabel: event.target.value, destinationPoint: null }))} aria-label="Route destination" placeholder="To…" autoComplete="off" />
+          <select value={routeDraft.costing} onChange={(event) => setRouteDraft((current) => ({ ...current, costing: event.target.value }))} aria-label="Travel mode">
+            {ROUTE_MODES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <button type="submit" aria-label="Calculate route" title="Calculate route" disabled={!routeDraft.originLabel.trim() || !routeDraft.destinationLabel.trim() || routeResolving}>{routeResolving ? <LoaderCircle className="spin" /> : <Route />}</button>
+        </form> : <form onSubmit={submit}>
           <input value={draft} onChange={(event) => setDraft(event.target.value)} aria-label="Search map" placeholder={activeMode === 'nearby' ? 'Business or category in this area…' : 'Search places, stores, or landmarks…'} autoComplete="off" />
           {draft && <button type="button" onClick={() => setDraft('')} aria-label="Clear map search"><X /></button>}
           <button type="submit" aria-label={activeMode === 'nearby' ? 'Search this area' : 'Run map search'} title={activeMode === 'nearby' ? 'Search this area' : 'Search map'} disabled={!draft.trim()}>{activeMode === 'nearby' ? <LocateFixed /> : <Search />}</button>
-        </form>
-        <button type="button" onClick={locate} aria-label="Use my location" title="Use my location"><Crosshair /></button>
-        <button type="button" onClick={() => onNavigate({ type: 'map', query, ...(mode === 'nearby' && bounds ? { mode, bounds } : {}), fullScreen: !fullScreen })} aria-label={fullScreen ? 'Exit full screen map' : 'Open full screen map'} title={fullScreen ? 'Exit full screen' : 'Full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
+        </form>}
+        <button type="button" onClick={locate} aria-label={activeMode === 'directions' ? 'Use my location as route origin' : 'Use my location'} title={activeMode === 'directions' ? 'Use current location as start' : 'Use my location'}><Crosshair /></button>
+        <button type="button" onClick={() => onNavigate({ type: 'map', query, ...(mode === 'directions' && routeRequest ? { mode, route: routeRequest } : mode === 'nearby' && bounds ? { mode, bounds } : {}), fullScreen: !fullScreen })} aria-label={fullScreen ? 'Exit full screen map' : 'Open full screen map'} title={fullScreen ? 'Exit full screen' : 'Full screen'}>{fullScreen ? <Minimize2 /> : <Maximize2 />}</button>
         <button type="button" onClick={onClose} aria-label="Close map"><X /></button>
       </header>
+      {routeFormError && <div className="map-route-form-error" role="alert">{routeFormError}</div>}
 
       {resultsHost && !compact && !fullScreen ? createPortal(resultsPanel, resultsHost) : resultsPanel}
     </section>

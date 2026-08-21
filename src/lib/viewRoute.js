@@ -18,6 +18,18 @@ function safeMapBounds(value) {
   return { west, south, east, north }
 }
 
+function safeRoutePoint(value, label) {
+  const coordinates = String(value || '').split(',').map(Number)
+  if (coordinates.length !== 2 || !coordinates.every(Number.isFinite)) return null
+  const [latitude, longitude] = coordinates
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null
+  return {
+    latitude,
+    longitude,
+    label: String(label || '').trim().slice(0, 160) || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+  }
+}
+
 export function parseViewSearch(search = '') {
   const params = new URLSearchParams(search)
   const view = params.get('view') || ''
@@ -30,11 +42,24 @@ export function parseViewSearch(search = '') {
   if (view === 'map') {
     const query = (params.get('q') || '').trim().slice(0, 300)
     const bounds = safeMapBounds(params.get('bbox'))
-    const mode = params.get('mode') === 'nearby' && bounds ? 'nearby' : 'search'
+    const routeOrigin = safeRoutePoint(params.get('from'), params.get('fromLabel'))
+    const routeDestination = safeRoutePoint(params.get('to'), params.get('toLabel'))
+    const requestedMode = params.get('mode')
+    const mode = requestedMode === 'directions' && routeOrigin && routeDestination
+      ? 'directions'
+      : requestedMode === 'nearby' && bounds ? 'nearby' : 'search'
     return query ? {
       type: 'map',
       query,
       ...(mode === 'nearby' ? { mode, bounds } : {}),
+      ...(mode === 'directions' ? {
+        mode,
+        route: {
+          origin: routeOrigin,
+          destination: routeDestination,
+          costing: ['auto', 'pedestrian', 'bicycle'].includes(params.get('costing')) ? params.get('costing') : 'auto',
+        },
+      } : {}),
       fullScreen: params.get('full') === '1',
     } : { type: 'dial' }
   }
@@ -71,8 +96,17 @@ export function buildViewSearch(view) {
   } else if (view.type === 'map' && String(view.query || '').trim()) {
     params.set('view', 'map')
     params.set('q', String(view.query).trim().slice(0, 300))
+    const routeOrigin = safeRoutePoint(view.route?.origin ? [view.route.origin.latitude, view.route.origin.longitude].join(',') : '', view.route?.origin?.label)
+    const routeDestination = safeRoutePoint(view.route?.destination ? [view.route.destination.latitude, view.route.destination.longitude].join(',') : '', view.route?.destination?.label)
     const bounds = safeMapBounds(view.bounds ? [view.bounds.west, view.bounds.south, view.bounds.east, view.bounds.north].join(',') : '')
-    if (view.mode === 'nearby' && bounds) {
+    if (view.mode === 'directions' && routeOrigin && routeDestination) {
+      params.set('mode', 'directions')
+      params.set('from', [routeOrigin.latitude, routeOrigin.longitude].join(','))
+      params.set('to', [routeDestination.latitude, routeDestination.longitude].join(','))
+      params.set('fromLabel', routeOrigin.label)
+      params.set('toLabel', routeDestination.label)
+      params.set('costing', ['auto', 'pedestrian', 'bicycle'].includes(view.route?.costing) ? view.route.costing : 'auto')
+    } else if (view.mode === 'nearby' && bounds) {
       params.set('mode', 'nearby')
       params.set('bbox', [bounds.west, bounds.south, bounds.east, bounds.north].join(','))
     }
