@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Crosshair, ExternalLink, LoaderCircle, MapPinned, Maximize2, Minimize2, Search, X } from 'lucide-react'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '../lib/api.js'
@@ -10,6 +11,38 @@ const START_CENTER = [-98.5, 39.5]
 function resultSubtitle(result) {
   const kind = [result.type, result.category].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' · ')
   return kind || 'place'
+}
+
+function MapResultsPanel({ query, search, selectedId, onSelect, workspaces, activeWorkspaceId, onCreateShortcut }) {
+  return (
+    <aside className="map-results-panel" aria-label="Map results">
+      <div className="map-results-heading">
+        <div><small>MAP RESULTS</small><strong>{query}</strong></div>
+        {!search.loading && !search.error && <span>{search.results.length}</span>}
+      </div>
+      {search.loading && <div className="map-results-state"><LoaderCircle className="spin" /> Searching OpenStreetMap</div>}
+      {search.error && <div className="map-results-state error">{search.error}</div>}
+      {!search.loading && !search.error && !search.results.length && <div className="map-results-state">No matching places found.</div>}
+      {!!search.results.length && <ol>
+        {search.results.map((result, index) => <li key={result.id} className={selectedId === result.id ? 'selected' : ''}>
+          <button className="map-result-primary" type="button" onClick={() => onSelect(result)}>
+            <span className="map-result-index">{index + 1}</span>
+            <span><strong>{result.title}</strong><small>{resultSubtitle(result)}</small><span>{result.displayName}</span></span>
+          </button>
+          <div className="map-result-actions">
+            {result.website && <a href={result.website} target="_blank" rel="noreferrer" title="Open website"><ExternalLink /></a>}
+            <a href={result.url} target="_blank" rel="noreferrer" title="View on OpenStreetMap"><MapPinned /></a>
+            <ShortcutTarget result={result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
+          </div>
+          {selectedId === result.id && (result.openingHours || result.phone) && <div className="map-result-details">
+            {result.openingHours && <span>{result.openingHours}</span>}
+            {result.phone && <a href={`tel:${result.phone}`}>{result.phone}</a>}
+          </div>}
+        </li>)}
+      </ol>}
+      <footer>Search by {search.provider || 'Nominatim'} · Map © OpenStreetMap contributors</footer>
+    </aside>
+  )
 }
 
 function fitMapToResults(map, results) {
@@ -27,7 +60,7 @@ function fitMapToResults(map, results) {
   ], { padding: 100, maxZoom: 15, duration: 900 })
 }
 
-export function MapSearchView({ query, fullScreen = false, workspaces, activeWorkspaceId, onNavigate, onCreateShortcut, onClose }) {
+export function MapSearchView({ query, fullScreen = false, compact = false, resultsHost = null, workspaces, activeWorkspaceId, onNavigate, onCreateShortcut, onClose }) {
   const mapNodeRef = useRef(null)
   const mapRef = useRef(null)
   const maplibreRef = useRef(null)
@@ -141,6 +174,8 @@ export function MapSearchView({ query, fullScreen = false, workspaces, activeWor
     })
   }
 
+  const resultsPanel = <MapResultsPanel query={query} search={search} selectedId={selectedId} onSelect={selectResult} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
+
   return (
     <section className={`map-search-view${fullScreen ? ' full-screen' : ''}`} aria-label="Map search">
       <div className="map-canvas" ref={mapNodeRef} />
@@ -156,33 +191,7 @@ export function MapSearchView({ query, fullScreen = false, workspaces, activeWor
         <button type="button" onClick={onClose} aria-label="Close map"><X /></button>
       </header>
 
-      <aside className="map-results-panel" aria-label="Map results">
-        <div className="map-results-heading">
-          <div><small>MAP RESULTS</small><strong>{query}</strong></div>
-          {!search.loading && !search.error && <span>{search.results.length}</span>}
-        </div>
-        {search.loading && <div className="map-results-state"><LoaderCircle className="spin" /> Searching OpenStreetMap</div>}
-        {search.error && <div className="map-results-state error">{search.error}</div>}
-        {!search.loading && !search.error && !search.results.length && <div className="map-results-state">No matching places found.</div>}
-        {!!search.results.length && <ol>
-          {search.results.map((result, index) => <li key={result.id} className={selectedId === result.id ? 'selected' : ''}>
-            <button className="map-result-primary" type="button" onClick={() => selectResult(result)}>
-              <span className="map-result-index">{index + 1}</span>
-              <span><strong>{result.title}</strong><small>{resultSubtitle(result)}</small><span>{result.displayName}</span></span>
-            </button>
-            <div className="map-result-actions">
-              {result.website && <a href={result.website} target="_blank" rel="noreferrer" title="Open website"><ExternalLink /></a>}
-              <a href={result.url} target="_blank" rel="noreferrer" title="View on OpenStreetMap"><MapPinned /></a>
-              <ShortcutTarget result={result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
-            </div>
-            {selectedId === result.id && (result.openingHours || result.phone) && <div className="map-result-details">
-              {result.openingHours && <span>{result.openingHours}</span>}
-              {result.phone && <a href={`tel:${result.phone}`}>{result.phone}</a>}
-            </div>}
-          </li>)}
-        </ol>}
-        <footer>Search by {search.provider || 'Nominatim'} · Map © OpenStreetMap contributors</footer>
-      </aside>
+      {resultsHost && !compact && !fullScreen ? createPortal(resultsPanel, resultsHost) : resultsPanel}
     </section>
   )
 }

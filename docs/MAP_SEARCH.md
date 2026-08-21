@@ -37,6 +37,13 @@ Map and search attribution remains visible in the interface. Selected results ca
 their website, open their OpenStreetMap object, or use V Start's existing database-backed
 quick-shortcut action.
 
+In Wide mode, the result list temporarily occupies the widget column while the map owns
+the complete dial column. Clock, weather, and the other widgets remain mounted but inert
+and visually hidden, so closing Map restores them immediately without restarting their
+data connections. Mirrored layouts move the results with the widget column. Compact mode
+keeps a bottom result sheet, and fullscreen uses an over-map drawer because neither mode
+has an available widget column.
+
 ## Later expansion
 
 The present slice handles named places, businesses, cities, and natural features returned

@@ -80,6 +80,7 @@ export function App() {
   const [headerDirection, setHeaderDirection] = useState('left')
   const [inlineResults, setInlineResults] = useState(null)
   const [lastViewVeil, setLastViewVeil] = useState('service')
+  const [mapResultsHost, setMapResultsHost] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const [agentDraft, setAgentDraft] = useState(null)
   const [shortcutFilter, setShortcutFilter] = useState(null)
@@ -1067,7 +1068,7 @@ export function App() {
         aria-hidden="true"
       />
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
+      <WidgetRail compact={compact} settings={settings} mapActive={routedView.type === 'map'} onMapResultsHost={setMapResultsHost} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedView.type === 'map' ? (
@@ -1075,6 +1076,8 @@ export function App() {
             key={location.search}
             query={routedView.query}
             fullScreen={routedView.fullScreen}
+            compact={compact}
+            resultsHost={mapResultsHost}
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspace.id}
             onNavigate={navigateView}

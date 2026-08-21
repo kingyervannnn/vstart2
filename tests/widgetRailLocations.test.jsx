@@ -11,6 +11,29 @@ afterEach(() => {
 })
 
 describe('Widget rail city clocks', () => {
+  it('keeps widget content mounted while exposing a wide-map result host', () => {
+    const onMapResultsHost = vi.fn()
+    const props = {
+      compact: false,
+      settings: { widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false }, music: { sources: [] } },
+      onOpenWidget: vi.fn(),
+      onPatch: vi.fn(),
+      onMapResultsHost,
+    }
+    const { container, rerender } = render(<WidgetRail {...props} mapActive />)
+    const content = container.querySelector('.widget-rail-content')
+    const host = container.querySelector('.map-results-host')
+
+    expect(content).toBeTruthy()
+    expect(content.getAttribute('aria-hidden')).toBe('true')
+    expect(host).toBeTruthy()
+    expect(onMapResultsHost).toHaveBeenCalledWith(host)
+
+    rerender(<WidgetRail {...props} mapActive={false} />)
+    expect(container.querySelector('.widget-rail-content')).toBe(content)
+    expect(container.querySelector('.map-results-host')).toBeNull()
+  })
+
   it('renders configured secondary clocks and uses them to select weather context', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
