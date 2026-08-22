@@ -34,8 +34,23 @@ describe('inline results actions', () => {
     render(<InlineResults query="example" results={results} loading={false} error="" workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByRole('link', { name: 'New tab' }).getAttribute('href')).toBe('https://example.com/')
     fireEvent.click(screen.getByRole('button', { name: 'Open inline' }))
-    expect((await screen.findByTitle('Example result')).getAttribute('src')).toBe('https://example.com/')
+    const frame = await screen.findByTitle('Example result')
+    expect(frame.getAttribute('src')).toBe('https://example.com/')
+    expect(frame.getAttribute('allow')).toContain('fullscreen')
+    expect(frame.hasAttribute('allowfullscreen')).toBe(true)
     expect(screen.getByText('Native frame')).toBeTruthy()
+  })
+
+  it('can deny native fullscreen without disabling V Start page expansion', async () => {
+    const { container } = render(<InlineResults query="example" results={results} loading={false} error="" allowEmbeddedFullscreen={false} workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open inline' }))
+
+    const frame = await screen.findByTitle('Example result')
+    expect(frame.getAttribute('allow')).not.toContain('fullscreen')
+    expect(frame.hasAttribute('allowfullscreen')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open full screen' }))
+    expect(container.querySelector('.inline-results.full-screen')).toBeTruthy()
   })
 
   it('adds a result to the selected workspace', async () => {

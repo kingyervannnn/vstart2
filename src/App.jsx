@@ -1139,6 +1139,7 @@ export function App() {
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspace.id}
             linkBehavior={settings.search?.inlineLinkBehavior || 'inline'}
+            allowEmbeddedFullscreen={settings.search?.allowEmbeddedFullscreen !== false}
             resultsHost={inlineFrameSplitActive ? inlineResultsHost : null}
             onNavigate={navigateView}
             onCreateShortcut={quickShortcutFromResult}

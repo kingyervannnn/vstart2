@@ -75,7 +75,7 @@ function ResultList({ category, results, selectedUrl = '', linkBehavior, workspa
   </>
 }
 
-export function InlineResults({ query, category = 'general', results, loading, error, loadingMore = false, loadMoreError = '', hasMore = false, initialFrame = null, initialFullScreen = false, resultsHost = null, workspaces, activeWorkspaceId, linkBehavior = 'inline', onNavigate, onCreateShortcut, onLoadMore, onClose }) {
+export function InlineResults({ query, category = 'general', results, loading, error, loadingMore = false, loadMoreError = '', hasMore = false, initialFrame = null, initialFullScreen = false, resultsHost = null, workspaces, activeWorkspaceId, linkBehavior = 'inline', allowEmbeddedFullscreen = true, onNavigate, onCreateShortcut, onLoadMore, onClose }) {
   const [frame, setFrame] = useState(() => initialFrame ? { result: initialFrame, src: null, loading: true, assist: 'preparing' } : null)
   const [fullScreen, setFullScreen] = useState(initialFullScreen)
   const [extension, setExtension] = useState({ installed: false, iframeAssist: false, version: null })
@@ -188,7 +188,13 @@ export function InlineResults({ query, category = 'general', results, loading, e
             <span>{extension.installed ? 'Reload the V Start Multi-Tool extension, then try again.' : 'Install the V Start Multi-Tool to use this provider inline.'}</span>
             <a className="inline-action external" href={frame.result.url} target="_blank" rel="noreferrer"><ExternalLink /> Open results</a>
           </div>}
-          {frame.src && <iframe src={frame.src} title={frame.result.title} onLoad={() => setFrame((value) => value ? { ...value, loading: false } : value)} />}
+          {frame.src && <iframe
+            src={frame.src}
+            title={frame.result.title}
+            allow={allowEmbeddedFullscreen ? 'autoplay; encrypted-media; picture-in-picture; fullscreen' : 'autoplay; encrypted-media; picture-in-picture'}
+            allowFullScreen={allowEmbeddedFullscreen}
+            onLoad={() => setFrame((value) => value ? { ...value, loading: false } : value)}
+          />}
         </div>
       </section>
       {resultsHost && createPortal(<aside className="inline-results inline-results-navigator" aria-label="Search results navigator">

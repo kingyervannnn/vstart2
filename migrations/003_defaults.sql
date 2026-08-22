@@ -18,6 +18,7 @@ VALUES (
       "engine": "google",
       "inlineEnabled": true,
       "inlineLinkBehavior": "inline",
+      "allowEmbeddedFullscreen": true,
       "imageSearchEnabled": true,
       "shortcuts": { "focus": "/", "inline": "mod+enter" },
       "dock": {

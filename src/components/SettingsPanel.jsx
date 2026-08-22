@@ -332,6 +332,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <div className="setting-note"><strong>Inline search provider · SearXNG</strong><span>Inline text and image results always use the private SearXNG service bundled with V Start.</span></div>
               <label className="setting-field"><span>Result click behavior</span><select value={settings.search?.inlineLinkBehavior || 'inline'} onChange={(event) => onPatch({ search: { inlineLinkBehavior: event.target.value } })}><option value="inline">Open inline in right rail</option><option value="inline-fullscreen">Open inline full screen</option><option value="external">Open in a new tab</option></select></label>
               <p className="field-help">Hovering a result still reveals quick alternatives for inline, full-screen, external, and shortcut actions.</p>
+              <Toggle label="Allow embedded-site fullscreen" detail="Lets sites such as YouTube enter native browser fullscreen. V Start's expand button remains page-contained." checked={settings.search?.allowEmbeddedFullscreen !== false} onChange={(value) => onPatch({ search: { allowEmbeddedFullscreen: value } })} />
               <div className="setting-subsection search-control-settings">
                 <h4>Search bar controls</h4>
                 <Toggle label="Inline results" detail="Show the globe control." checked={searchControls.inline ?? (settings.search?.inlineEnabled !== false)} onChange={(value) => onPatch({ search: { controls: { inline: value } } })} />
