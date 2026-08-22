@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, Check, ExternalLink, LoaderCircle, Maximize2, Minimize2, PanelRightOpen, Plus, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { activateFrameAssist, deactivateFrameAssist, frameAssistStatus } from '../lib/frameAssist.js'
 
@@ -44,7 +45,37 @@ export function ShortcutTarget({ result, workspaces, activeWorkspaceId, onCreate
   )
 }
 
-export function InlineResults({ query, category = 'general', results, loading, error, initialFrame = null, initialFullScreen = false, workspaces, activeWorkspaceId, linkBehavior = 'inline', onNavigate, onCreateShortcut, onClose }) {
+function ResultList({ category, results, selectedUrl = '', linkBehavior, workspaces, activeWorkspaceId, onOpen, onCreateShortcut, loadingMore, loadMoreError, hasMore, onLoadMore, compact = false }) {
+  return <>
+    <ol className={`${category === 'images' ? 'inline-image-results' : ''}${compact ? ' inline-rail-result-list' : ''}`.trim()}>
+      {results.map((result) => (
+        <li key={`${result.url}:${result.title}`} className={result.url === selectedUrl ? 'selected' : ''}>
+          <a className="inline-result-primary" href={result.url} target={linkBehavior === 'external' ? '_blank' : undefined} rel={linkBehavior === 'external' ? 'noreferrer' : undefined} onClick={(event) => {
+            if (linkBehavior === 'external') return
+            event.preventDefault()
+            onOpen(result, linkBehavior === 'inline-fullscreen')
+          }}>
+            {category === 'images' && result.thumbnailUrl && <span className="inline-result-image"><img src={result.thumbnailUrl} alt={result.title || 'Image search result'} loading="lazy" referrerPolicy="no-referrer" /></span>}
+            <span className="inline-result-heading"><strong>{result.title}</strong><span>{result.url}</span></span>
+            {!compact && result.content && <span className="inline-result-description">{result.content}</span>}
+          </a>
+          <div className="inline-result-actions">
+            <button className="inline-action" type="button" onClick={() => onOpen(result)} title="Open inline"><PanelRightOpen /> <span>Open inline</span></button>
+            {!compact && <button className="inline-action" type="button" onClick={() => onOpen(result, true)} title="Open inline full screen"><Maximize2 /> <span>Open inline full screen</span></button>}
+            <a className="inline-action external" href={result.url} target="_blank" rel="noreferrer" title="Open in a new tab"><ExternalLink /> <span>New tab</span></a>
+            {!compact && <ShortcutTarget result={result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />}
+          </div>
+        </li>
+      ))}
+    </ol>
+    {(hasMore || loadingMore || loadMoreError) && <div className="inline-load-more">
+      {loadMoreError && <small>{loadMoreError}</small>}
+      {hasMore && <button type="button" onClick={onLoadMore} disabled={loadingMore}>{loadingMore ? <><LoaderCircle className="spin" /> Loading more</> : 'Load more results'}</button>}
+    </div>}
+  </>
+}
+
+export function InlineResults({ query, category = 'general', results, loading, error, loadingMore = false, loadMoreError = '', hasMore = false, initialFrame = null, initialFullScreen = false, resultsHost = null, workspaces, activeWorkspaceId, linkBehavior = 'inline', onNavigate, onCreateShortcut, onLoadMore, onClose }) {
   const [frame, setFrame] = useState(() => initialFrame ? { result: initialFrame, src: null, loading: true, assist: 'preparing' } : null)
   const [fullScreen, setFullScreen] = useState(initialFullScreen)
   const [extension, setExtension] = useState({ installed: false, iframeAssist: false, version: null })
@@ -131,14 +162,9 @@ export function InlineResults({ query, category = 'general', results, loading, e
     setFullScreen(next)
   }
 
-  const followPrimaryResult = (event, result) => {
-    if (linkBehavior === 'external') return
-    event.preventDefault()
-    void openInside(result, linkBehavior === 'inline-fullscreen')
-  }
-
   if (frame) {
     return (
+      <>
       <section className={`inline-results iframe-active${fullScreen ? ' full-screen' : ''}`} aria-label="Inline website">
         <header className="iframe-toolbar">
           <button className="iframe-back" type="button" onClick={backToResults} aria-label="Back to search results"><ArrowLeft /></button>
@@ -165,6 +191,13 @@ export function InlineResults({ query, category = 'general', results, loading, e
           {frame.src && <iframe src={frame.src} title={frame.result.title} onLoad={() => setFrame((value) => value ? { ...value, loading: false } : value)} />}
         </div>
       </section>
+      {resultsHost && createPortal(<aside className="inline-results inline-results-navigator" aria-label="Search results navigator">
+        <header><small>RESULTS</small><strong>{query || frame.result.title}</strong><span>{results.length}</span></header>
+        {loading && <div className="results-state"><LoaderCircle className="spin" /> Searching</div>}
+        {error && <div className="results-state error">{error}</div>}
+        {!loading && !error && <ResultList category={category} results={results} selectedUrl={frame.result.url} linkBehavior={linkBehavior} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onOpen={(result, forceFullScreen) => void openInside(result, forceFullScreen)} onCreateShortcut={onCreateShortcut} loadingMore={loadingMore} loadMoreError={loadMoreError} hasMore={hasMore} onLoadMore={onLoadMore} compact />}
+      </aside>, resultsHost)}
+      </>
     )
   }
 
@@ -180,23 +213,7 @@ export function InlineResults({ query, category = 'general', results, loading, e
       {loading && <div className="results-state"><LoaderCircle className="spin" /> Searching</div>}
       {error && <div className="results-state error">{error}</div>}
       {!loading && !error && (
-        <ol className={category === 'images' ? 'inline-image-results' : undefined}>
-          {results.map((result) => (
-            <li key={`${result.url}:${result.title}`}>
-              <a className="inline-result-primary" href={result.url} target={linkBehavior === 'external' ? '_blank' : undefined} rel={linkBehavior === 'external' ? 'noreferrer' : undefined} onClick={(event) => followPrimaryResult(event, result)}>
-                {category === 'images' && result.thumbnailUrl && <span className="inline-result-image"><img src={result.thumbnailUrl} alt={result.title || 'Image search result'} loading="lazy" referrerPolicy="no-referrer" /></span>}
-                <span className="inline-result-heading"><strong>{result.title}</strong><span>{result.url}</span></span>
-                {result.content && <span className="inline-result-description">{result.content}</span>}
-              </a>
-              <div className="inline-result-actions">
-                <button className="inline-action" type="button" onClick={() => void openInside(result)} title="Open inline"><PanelRightOpen /> <span>Open inline</span></button>
-                <button className="inline-action" type="button" onClick={() => void openInside(result, true)} title="Open inline full screen"><Maximize2 /> <span>Open inline full screen</span></button>
-                <a className="inline-action external" href={result.url} target="_blank" rel="noreferrer" title="Open in a new tab"><ExternalLink /> <span>New tab</span></a>
-                <ShortcutTarget result={result} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onCreateShortcut={onCreateShortcut} />
-              </div>
-            </li>
-          ))}
-        </ol>
+        <ResultList category={category} results={results} linkBehavior={linkBehavior} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onOpen={(result, forceFullScreen) => void openInside(result, forceFullScreen)} onCreateShortcut={onCreateShortcut} loadingMore={loadingMore} loadMoreError={loadMoreError} hasMore={hasMore} onLoadMore={onLoadMore} />
       )}
     </section>
   )

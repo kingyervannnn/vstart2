@@ -310,18 +310,19 @@ to `inlineResults`, modeled after the mail overlay's full-panel use of available
 
 The result view:
 
-- Occupies the dial rail from below the scrolling header to the safe area above/around
-  the search dock.
+- Pins the search dock to the top of the active result view without changing its saved
+  speed-dial geometry.
 - Uses the full dial-rail width and height.
-- Keeps the widget rail visible in Wide Mode and the widget-access dock available in
-  Compact Mode.
+- Keeps the widget rail visible in Wide Mode until a result is opened.
 - Occupies the dial rail without covering the Wide widget rail.
 - Keeps the search dock accessible for query refinement.
 - Provides a clear Back to Speed Dial control.
 - Has one internal scroll container; page scroll remains locked/stable.
 - Separates web and image result rendering.
-- Displays result lists only. It does not embed pages, use an iframe, or open an internal
-  article reader in the first release.
+- Loads additional bounded SearXNG pages on request and deduplicates their URLs.
+- When a result opens inline in Wide Mode, gives the iframe the dial rail and temporarily
+  replaces widgets with the result navigator. Compact Mode retains a single-column iframe
+  and Back-to-results path.
 - Keeps query/results only for the transient in-memory result session and does not persist
   the live result session across reload.
 - Uses SearXNG for web results and `image-search-api` for image results.

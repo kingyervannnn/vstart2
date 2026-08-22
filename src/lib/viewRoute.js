@@ -133,6 +133,10 @@ export function resolveInlinePresentation(view, fetched) {
     results: matches ? fetched.results || [] : [],
     loading: matches ? Boolean(fetched.loading) : Boolean(view.query),
     error: matches ? fetched.error || '' : '',
+    loadingMore: matches ? Boolean(fetched.loadingMore) : false,
+    loadMoreError: matches ? fetched.loadMoreError || '' : '',
+    page: matches ? Number(fetched.page) || 0 : 0,
+    hasMore: matches ? Boolean(fetched.hasMore) : false,
     initialFrame: view.type === 'frame' ? view.result : null,
     initialFullScreen: Boolean(view.fullScreen),
   }

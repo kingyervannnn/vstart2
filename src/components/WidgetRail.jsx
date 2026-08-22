@@ -100,7 +100,7 @@ function musicTime(seconds) {
   return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
 }
 
-export function WidgetRail({ compact, settings, mapActive = false, onMapResultsHost, onOpenWidget, onPatch, onEmptyClick }) {
+export function WidgetRail({ compact, settings, mapActive = false, inlineFrameActive = false, onMapResultsHost, onInlineResultsHost, onOpenWidget, onPatch, onEmptyClick }) {
   const musicSources = useMemo(() => (settings.music?.sources || []).filter((source) => source.enabled !== false), [settings.music?.sources])
   const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
@@ -238,8 +238,8 @@ export function WidgetRail({ compact, settings, mapActive = false, onMapResultsH
   }
 
   return (
-    <aside className={`widget-rail ${mapActive ? 'map-results-active' : ''}`} aria-label={mapActive ? 'Map results and widgets' : 'Widgets'} onClick={(event) => event.target === event.currentTarget && onEmptyClick?.()}>
-      <div className="widget-rail-content" aria-hidden={mapActive || undefined} inert={mapActive || undefined} onClick={(event) => event.target === event.currentTarget && onEmptyClick?.()}>
+    <aside className={`widget-rail ${mapActive || inlineFrameActive ? 'rail-overlay-active' : ''} ${mapActive ? 'map-results-active' : ''} ${inlineFrameActive ? 'inline-results-active' : ''}`} aria-label={mapActive ? 'Map results and widgets' : inlineFrameActive ? 'Inline search results and widgets' : 'Widgets'} onClick={(event) => event.target === event.currentTarget && onEmptyClick?.()}>
+      <div className="widget-rail-content" aria-hidden={mapActive || inlineFrameActive || undefined} inert={mapActive || inlineFrameActive || undefined} onClick={(event) => event.target === event.currentTarget && onEmptyClick?.()}>
       {widgets.clock !== false && <ClockWidget settings={widgets} onLocationSelect={(locationId) => onPatch({ widgets: { activeWeatherLocationId: locationId } })} />}
       {widgets.weather !== false && <WeatherWidget compact={compact} settings={widgets} onOpen={() => onOpenWidget('weather')} />}
       <div className="widget-access-list">
@@ -284,6 +284,7 @@ export function WidgetRail({ compact, settings, mapActive = false, onMapResultsH
       )}
       </div>
       {mapActive && <div className="map-results-host" ref={onMapResultsHost} />}
+      {inlineFrameActive && <div className="inline-results-host" ref={onInlineResultsHost} />}
     </aside>
   )
 }

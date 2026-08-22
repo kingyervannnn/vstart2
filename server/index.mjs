@@ -11,10 +11,12 @@ import { deepMerge, httpUrl, parse, placement, placements, slugify, uuid } from 
 import { BACKGROUND_MIME_TYPES, createBackgroundPreview, ensureBackgroundPreview, MAX_BACKGROUND_BYTES, storeBackgroundAsset, warmBackgroundPreviews } from './backgrounds.mjs'
 import { createMapSearchService } from './map-search.mjs'
 import { createMapRouteService } from './map-route.mjs'
+import { createInlineSearchService } from './inline-search.mjs'
 
 const PORT = Number(process.env.PORT || 3110)
 const mapSearch = createMapSearchService({ database: pool })
 const mapRoute = createMapRouteService({ database: pool })
+const inlineSearch = createInlineSearchService()
 const CANVASES = {
   wide: { width: 1600, height: 1000 },
   compact: { width: 820, height: 1000 },
@@ -1014,47 +1016,10 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === 'GET' && pathname === '/api/search') {
-    const query = url.searchParams.get('q')?.trim()
-    if (!query) throw new HttpError(400, 'Search query is required')
-    const category = url.searchParams.get('category') === 'images' ? 'images' : 'general'
-    const endpoint = new URL('/search', process.env.SEARXNG_URL || 'http://127.0.0.1:8181')
-    endpoint.searchParams.set('q', query)
-    endpoint.searchParams.set('format', 'json')
-    endpoint.searchParams.set('language', 'en-US')
-    if (category === 'images') endpoint.searchParams.set('categories', 'images')
-    try {
-      const upstream = await fetch(endpoint, {
-        signal: AbortSignal.timeout(8000),
-        headers: {
-          'user-agent': 'VStart2/0.1 inline search',
-          'x-forwarded-for': '127.0.0.1',
-          'x-real-ip': '127.0.0.1',
-        },
-      })
-      if (!upstream.ok) throw new Error(`SearXNG returned ${upstream.status}`)
-      const payload = await upstream.json()
-      const results = (payload.results || []).slice(0, 18).map((item) => ({
-        title: item.title,
-        url: item.url,
-        content: item.content || '',
-        engine: item.engine || item.engines?.[0] || '',
-        ...(category === 'images' ? {
-          thumbnailUrl: item.thumbnail_src || item.thumbnail || item.img_src || '',
-          imageUrl: item.img_src || item.thumbnail_src || item.thumbnail || '',
-          source: item.source || '',
-        } : {}),
-      }))
-      const failedEngines = (payload.unresponsive_engines || []).map((value) => String(value?.[0] || '')).filter(Boolean)
-      if (!results.length && failedEngines.length) {
-        return sendJson(response, 503, {
-          error: 'Inline search providers did not respond',
-          details: `SearXNG providers unavailable: ${failedEngines.join(', ')}`,
-        })
-      }
-      return sendJson(response, 200, { query, category, results })
-    } catch (error) {
-      return sendJson(response, 503, { error: 'Inline search is temporarily unavailable', details: error.message })
-    }
+    return sendJson(response, 200, await inlineSearch.search(url.searchParams.get('q') || '', {
+      category: url.searchParams.get('category'),
+      page: url.searchParams.get('page'),
+    }))
   }
 
   if (request.method === 'GET' && pathname === '/api/maps/search') {

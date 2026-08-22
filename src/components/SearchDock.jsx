@@ -35,6 +35,9 @@ export function SearchDock({
   onLocateShortcut,
   onShortcutFilterChange,
   restoredQuery = '',
+  inlineView = false,
+  inlineFrameView = false,
+  inlineRail = false,
   draftRequest = null,
   onDraftConsumed,
   agentMode = false,
@@ -168,10 +171,9 @@ export function SearchDock({
   }, [agentMode])
 
   useEffect(() => {
-    if (!restoredQuery) return
-    setQuery(restoredQuery)
-    setInline(true)
-  }, [restoredQuery])
+    if (restoredQuery) setQuery(restoredQuery)
+    if (inlineView) setInline(true)
+  }, [inlineView, restoredQuery])
 
   useEffect(() => {
     if (!agentMode || !draftRequest?.text) return
@@ -201,8 +203,8 @@ export function SearchDock({
   useEffect(() => setWorkspaceOffset(configuredWorkspaceOffset), [configuredWorkspaceOffset])
   useEffect(() => setWorkspaceSide(configuredWorkspaceSide), [configuredWorkspaceSide])
   useEffect(() => {
-    if (settings.general?.autofocusSearch) inputRef.current?.focus({ preventScroll: true })
-  }, [settings.general?.autofocusSearch])
+    if (settings.general?.autofocusSearch && !inlineView) inputRef.current?.focus({ preventScroll: true })
+  }, [inlineView, settings.general?.autofocusSearch])
 
   useEffect(() => {
     const keydown = (event) => {
@@ -646,22 +648,22 @@ export function SearchDock({
   const clearVisible = query.length > 0 && !recording
   const submitReady = Boolean(query.trim() || imageAttachment) && !imageBusy && !recording
   const searchBlur = Math.max(0, Math.min(40, Number.isFinite(Number(searchAppearance.blur)) ? Number(searchAppearance.blur) : 19))
-  const dockStyle = agentMode
+  const dockStyle = agentMode || inlineView
     ? { '--search-blur': `${searchBlur}px` }
     : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%`, '--search-blur': `${searchBlur}px` }
 
   return (
     <div
       ref={dockRef}
-      className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${searchAppearance.outline === false ? 'search-outline-off' : ''} ${agentMode ? 'agent-composer-wrap' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
+      className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${searchAppearance.outline === false ? 'search-outline-off' : ''} ${agentMode ? 'agent-composer-wrap' : ''} ${inlineView ? 'inline-view-dock' : ''} ${inlineRail ? 'inline-rail-dock' : ''} ${inlineFrameView && !inlineRail ? 'inline-frame-dock-hidden' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
       style={dockStyle}
-      onPointerDown={agentMode ? undefined : beginDockMove}
-      onPointerMove={agentMode ? undefined : moveInteraction}
-      onPointerUp={agentMode ? undefined : endInteraction}
-      onPointerCancel={agentMode ? undefined : endInteraction}
-      onLostPointerCapture={agentMode ? undefined : endInteraction}
+      onPointerDown={agentMode || inlineView ? undefined : beginDockMove}
+      onPointerMove={agentMode || inlineView ? undefined : moveInteraction}
+      onPointerUp={agentMode || inlineView ? undefined : endInteraction}
+      onPointerCancel={agentMode || inlineView ? undefined : endInteraction}
+      onLostPointerCapture={agentMode || inlineView ? undefined : endInteraction}
     >
-      {!agentMode && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
+      {!agentMode && !inlineView && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
       <form
         className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() || imageAttachment ? 'has-query' : ''} ${imageDragActive ? 'image-drop-active' : ''}`}
         onSubmit={submit}
@@ -684,17 +686,17 @@ export function SearchDock({
             ? <button type="button" className="active" onClick={onAgentStop} aria-label="Stop Hermes"><CircleStop size={18} /></button>
             : <button type="submit" disabled={!agentReady || (!query.trim() && !imageAttachment) || imageBusy} aria-label="Send to Hermes">{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Send size={18} />}</button>}
         </> : <>
-          {showInlineControl && <button type="button" className={inline ? 'active' : ''} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>}
+          {showInlineControl && <button type="button" className={`inline-search-toggle ${inline ? 'active' : ''}`} onClick={() => setInline((value) => !value)} aria-label="Toggle inline results" aria-pressed={inline}><Globe2 size={18} /></button>}
           {imageAttachment && <div className="search-image-attachment" title={imageAttachment.name}><img src={imageAttachment.dataUrl} alt="" /><button type="button" onClick={() => setImageAttachment(null)} aria-label="Remove attached image"><X /></button></div>}
           {recording
             ? <VoiceWaveform levels={voiceLevels} />
             : <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true) }} onPaste={onImagePaste} onKeyDown={submitFromInput} onFocus={() => setSuggestionsOpen(true)} onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)} placeholder={imageAttachment ? inline ? 'Add optional visual-search context…' : 'Add optional context…' : mapMode ? 'Search places, businesses, or landmarks…' : imageMode ? inline ? 'Search SearXNG images…' : `Search ${settings.search?.engine || 'google'} images…` : inline ? 'Search inline with SearXNG…' : `Search ${settings.search?.engine || 'google'}…`} aria-label="Search" autoComplete="off" />}
           <button type="button" className={`search-clear ${clearVisible ? 'visible' : ''}`} onClick={clearQuery} aria-label="Clear search text" aria-hidden={!clearVisible} tabIndex={clearVisible ? 0 : -1} disabled={!clearVisible}><X /></button>
           <button type="submit" className="search-submit" aria-label="Search" disabled={!submitReady}>{imageBusy ? <LoaderCircle className="spin" size={17} /> : <Search size={17} />}</button>
-          {showVoiceControl && <button type="button" className={recording ? 'active recording' : ''} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>}
+          {showVoiceControl && <button type="button" className={`voice-search-toggle ${recording ? 'active recording' : ''}`} onClick={startVoice} aria-label={recording ? 'Stop recording' : 'Voice search'}>{transcribing ? <LoaderCircle className="spin" size={17} /> : recording ? <Square size={15} /> : <Mic size={17} />}</button>}
           {showImageControl && <button type="button" className={`image-search-toggle ${imageMode ? 'active' : ''}`} onClick={() => { setMapMode(false); setImageMode((value) => !value) }} aria-label="Toggle image search" aria-pressed={imageMode}><Image size={17} /></button>}
-          {showMapControl && <button type="button" className={mapMode ? 'active' : ''} onClick={toggleMapMode} aria-label="Toggle map search" aria-pressed={mapMode} title={mapMode ? 'Turn off map search' : 'Turn on map search'}><MapPinned size={17} /></button>}
-          {showAgentControl && <button type="button" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>}
+          {showMapControl && <button type="button" className={`map-search-toggle ${mapMode ? 'active' : ''}`} onClick={toggleMapMode} aria-label="Toggle map search" aria-pressed={mapMode} title={mapMode ? 'Turn off map search' : 'Turn on map search'}><MapPinned size={17} /></button>}
+          {showAgentControl && <button type="button" className="agent-search-toggle" onClick={onAgentToggle} aria-label="Open Agent Mode" aria-pressed={false}><Sparkles size={18} /></button>}
         </>}
       </form>
       {imageError && <div className="search-image-error" role="alert">{imageError}</div>}
@@ -717,7 +719,7 @@ export function SearchDock({
         {!!suggestions.length && !!visibleShortcutResults.length && <li className="search-suggestion-heading" role="presentation"><span>WEB SUGGESTIONS</span></li>}
         {suggestions.map((suggestion) => <li key={suggestion}><button className="web-suggestion" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setQuery(suggestion); setSuggestionsOpen(false); void submit(null, suggestion) }}>{suggestion}</button></li>)}
       </ul>}
-      {editMode && !agentMode && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
+      {editMode && !agentMode && !inlineView && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>
   )
 }

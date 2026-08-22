@@ -93,4 +93,25 @@ describe('inline results actions', () => {
     expect((await screen.findByTitle('Visual search results')).getAttribute('src')).toBe(visualResult.url)
     expect(screen.getByText('Assist active')).toBeTruthy()
   })
+
+  it('loads another bounded page without replacing current results', () => {
+    const onLoadMore = vi.fn()
+    render(<InlineResults query="example" results={results} loading={false} error="" hasMore onLoadMore={onLoadMore} workspaces={workspaces} activeWorkspaceId="home" onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Load more results' }))
+    expect(onLoadMore).toHaveBeenCalledOnce()
+    expect(screen.getByText('Example result')).toBeTruthy()
+  })
+
+  it('portals the live result navigator beside an active iframe', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const onNavigate = vi.fn()
+    const other = { title: 'Second result', url: 'https://second.example/', content: 'Another result' }
+    render(<InlineResults query="example" results={[...results, other]} loading={false} error="" initialFrame={results[0]} resultsHost={host} workspaces={workspaces} activeWorkspaceId="home" onNavigate={onNavigate} onCreateShortcut={vi.fn()} onClose={vi.fn()} />)
+
+    expect(await screen.findByRole('complementary', { name: 'Search results navigator' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('link', { name: /Second result/ }))
+    expect(onNavigate).toHaveBeenCalledWith({ type: 'frame', query: 'example', category: 'general', result: other, fullScreen: false })
+    host.remove()
+  })
 })

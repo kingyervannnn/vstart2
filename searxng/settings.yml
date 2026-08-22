@@ -2,11 +2,22 @@ use_default_settings:
   engines:
     keep_only:
       - bing images
+      - bing
+      - brave
       - duckduckgo
       - google
       - google images
+      - mojeek
+      - qwant
       - startpage
       - wikipedia
+engines:
+  - name: bing
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: qwant
+    disabled: false
 server:
   secret_key: "vstart2-local-searxng"
   bind_address: "0.0.0.0"

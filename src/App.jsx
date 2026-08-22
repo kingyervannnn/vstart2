@@ -33,6 +33,16 @@ const LOADING_SHELL_DELAY_MS = 350
 const BACKGROUND_FADE_MS = 1500
 const BACKGROUND_RESOLUTION_FADE_MS = 650
 const BACKGROUND_ROTATION_LOCK = 'vstart2-background-rotation-leader'
+
+function mergeSearchResults(current = [], next = []) {
+  const seen = new Set()
+  return [...current, ...next].filter((result) => {
+    const key = String(result?.url || '')
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 const BACKGROUND_ROTATION_CHANNEL = 'vstart2-background-rotation'
 const BACKGROUND_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const MAX_BACKGROUND_BYTES = 300 * 1024 * 1024
@@ -81,6 +91,7 @@ export function App() {
   const [inlineResults, setInlineResults] = useState(null)
   const [lastViewVeil, setLastViewVeil] = useState('service')
   const [mapResultsHost, setMapResultsHost] = useState(null)
+  const [inlineResultsHost, setInlineResultsHost] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const [agentDraft, setAgentDraft] = useState(null)
   const [shortcutFilter, setShortcutFilter] = useState(null)
@@ -151,10 +162,10 @@ export function App() {
     }
     if (routedView.type === 'search' || routedView.type === 'frame') {
       const initialFrame = routedView.type === 'frame' ? routedView.result : null
-      setInlineResults({ query: routedView.query, category: routedView.category, results: [], loading: Boolean(routedView.query), error: '', initialFrame, initialFullScreen: routedView.fullScreen })
+      setInlineResults({ query: routedView.query, category: routedView.category, results: [], loading: Boolean(routedView.query), loadingMore: false, loadMoreError: '', page: 0, hasMore: false, error: '', initialFrame, initialFullScreen: routedView.fullScreen })
       if (routedView.query) {
-        void api.search(routedView.query, routedView.category).then((result) => {
-          if (live) setInlineResults((current) => current ? { ...current, results: result.results, loading: false, error: '' } : current)
+        void api.search(routedView.query, routedView.category, 1).then((result) => {
+          if (live) setInlineResults((current) => current ? { ...current, results: result.results, loading: false, page: result.page || 1, hasMore: result.hasMore !== false, error: '' } : current)
         }).catch((error) => {
           if (live) setInlineResults((current) => current ? { ...current, results: [], loading: false, error: error.message } : current)
         })
@@ -164,6 +175,34 @@ export function App() {
     setInlineResults(null)
     return () => { live = false }
   }, [routedView])
+
+  const loadMoreInlineResults = useCallback(async () => {
+    const current = inlineResults
+    if (!current?.query || current.loading || current.loadingMore || !current.hasMore) return
+    const nextPage = Math.min(5, Math.max(1, Number(current.page) || 1) + 1)
+    setInlineResults((value) => value && value.query === current.query && value.category === current.category
+      ? { ...value, loadingMore: true, loadMoreError: '' }
+      : value)
+    try {
+      const result = await api.search(current.query, current.category, nextPage)
+      setInlineResults((value) => {
+        if (!value || value.query !== current.query || value.category !== current.category) return value
+        const merged = mergeSearchResults(value.results, result.results)
+        return {
+          ...value,
+          results: merged,
+          loadingMore: false,
+          loadMoreError: '',
+          page: result.page || nextPage,
+          hasMore: result.hasMore !== false && merged.length > value.results.length,
+        }
+      })
+    } catch (error) {
+      setInlineResults((value) => value && value.query === current.query && value.category === current.category
+        ? { ...value, loadingMore: false, loadMoreError: error.message }
+        : value)
+    }
+  }, [inlineResults])
 
   const workspaces = useMemo(() => bootstrap?.workspaces || [], [bootstrap?.workspaces])
   const workspaceRoute = location.pathname.match(/^\/w\/([^/]+)(?:\/agent(?:\/([^/]+))?)?$/)
@@ -195,6 +234,7 @@ export function App() {
     || settings.mail?.defaultAccount
     || 'all'
   const routedInline = resolveInlinePresentation(routedView, inlineResults)
+  const inlineFrameSplitActive = routedView.type === 'frame' && !routedView.fullScreen && !compact
   const viewVeil = routedInline && !routedView.fullScreen ? 'inline' : routedView.type === 'map' && !routedView.fullScreen ? 'map' : routedView.type === 'service' ? 'service' : agentMode ? 'agent' : ''
   const renderedViewVeil = viewVeil || lastViewVeil
 
@@ -824,7 +864,9 @@ export function App() {
     }
   }
 
-  const runInlineSearch = (query) => navigateView({ type: 'search', query, category: 'general' })
+  const runInlineSearch = (query) => navigateView(routedView.type === 'frame'
+    ? { ...routedView, query, category: 'general' }
+    : { type: 'search', query, category: 'general' })
   const runMapSearch = (query) => navigateView({ type: 'map', query, fullScreen: false })
   const openSearchBarUrl = useCallback((url) => {
     let title = url
@@ -851,7 +893,9 @@ export function App() {
       })
       return
     }
-    navigateView({ type: 'search', query, category: 'images' })
+    navigateView(routedView.type === 'frame'
+      ? { ...routedView, query, category: 'images' }
+      : { type: 'search', query, category: 'images' })
   }
 
   const createWorkspace = async (nameOrValues) => {
@@ -1059,7 +1103,7 @@ export function App() {
     {previousBackgroundStyle && <div className={`app-background-layer background-previous ${backgroundLayers.previousId ? 'background-custom' : 'background-default'}`} style={previousBackgroundStyle} aria-hidden="true" />}
     <div key={displayedBackgroundId || 'default'} className={`app-background-layer background-current ${displayedBackgroundId ? 'background-custom' : 'background-default'} ${previousBackgroundStyle ? 'background-fading-in' : ''}`} style={currentBackgroundStyle} aria-hidden="true" />
     <main
-      className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${routedView.type === 'map' ? 'map-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
+      className={`vstart-app ${compact ? 'compact-mode' : 'wide-mode'} ${agentMode ? 'agent-active' : ''} ${routedInline ? 'inline-search-active' : ''} ${inlineFrameSplitActive ? 'inline-frame-split-active' : ''} ${routedView.type === 'map' ? 'map-active' : ''} ${showCompactInnerRing ? 'compact-ring-active' : ''} ${settings.general?.mirrorLayout ? 'mirrored' : ''} ${settings.general?.innerOutline ? 'inner-outline' : ''} ${settings.appearance?.edgeEffect ? 'edge-effect' : ''} ${settings.appearance?.edgeGlow ? 'edge-glow' : ''} ${settings.appearance?.animatedOverlay ? 'animated-overlay' : ''}`}
       style={appStyle}
     >
       <div
@@ -1068,7 +1112,7 @@ export function App() {
         aria-hidden="true"
       />
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} mapActive={routedView.type === 'map'} onMapResultsHost={setMapResultsHost} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
+      <WidgetRail compact={compact} settings={settings} mapActive={routedView.type === 'map'} inlineFrameActive={inlineFrameSplitActive} onMapResultsHost={setMapResultsHost} onInlineResultsHost={setInlineResultsHost} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedView.type === 'map' ? (
@@ -1094,8 +1138,10 @@ export function App() {
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspace.id}
             linkBehavior={settings.search?.inlineLinkBehavior || 'inline'}
+            resultsHost={inlineFrameSplitActive ? inlineResultsHost : null}
             onNavigate={navigateView}
             onCreateShortcut={quickShortcutFromResult}
+            onLoadMore={loadMoreInlineResults}
             onClose={() => navigateView({ type: 'dial' })}
           />
         ) : routedView.type === 'service' ? (
@@ -1178,6 +1224,9 @@ export function App() {
           onLocateShortcut={locateShortcutFromSearch}
           onShortcutFilterChange={setShortcutFilter}
           restoredQuery={routedInline?.query || ''}
+          inlineView={Boolean(routedInline)}
+          inlineFrameView={routedView.type === 'frame'}
+          inlineRail={inlineFrameSplitActive}
           draftRequest={agentDraft}
           onDraftConsumed={() => setAgentDraft(null)}
           agentMode={agentMode}

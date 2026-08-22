@@ -34,6 +34,23 @@ describe('Widget rail city clocks', () => {
     expect(container.querySelector('.map-results-host')).toBeNull()
   })
 
+  it('temporarily replaces widgets with an inline result host', () => {
+    const onInlineResultsHost = vi.fn()
+    const { container } = render(<WidgetRail
+      compact={false}
+      settings={{ widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false }, music: { sources: [] } }}
+      inlineFrameActive
+      onInlineResultsHost={onInlineResultsHost}
+      onOpenWidget={vi.fn()}
+      onPatch={vi.fn()}
+    />)
+    const content = container.querySelector('.widget-rail-content')
+    const host = container.querySelector('.inline-results-host')
+    expect(content.getAttribute('aria-hidden')).toBe('true')
+    expect(host).toBeTruthy()
+    expect(onInlineResultsHost).toHaveBeenCalledWith(host)
+  })
+
   it('renders configured secondary clocks and uses them to select weather context', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

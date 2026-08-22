@@ -67,7 +67,7 @@ export const api = {
     })
   },
   deleteBackground: (id) => mutation(`/api/assets/${id}`, 'DELETE', {}, 'background-delete'),
-  search: (query, category = 'general') => request(`/api/search?q=${encodeURIComponent(query)}&category=${category === 'images' ? 'images' : 'general'}`),
+  search: (query, category = 'general', page = 1) => request(`/api/search?q=${encodeURIComponent(query)}&category=${category === 'images' ? 'images' : 'general'}&page=${Math.max(1, Number.parseInt(page, 10) || 1)}`),
   mapSearch: (query) => request(`/api/maps/search?q=${encodeURIComponent(query)}`),
   mapNearby: (query, bounds) => {
     const params = new URLSearchParams({ q: query })

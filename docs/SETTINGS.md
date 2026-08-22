@@ -123,6 +123,8 @@ There are no Modern, Classic, Edge, Stage, or layout-override settings.
 - Maximum suggestions: small bounded choice.
 - Inline search enabled.
 - Inline result engine: the bundled SearXNG service, independent of the external search-engine selection.
+- Inline result pages load progressively and remain bounded; the bundled SearXNG config
+  uses several general engines so one blocked provider does not empty the page.
 - Inline image results enabled.
 - Image search enabled.
 - Voice/STT enabled.

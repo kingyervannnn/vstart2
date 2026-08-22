@@ -86,4 +86,11 @@ describe('search dock submit button', () => {
 
     expect(onInlineResults).toHaveBeenCalledWith('inline query')
   })
+
+  it('pins the same dock and removes workspace chrome during an inline view', () => {
+    const { container } = render(<SearchDock {...baseProps} inlineView restoredQuery="inline query" onInlineResults={vi.fn()} />)
+    expect(container.querySelector('.search-dock-wrap.inline-view-dock')).toBeTruthy()
+    expect(container.querySelector('.workspace-switcher')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('inline query')
+  })
 })

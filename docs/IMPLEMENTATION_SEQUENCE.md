@@ -184,16 +184,19 @@ Build:
 - Full-height/full-width inline result view separate from the search input component.
 - Transient hiding of the shortcut layer while results are active.
 - Web result list, loading, empty, error, and retry states.
-- Search dock stays accessible for query refinement.
+- Search dock pins to the top during results and moves above the widget-rail navigator
+  while a Wide Mode iframe is active.
 - Back-to-Speed-Dial behavior and focus restoration.
 - One owned internal scroll region with workspace switching suppressed while results own
   scroll.
-- No iframe, embedded page, or internal article reader.
+- Bounded SearXNG pagination with URL deduplication.
+- Iframe selection keeps the result navigator available in the Wide widget rail; Compact
+  Mode remains single-column.
 
 Gate:
 
-- Inline results use only the available dial rail at every responsive size while widgets
-  remain visible.
+- Initial inline results use the dial rail; selecting a result in Wide Mode temporarily
+  replaces widgets with navigation while the iframe uses the dial rail.
 - Opening/closing does not shift the page or lose the search dock.
 - Mail-style rail takeover comparison is visually approved.
 
