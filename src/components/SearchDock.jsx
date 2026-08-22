@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CircleStop, Globe2, Image, LoaderCircle, LocateFixed, MapPinned, Mic, Paperclip, Search, Send, Sparkles, Square, X } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { prepareImageAttachment, uploadImageForLens, visualSearchUrl } from '../lib/imageAttachment.js'
@@ -38,6 +39,7 @@ export function SearchDock({
   inlineView = false,
   inlineFrameView = false,
   inlineRail = false,
+  portalHost = null,
   draftRequest = null,
   onDraftConsumed,
   agentMode = false,
@@ -652,7 +654,7 @@ export function SearchDock({
     ? { '--search-blur': `${searchBlur}px` }
     : { left: `${geometry.x * 100}%`, top: `${geometry.y * 100}%`, width: `${geometry.width * 100}%`, '--search-blur': `${searchBlur}px` }
 
-  return (
+  const dock = (
     <div
       ref={dockRef}
       className={`search-dock-wrap workspace-side-${effectiveWorkspaceSide} ${searchAppearance.outline === false ? 'search-outline-off' : ''} ${agentMode ? 'agent-composer-wrap' : ''} ${inlineView ? 'inline-view-dock' : ''} ${inlineRail ? 'inline-rail-dock' : ''} ${inlineFrameView && !inlineRail ? 'inline-frame-dock-hidden' : ''} ${editMode ? 'editing' : ''} ${workspaceMoving ? 'workspace-moving' : ''} ${interactionKind ? `interacting ${interactionKind}` : ''}`}
@@ -722,4 +724,7 @@ export function SearchDock({
       {editMode && !agentMode && !inlineView && <button className="dock-resize-handle" type="button" onPointerDown={(event) => beginInteraction(event, 'resize')} aria-label="Resize search bar" />}
     </div>
   )
+
+  if (inlineRail && !portalHost) return null
+  return inlineRail ? createPortal(dock, portalHost) : dock
 }

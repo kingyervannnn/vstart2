@@ -91,6 +91,7 @@ export function App() {
   const [inlineResults, setInlineResults] = useState(null)
   const [lastViewVeil, setLastViewVeil] = useState('service')
   const [mapResultsHost, setMapResultsHost] = useState(null)
+  const [inlineDockHost, setInlineDockHost] = useState(null)
   const [inlineResultsHost, setInlineResultsHost] = useState(null)
   const [agentUi, setAgentUi] = useState({ running: false, ready: false, state: 'idle' })
   const [agentDraft, setAgentDraft] = useState(null)
@@ -1112,7 +1113,7 @@ export function App() {
         aria-hidden="true"
       />
       <ScrollingHeader workspace={activeWorkspace} direction={headerDirection} onNext={() => cycleWorkspace(1)} onPrevious={() => cycleWorkspace(-1)} />
-      <WidgetRail compact={compact} settings={settings} mapActive={routedView.type === 'map'} inlineFrameActive={inlineFrameSplitActive} onMapResultsHost={setMapResultsHost} onInlineResultsHost={setInlineResultsHost} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
+      <WidgetRail compact={compact} settings={settings} mapActive={routedView.type === 'map'} inlineFrameActive={inlineFrameSplitActive} onMapResultsHost={setMapResultsHost} onInlineDockHost={setInlineDockHost} onInlineResultsHost={setInlineResultsHost} onPatch={patchSettings} onOpenWidget={toggleWidgetView} onEmptyClick={() => routedView.type === 'service' && navigateView({ type: 'dial' })} />
       <section className="dial-rail" onWheel={onDialWheel}>
         {showCompactInnerRing && <div className="compact-inner-ring" aria-hidden="true" />}
         {routedView.type === 'map' ? (
@@ -1227,6 +1228,7 @@ export function App() {
           inlineView={Boolean(routedInline)}
           inlineFrameView={routedView.type === 'frame'}
           inlineRail={inlineFrameSplitActive}
+          portalHost={inlineFrameSplitActive ? inlineDockHost : null}
           draftRequest={agentDraft}
           onDraftConsumed={() => setAgentDraft(null)}
           agentMode={agentMode}

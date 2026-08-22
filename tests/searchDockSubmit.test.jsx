@@ -93,4 +93,17 @@ describe('search dock submit button', () => {
     expect(container.querySelector('.workspace-switcher')).toBeNull()
     expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('inline query')
   })
+
+  it('portals the iframe dock into the widget rail host', () => {
+    const portalHost = document.createElement('div')
+    document.body.append(portalHost)
+    const { container, unmount } = render(<SearchDock {...baseProps} inlineView inlineFrameView inlineRail portalHost={portalHost} restoredQuery="inline query" onInlineResults={vi.fn()} />)
+
+    expect(container.querySelector('.search-dock-wrap')).toBeNull()
+    expect(portalHost.querySelector('.search-dock-wrap.inline-rail-dock')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Search' }).value).toBe('inline query')
+
+    unmount()
+    portalHost.remove()
+  })
 })

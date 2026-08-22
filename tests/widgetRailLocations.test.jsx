@@ -35,19 +35,24 @@ describe('Widget rail city clocks', () => {
   })
 
   it('temporarily replaces widgets with an inline result host', () => {
+    const onInlineDockHost = vi.fn()
     const onInlineResultsHost = vi.fn()
     const { container } = render(<WidgetRail
       compact={false}
       settings={{ widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false }, music: { sources: [] } }}
       inlineFrameActive
+      onInlineDockHost={onInlineDockHost}
       onInlineResultsHost={onInlineResultsHost}
       onOpenWidget={vi.fn()}
       onPatch={vi.fn()}
     />)
     const content = container.querySelector('.widget-rail-content')
+    const dockHost = container.querySelector('.inline-dock-host')
     const host = container.querySelector('.inline-results-host')
     expect(content.getAttribute('aria-hidden')).toBe('true')
+    expect(dockHost).toBeTruthy()
     expect(host).toBeTruthy()
+    expect(onInlineDockHost).toHaveBeenCalledWith(dockHost)
     expect(onInlineResultsHost).toHaveBeenCalledWith(host)
   })
 

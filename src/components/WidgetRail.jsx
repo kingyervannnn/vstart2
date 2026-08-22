@@ -100,7 +100,7 @@ function musicTime(seconds) {
   return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
 }
 
-export function WidgetRail({ compact, settings, mapActive = false, inlineFrameActive = false, onMapResultsHost, onInlineResultsHost, onOpenWidget, onPatch, onEmptyClick }) {
+export function WidgetRail({ compact, settings, mapActive = false, inlineFrameActive = false, onMapResultsHost, onInlineDockHost, onInlineResultsHost, onOpenWidget, onPatch, onEmptyClick }) {
   const musicSources = useMemo(() => (settings.music?.sources || []).filter((source) => source.enabled !== false), [settings.music?.sources])
   const activeMusicSource = musicSources.find((source) => source.id === settings.music?.activeSourceId) || musicSources[0] || null
   const [musicState, setMusicState] = useState({ loading: true, error: '', data: null })
@@ -284,6 +284,7 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
       )}
       </div>
       {mapActive && <div className="map-results-host" ref={onMapResultsHost} />}
+      {inlineFrameActive && <div className="inline-dock-host" ref={onInlineDockHost} />}
       {inlineFrameActive && <div className="inline-results-host" ref={onInlineResultsHost} />}
     </aside>
   )
