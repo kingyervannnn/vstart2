@@ -16,7 +16,7 @@ import { musicApi } from '../lib/music.js'
 import { WidgetRail } from './WidgetRail.jsx'
 
 const settings = {
-  widgets: { clock: false, weather: false, notes: false, email: false, music: true, environment: false },
+  widgets: { clock: false, weather: false, notes: false, email: false, music: true, environment: false, missionGlance: false },
   music: {
     activeSourceId: 'source-one',
     sources: [

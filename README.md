@@ -102,7 +102,9 @@ The Environment widget uses the existing `room-light` CLI through a narrow nativ
 [Environment Bridge](environment-bridge/README.md). Install it with
 `npm run environment:bridge:manage -- install`. The bridge discovers the CLI's sanitized
 color and intensity capabilities at runtime, so newly configured options appear without a
-V Start code change; it never accepts arbitrary shell commands.
+V Start code change; it never accepts arbitrary shell commands. The same loopback bridge
+feeds the read-only Mission Glance widget with cached branch, dirty-file, and last-commit
+status for the project paths saved in Settings → Widgets.
 
 The Music widget is connected through a database-backed source registry. V Start seeds a
 YouTube Music Desktop source at `http://127.0.0.1:26538`; enable the YouTube Music

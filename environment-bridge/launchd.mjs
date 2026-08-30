@@ -16,6 +16,7 @@ const logDir = join(homedir(), 'Library/Logs/VStart2')
 const stdoutLog = join(logDir, 'environment-bridge.log')
 const stderrLog = join(logDir, 'environment-bridge.error.log')
 const lightCliPath = process.env.VSTART_LIGHT_CLI_PATH || join(homedir(), '.local/bin/room-light')
+const gitPath = process.env.VSTART_GIT_PATH || '/usr/bin/git'
 const domain = `gui/${process.getuid()}`
 const serviceTarget = `${domain}/${LABEL}`
 const xml = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;')
@@ -30,6 +31,7 @@ function plist() {
   <key>EnvironmentVariables</key><dict>
     <key>VSTART_ENVIRONMENT_BRIDGE_PORT</key><string>3140</string>
     <key>VSTART_LIGHT_CLI_PATH</key><string>${xml(lightCliPath)}</string>
+    <key>VSTART_GIT_PATH</key><string>${xml(gitPath)}</string>
     <key>PATH</key><string>${xml(`${dirname(process.execPath)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`)}</string>
   </dict>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>10</integer>

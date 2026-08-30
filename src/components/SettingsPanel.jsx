@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowUp, Bot, Check, Database, Folder, FolderUp, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Bot, Check, Database, Folder, FolderUp, GitBranch, Image, LayoutGrid, Mail, Music2, NotebookPen, Palette, PanelsTopLeft, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { backgroundRotationInterval, backgroundRotationSettings } from '../lib/backgroundRotation.js'
 import { BACKGROUND_ZOOM_DEFAULT, BACKGROUND_ZOOM_MAX, BACKGROUND_ZOOM_MIN, normalizeBackgroundZoom } from '../lib/backgroundZoom.js'
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from '../lib/fonts.js'
@@ -7,6 +7,7 @@ import { DEFAULT_EDGE_GLOW_INTENSITY, DEFAULT_ELEMENT_GLOW_INTENSITY, normalizeG
 import { normalizeHeaderScrollSpeed } from '../lib/headerScroll.js'
 import { configuredWeatherLocations, LOCATION_OPTIONS } from '../lib/locations.js'
 import { mailBridge } from '../lib/mailBridge.js'
+import { DEFAULT_MISSION_GLANCE_PROJECT_PATHS, normalizeMissionGlancePaths } from '../lib/missionGlance.js'
 import { musicApi } from '../lib/music.js'
 
 const DEFAULT_NOTES_VAULT_PATH = '/Users/vbitzx/SYNC/Vaults'
@@ -65,6 +66,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
   const [newMusicSource, setNewMusicSource] = useState({ name: 'YouTube Music', baseUrl: 'http://127.0.0.1:26538' })
   const [musicChecks, setMusicChecks] = useState({})
   const [notesVaultDraft, setNotesVaultDraft] = useState(() => settings.notes?.vaultPath || DEFAULT_NOTES_VAULT_PATH)
+  const [missionGlancePathsDraft, setMissionGlancePathsDraft] = useState(() => normalizeMissionGlancePaths(settings.missionGlance?.projectPaths).join('\n'))
   const [notesVaultStatus, setNotesVaultStatus] = useState({ state: 'idle', detail: '' })
   const [agentConnectionStatus, setAgentConnectionStatus] = useState({ state: 'idle', detail: '' })
   const globalFontFamily = settings.appearance?.fontFamily || DEFAULT_FONT_FAMILY
@@ -259,6 +261,13 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
       ? settings.widgets.activeWeatherLocationId
       : weatherLocations.primary.id
     void onPatch({ widgets: { secondaryLocationIds: normalized, activeWeatherLocationId } })
+  }
+
+  const saveMissionGlancePaths = (event) => {
+    event.preventDefault()
+    const projectPaths = normalizeMissionGlancePaths(missionGlancePathsDraft.split('\n'))
+    setMissionGlancePathsDraft(projectPaths.join('\n'))
+    void onPatch({ missionGlance: { projectPaths } })
   }
 
   const testMusicSource = async (source) => {
@@ -593,7 +602,21 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'widgets' && <>
               <h3>Widgets</h3>
-              {['clock', 'weather', 'notes', 'email', 'music', 'environment'].map((widget) => <Toggle key={widget} label={`Show ${widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              {['clock', 'weather', 'notes', 'email', 'music', 'environment', 'missionGlance'].map((widget) => <Toggle key={widget} label={`Show ${widget === 'missionGlance' ? 'Mission Glance' : widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              <div className="notes-vault-settings mission-glance-settings">
+                <h4><GitBranch /> Mission Glance projects</h4>
+                <p className="settings-intro">Enter one absolute Git project path per line. Status reads stay on the loopback Environment Bridge.</p>
+                <form className="notes-vault-form" onSubmit={saveMissionGlancePaths}>
+                  <label>
+                    <span className="sr-only">Mission Glance project paths</span>
+                    <textarea rows="6" value={missionGlancePathsDraft} onChange={(event) => setMissionGlancePathsDraft(event.target.value)} spellCheck={false} autoComplete="off" aria-label="Mission Glance project paths" />
+                  </label>
+                  <div className="notes-vault-actions">
+                    <button type="submit">Save project paths</button>
+                    <button type="button" onClick={() => setMissionGlancePathsDraft(DEFAULT_MISSION_GLANCE_PROJECT_PATHS.join('\n'))}>Use defaults</button>
+                  </div>
+                </form>
+              </div>
               <div className="notes-vault-settings">
                 <h4><NotebookPen /> Notes vault</h4>
                 <p className="settings-intro">Notes are plain Markdown files in your Obsidian vault. Workspace metadata stays in PostgreSQL; note bodies live on disk.</p>

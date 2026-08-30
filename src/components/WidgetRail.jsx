@@ -3,6 +3,7 @@ import { ChevronDown, CloudSun, Lightbulb, ListMusic, Mail, Music2, NotebookPen,
 import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { EnvironmentControl } from './EnvironmentControl.jsx'
+import { MissionGlanceWidget } from './MissionGlanceWidget.jsx'
 
 function ClockFace({ location, now, twentyFourHour, primary = false, active = false, onSelect }) {
   const time = formatLocationTime(now, location, twentyFourHour)
@@ -246,6 +247,7 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
         {widgets.notes !== false && <WidgetAccess icon={NotebookPen} label="Notes" detail="Open notes" onClick={() => onOpenWidget('notes')} />}
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}
       </div>
+      {widgets.missionGlance !== false && <MissionGlanceWidget paths={settings.missionGlance?.projectPaths} />}
       {widgets.environment !== false && <EnvironmentControl onOpen={() => onOpenWidget('environment')} />}
       {widgets.music !== false && (
         <section className={`music-widget music-glow-${musicGlowStyle} glow-trigger-${musicGlowTrigger} ${musicState.data && !musicState.error ? 'music-connected' : ''} ${musicState.data?.isPlaying ? 'music-playing' : ''} ${widgets.musicOutline === true ? 'music-outline' : 'music-no-outline'}`} style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>

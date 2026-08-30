@@ -189,6 +189,28 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mirrored .widget-access-list { justify-content: flex-end; }
 .mirrored .widget-inline-panel { margin-right: 0; margin-left: auto; }
 
+.mission-glance-widget { width: min(100%, 320px); margin-top: 17px; padding: 12px 0; border-block: 1px solid rgba(255,255,255,.13); color: inherit; }
+.mission-glance-widget > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 5px; }
+.mission-glance-widget > header > span { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.mission-glance-widget > header svg { width: 14px; color: color-mix(in srgb, var(--app-accent) 76%, var(--app-text)); }
+.mission-glance-widget > header strong { font-size: 11px; }
+.mission-glance-widget > header small { color: color-mix(in srgb, var(--app-text) 42%, transparent); font-size: 7px; letter-spacing: .11em; text-transform: uppercase; }
+.mission-glance-widget ul { list-style: none; display: grid; gap: 0; margin: 0; padding: 0; }
+.mission-glance-widget li { min-width: 0; display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.075); }
+.mission-glance-widget li:last-child { border-bottom: 0; padding-bottom: 1px; }
+.mission-glance-project-heading { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.mission-glance-project-heading strong { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mission-glance-project-heading span { flex: none; color: color-mix(in srgb, var(--app-text) 48%, transparent); font-size: 7px; }
+.mission-glance-project-heading span.dirty { color: #ffc98a; }
+.mission-glance-branch, .mission-glance-commit { min-width: 0; display: flex; align-items: center; gap: 5px; color: color-mix(in srgb, var(--app-text) 48%, transparent); font-size: 8px; }
+.mission-glance-branch svg { width: 9px; height: 9px; flex: none; }
+.mission-glance-branch span, .mission-glance-commit span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-glance-commit i { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #67d391; box-shadow: 0 0 8px rgba(103,211,145,.45); }
+.mission-glance-commit time { flex: none; color: color-mix(in srgb, var(--app-text) 63%, transparent); font-variant-numeric: tabular-nums; }
+.mission-glance-state, .mission-glance-widget li.unavailable p { margin: 5px 0 0; color: color-mix(in srgb, var(--app-text) 42%, transparent); font-size: 8px; }
+.mission-glance-widget li.unavailable .mission-glance-project-heading strong { color: color-mix(in srgb, var(--app-text) 58%, transparent); }
+.mirrored .mission-glance-widget { margin-right: 0; margin-left: auto; }
+
 .environment-control { min-width: 0; color: inherit; }
 .environment-control.widget { width: min(100%, 300px); display: grid; gap: 10px; margin-top: 17px; padding: 12px 0; border-block: 1px solid rgba(255,255,255,.13); }
 .environment-control.widget.compact-strip { grid-template-columns: minmax(72px, 1fr) 60px 48px 51px 27px; align-items: center; gap: 4px; padding-block: 8px; }
@@ -894,6 +916,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .notes-vault-status.ready { border: 1px solid rgba(120, 220, 160, .22); background: rgba(70, 180, 120, .08); }
 .notes-vault-status.error { border: 1px solid rgba(255,120,120,.28); background: rgba(255,80,80,.08); }
 .notes-vault-status.checking, .notes-vault-status.saving { border: 1px solid rgba(255,255,255,.08); }
+.mission-glance-settings textarea { width: 100%; min-height: 116px; resize: vertical; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; outline: 0; padding: 9px 10px; color: inherit; background: rgba(255,255,255,.035); font: 9px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mission-glance-settings textarea:focus { border-color: color-mix(in srgb, var(--app-accent) 48%, transparent); }
 .notes-service-list { display: grid; gap: 5px; padding-top: 12px; }
 .notes-service-list article { position: relative; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.09); border-radius: 11px; background: transparent; transition: background 150ms ease; }
 .notes-service-list article:hover, .notes-service-list article:focus-within { background: rgba(255,255,255,.045); }
