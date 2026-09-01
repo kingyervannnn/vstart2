@@ -776,9 +776,6 @@ async function handleRequest(request, response) {
       const row = current.rows[0]
       if (row.kind !== 'shortcut') throw new HttpError(400, 'Folders do not have shortcut icons')
       if (Number(row.version) !== data.version) throw new HttpError(409, 'Shortcut changed elsewhere')
-      if (data.mode === 'auto' && row.icon_override_url) {
-        return bootstrapResponse(client, { iconWarning: 'This shortcut uses a custom image URL. Clear it before finding a different icon.' })
-      }
       const currentAsset = row.icon_asset_id
         ? await client.query('SELECT sha256, mime_type, content FROM assets WHERE id = $1', [row.icon_asset_id])
         : { rows: [] }
@@ -792,7 +789,9 @@ async function handleRequest(request, response) {
             excludeSourceUrls: [row.favicon_url],
             excludeContentSha256: currentAsset.rows[0]?.sha256 || null,
             allowGeneratedFallback: false,
-            minimumPreference: currentMetrics ? shortcutIconPreference(currentMetrics) : Number.NEGATIVE_INFINITY,
+            minimumPreference: currentMetrics && !row.icon_override_url
+              ? shortcutIconPreference(currentMetrics)
+              : Number.NEGATIVE_INFINITY,
           })
       if (!icon) {
         return bootstrapResponse(client, { iconWarning: `No different icon variant was found for ${row.title}.` })
@@ -801,10 +800,10 @@ async function handleRequest(request, response) {
       await client.query(`
         UPDATE shortcut_items
         SET icon_asset_id = $2, favicon_url = $3,
-          icon_override_url = CASE WHEN $4 THEN NULL ELSE icon_override_url END,
+          icon_override_url = CASE WHEN $4 OR $5 THEN NULL ELSE icon_override_url END,
           version = version + 1, updated_at = now()
         WHERE ${itemSelector}
-      `, [row.pin_group_id || match[0], icon.iconAssetId, icon.faviconUrl, data.mode === 'generated'])
+      `, [row.pin_group_id || match[0], icon.iconAssetId, icon.faviconUrl, data.mode === 'generated', data.mode === 'auto' && Boolean(row.icon_override_url)])
       return bootstrapResponse(client, { iconWarning: icon.warning })
     })
   }
