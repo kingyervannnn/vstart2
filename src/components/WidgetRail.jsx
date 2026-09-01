@@ -229,7 +229,7 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
     return (
       <nav className="compact-widget-dock" aria-label="Widget access">
         {widgets.weather !== false && <button type="button" onClick={() => onOpenWidget('weather')} aria-label="Open weather"><CloudSun /></button>}
-        {widgets.missionGlance !== false && <button type="button" onClick={() => onOpenWidget('mission-glance')} aria-label="Open Mission Glance"><GitBranch /></button>}
+        {widgets.missionGlance !== false && <button type="button" onClick={() => onOpenWidget('mission-glance')} aria-label="Open Mission"><GitBranch /></button>}
         {widgets.notes !== false && <button type="button" onClick={() => onOpenWidget('notes')} aria-label="Open notes"><NotebookPen /></button>}
         {widgets.email !== false && <button type="button" onClick={() => onOpenWidget('mail')} aria-label="Open inbox"><Mail /></button>}
         {widgets.music !== false && <button type="button" onClick={() => onOpenWidget('music')} aria-label="Open music queue"><Music2 /></button>}
@@ -244,7 +244,7 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
       {widgets.clock !== false && <ClockWidget settings={widgets} onLocationSelect={(locationId) => onPatch({ widgets: { activeWeatherLocationId: locationId } })} />}
       {widgets.weather !== false && <WeatherWidget compact={compact} settings={widgets} onOpen={() => onOpenWidget('weather')} />}
       <div className="widget-access-list">
-        {widgets.missionGlance !== false && <WidgetAccess icon={GitBranch} label="Mission Glance" detail="Project status" onClick={() => onOpenWidget('mission-glance')} />}
+        {widgets.missionGlance !== false && <WidgetAccess icon={GitBranch} label="Mission" detail="Project status" onClick={() => onOpenWidget('mission-glance')} />}
         {widgets.notes !== false && <WidgetAccess icon={NotebookPen} label="Notes" detail="Open notes" onClick={() => onOpenWidget('notes')} />}
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}
       </div>

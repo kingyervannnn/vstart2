@@ -240,7 +240,7 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 - Notes.
 - Email.
 - Music.
-- Mission Glance.
+- Mission.
 
 ### Minimal per-widget settings
 
@@ -251,9 +251,9 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 - Email: account/filter/default mailbox behavior retained only where functional.
 - Music: enabled and glass blur amount. Provider configuration lives on the dedicated
   Music page.
-- Mission Glance: enabled and a bounded list of absolute host Git project paths.
+- Mission: enabled and a bounded list of absolute host Git project paths.
 
-Mission Glance appears as a compact launcher before Notes. Opening it uses the same
+Mission appears as a compact launcher before Notes. Opening it uses the same
 URL-backed main service area as Notes and Mail; project details are not rendered permanently
 inside the widget rail.
 

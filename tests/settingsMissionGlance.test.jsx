@@ -17,7 +17,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('Mission Glance settings', () => {
+describe('Mission settings', () => {
   it('persists visibility and exact absolute project paths through settings patches', () => {
     const onPatch = vi.fn()
     render(<SettingsPanel
@@ -44,11 +44,11 @@ describe('Mission Glance settings', () => {
     />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Widgets' }))
-    const visibility = screen.getByRole('checkbox', { name: 'Show Mission Glance' })
+    const visibility = screen.getByRole('checkbox', { name: 'Show Mission' })
     fireEvent.click(visibility)
     expect(onPatch).toHaveBeenCalledWith({ widgets: { missionGlance: false } })
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Mission Glance project paths' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mission project paths' }), {
       target: { value: '/Users/vbitzx/SS/trucking saas\n/Users/vbitzx/SS/PAYMENT WATCH' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save project paths' }))

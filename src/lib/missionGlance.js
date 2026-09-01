@@ -58,7 +58,7 @@ async function request(path, options = {}) {
     headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...options.headers },
   })
   const body = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(body?.error?.message || `Mission Glance request failed (${response.status})`)
+  if (!response.ok) throw new Error(body?.error?.message || `Mission request failed (${response.status})`)
   return body
 }
 

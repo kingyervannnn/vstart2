@@ -59,10 +59,10 @@ export function MissionGlanceWidget({ paths, expanded = false, onClose }) {
   }, [projectPaths])
 
   return (
-    <section className={`mission-glance-widget ${expanded ? 'expanded' : ''}`} aria-label="Mission Glance projects">
+    <section className={`mission-glance-widget ${expanded ? 'expanded' : ''}`} aria-label="Mission projects">
       <header>
-        <span><GitBranch /><span>{expanded && <small>PROJECT STATUS</small>}<strong>Mission Glance</strong></span></span>
-        <span className="mission-glance-header-actions"><small>Read-only</small>{expanded && <button type="button" onClick={onClose} aria-label="Close Mission Glance"><X /></button>}</span>
+        <span><GitBranch /><span>{expanded && <small>PROJECT STATUS</small>}<strong>Mission</strong></span></span>
+        <span className="mission-glance-header-actions"><small>Read-only</small>{expanded && <button type="button" onClick={onClose} aria-label="Close Mission"><X /></button>}</span>
       </header>
       {state.loading && <p className="mission-glance-state">Loading project status…</p>}
       {!state.loading && !state.projects.length && <p className="mission-glance-state">No projects configured</p>}

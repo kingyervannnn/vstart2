@@ -14,7 +14,7 @@ const SERVICE_META = {
   weather: { label: 'Weather', Icon: CloudSun },
   music: { label: 'Music', Icon: Music2 },
   environment: { label: 'Environment', Icon: Lightbulb },
-  'mission-glance': { label: 'Mission Glance', Icon: GitBranch },
+  'mission-glance': { label: 'Mission', Icon: GitBranch },
 }
 
 function MusicArtwork({ src, large = false }) {
@@ -1116,7 +1116,7 @@ export function ServiceRailView({ kind, initialMailAccount, musicSettings, onMus
     return <section className="service-rail-view environment-service" aria-label="Environment"><EnvironmentControl expanded onClose={onClose} /></section>
   }
   if (kind === 'mission-glance') {
-    return <section className="service-rail-view mission-glance-service" aria-label="Mission Glance"><MissionGlanceWidget paths={missionGlanceSettings?.projectPaths} expanded onClose={onClose} /></section>
+    return <section className="service-rail-view mission-glance-service" aria-label="Mission"><MissionGlanceWidget paths={missionGlanceSettings?.projectPaths} expanded onClose={onClose} /></section>
   }
   return (
     <section className={`service-rail-view ${kind}-service`} aria-label={meta.label}>

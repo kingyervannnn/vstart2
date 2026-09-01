@@ -603,14 +603,14 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
             </>}
             {page === 'widgets' && <>
               <h3>Widgets</h3>
-              {['clock', 'weather', 'notes', 'email', 'music', 'environment', 'missionGlance'].map((widget) => <Toggle key={widget} label={`Show ${widget === 'missionGlance' ? 'Mission Glance' : widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
+              {['clock', 'weather', 'notes', 'email', 'music', 'environment', 'missionGlance'].map((widget) => <Toggle key={widget} label={`Show ${widget === 'missionGlance' ? 'Mission' : widget}`} checked={settings.widgets?.[widget] !== false} onChange={(value) => onPatch({ widgets: { [widget]: value } })} />)}
               <div className="notes-vault-settings mission-glance-settings">
-                <h4><GitBranch /> Mission Glance projects</h4>
+                <h4><GitBranch /> Mission projects</h4>
                 <p className="settings-intro">Enter one absolute Git project path per line. Status reads stay on the loopback Environment Bridge.</p>
                 <form className="notes-vault-form" onSubmit={saveMissionGlancePaths}>
                   <label>
-                    <span className="sr-only">Mission Glance project paths</span>
-                    <textarea rows="6" value={missionGlancePathsDraft} onChange={(event) => setMissionGlancePathsDraft(event.target.value)} spellCheck={false} autoComplete="off" aria-label="Mission Glance project paths" />
+                    <span className="sr-only">Mission project paths</span>
+                    <textarea rows="6" value={missionGlancePathsDraft} onChange={(event) => setMissionGlancePathsDraft(event.target.value)} spellCheck={false} autoComplete="off" aria-label="Mission project paths" />
                   </label>
                   <div className="notes-vault-actions">
                     <button type="submit">Save project paths</button>

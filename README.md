@@ -103,7 +103,7 @@ The Environment widget uses the existing `room-light` CLI through a narrow nativ
 `npm run environment:bridge:manage -- install`. The bridge discovers the CLI's sanitized
 color and intensity capabilities at runtime, so newly configured options appear without a
 V Start code change; it never accepts arbitrary shell commands. The same loopback bridge
-feeds the read-only Mission Glance widget with cached branch, dirty-file, and last-commit
+feeds the read-only Mission widget with cached branch, dirty-file, and last-commit
 status for the project paths saved in Settings → Widgets.
 
 The Music widget is connected through a database-backed source registry. V Start seeds a

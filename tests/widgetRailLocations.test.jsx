@@ -11,7 +11,7 @@ afterEach(() => {
 })
 
 describe('Widget rail city clocks', () => {
-  it('places Mission Glance before Notes and opens it as a service', () => {
+  it('places Mission before Notes and opens it as a service', () => {
     const onOpenWidget = vi.fn()
     const { container } = render(<WidgetRail
       compact={false}
@@ -22,11 +22,11 @@ describe('Widget rail city clocks', () => {
 
     const launchers = [...container.querySelectorAll('.widget-access')]
     expect(launchers.map((button) => button.textContent)).toEqual([
-      expect.stringContaining('Mission Glance'),
+      expect.stringContaining('Mission'),
       expect.stringContaining('Notes'),
       expect.stringContaining('Mail'),
     ])
-    fireEvent.click(screen.getByRole('button', { name: 'Open Mission Glance' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Mission' }))
     expect(onOpenWidget).toHaveBeenCalledWith('mission-glance')
   })
 

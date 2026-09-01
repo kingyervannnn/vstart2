@@ -70,7 +70,7 @@ describe('MissionGlanceWidget', () => {
     render(<MissionGlanceWidget paths={[]} expanded onClose={onClose} />)
 
     expect(screen.getByText('PROJECT STATUS')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Close Mission Glance' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close Mission' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

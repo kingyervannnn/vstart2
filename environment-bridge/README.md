@@ -12,7 +12,7 @@ The Environment Bridge is a narrow loopback service between V Start and approved
 
 Colors and intensity levels are read from `room-light config --json` on a short cache. Changes to the CLI configuration therefore appear in V Start automatically. Commands are validated against those live capabilities and executed without a shell.
 
-Mission Glance sends its bounded PostgreSQL-backed project path list to the snapshot route. The bridge runs only `git -C <path> branch --show-current`, `status --porcelain=v1 -z`, and `log -1` with fixed argument arrays and a short per-project cache. Missing paths, non-Git folders, and Git failures return `available: false`; Git error output is not exposed.
+Mission sends its bounded PostgreSQL-backed project path list to the snapshot route. The bridge runs only `git -C <path> branch --show-current`, `status --porcelain=v1 -z`, and `log -1` with fixed argument arrays and a short per-project cache. Missing paths, non-Git folders, and Git failures return `available: false`; Git error output is not exposed.
 
 ## Service
 
