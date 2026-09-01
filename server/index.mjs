@@ -3,7 +3,7 @@ import http from 'node:http'
 import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readBuffer, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
-import { generateShortcutIcon, insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
+import { generateShortcutIcon, insertUploadedIcon, inspectIconQuality, resolveShortcutIcon, shortcutIconPreference } from './icons.mjs'
 import { addMusicQueueItem, controlMusic, playMusicItem, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
@@ -776,15 +776,35 @@ async function handleRequest(request, response) {
       const row = current.rows[0]
       if (row.kind !== 'shortcut') throw new HttpError(400, 'Folders do not have shortcut icons')
       if (Number(row.version) !== data.version) throw new HttpError(409, 'Shortcut changed elsewhere')
+      if (data.mode === 'auto' && row.icon_override_url) {
+        return bootstrapResponse(client, { iconWarning: 'This shortcut uses a custom image URL. Clear it before finding a different icon.' })
+      }
+      const currentAsset = row.icon_asset_id
+        ? await client.query('SELECT sha256, mime_type, content FROM assets WHERE id = $1', [row.icon_asset_id])
+        : { rows: [] }
+      const currentMetrics = currentAsset.rows[0]
+        ? await inspectIconQuality(currentAsset.rows[0].content, currentAsset.rows[0].mime_type)
+        : null
       const icon = data.mode === 'generated'
         ? await generateShortcutIcon(client, row.title, row.url)
-        : await resolveShortcutIcon(client, row.url, row.icon_override_url, { title: row.title })
+        : await resolveShortcutIcon(client, row.url, null, {
+            title: row.title,
+            excludeSourceUrls: [row.favicon_url],
+            excludeContentSha256: currentAsset.rows[0]?.sha256 || null,
+            allowGeneratedFallback: false,
+            minimumPreference: currentMetrics ? shortcutIconPreference(currentMetrics) : Number.NEGATIVE_INFINITY,
+          })
+      if (!icon) {
+        return bootstrapResponse(client, { iconWarning: `No different icon variant was found for ${row.title}.` })
+      }
       const itemSelector = row.pin_group_id ? 'pin_group_id = $1' : 'id = $1'
       await client.query(`
         UPDATE shortcut_items
-        SET icon_asset_id = $2, favicon_url = $3, version = version + 1, updated_at = now()
+        SET icon_asset_id = $2, favicon_url = $3,
+          icon_override_url = CASE WHEN $4 THEN NULL ELSE icon_override_url END,
+          version = version + 1, updated_at = now()
         WHERE ${itemSelector}
-      `, [row.pin_group_id || match[0], icon.iconAssetId, icon.faviconUrl])
+      `, [row.pin_group_id || match[0], icon.iconAssetId, icon.faviconUrl, data.mode === 'generated'])
       return bootstrapResponse(client, { iconWarning: icon.warning })
     })
   }

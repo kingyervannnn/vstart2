@@ -100,7 +100,6 @@ async function fetchPublicResource(source, { accept, maxBytes }) {
 }
 
 async function imageMetrics(content, mimeType) {
-  if (mimeType === 'image/svg+xml') return { vector: true, width: null, height: null, quality: Number.POSITIVE_INFINITY }
   if (mimeType === 'image/x-icon' || mimeType === 'image/vnd.microsoft.icon') {
     if (content.length < 22) return { vector: false, width: 0, height: 0, quality: 0 }
     const count = Math.min(content.readUInt16LE(4), Math.floor((content.length - 6) / 16))
@@ -109,15 +108,26 @@ async function imageMetrics(content, mimeType) {
       return Math.min(content[offset] || 256, content[offset + 1] || 256)
     })
     const quality = Math.max(0, ...sizes)
-    return { vector: false, width: quality, height: quality, quality }
+    return { vector: false, width: quality, height: quality, quality, markLike: quality >= 32 }
   }
   try {
-    const metadata = await sharp(content, { animated: true }).metadata()
+    const pipeline = sharp(content, { animated: true })
+    const [metadata, stats] = await Promise.all([pipeline.metadata(), sharp(content, { animated: true }).stats()])
     const width = Number(metadata.width) || 0
     const height = Number(metadata.pageHeight || metadata.height) || 0
-    return { vector: false, width, height, quality: Math.min(width, height) }
+    const alpha = stats.channels[3]
+    const visualCoverage = alpha ? alpha.mean / 255 : 1
+    const vector = mimeType === 'image/svg+xml'
+    return {
+      vector,
+      width: vector ? null : width,
+      height: vector ? null : height,
+      quality: vector ? Number.POSITIVE_INFINITY : Math.min(width, height),
+      visualCoverage,
+      markLike: Boolean(alpha && visualCoverage < 0.9),
+    }
   } catch {
-    return { vector: false, width: 0, height: 0, quality: 0 }
+    return { vector: mimeType === 'image/svg+xml', width: 0, height: 0, quality: 0, visualCoverage: 1, markLike: false }
   }
 }
 
@@ -177,7 +187,13 @@ export function serviceIconSlugs(title, destinationUrl) {
 }
 
 function catalogCandidates(title, destinationUrl) {
-  return serviceIconSlugs(title, destinationUrl).flatMap((slug) => [
+  const url = new URL(destinationUrl)
+  const identity = `${String(title).toLowerCase()} ${url.hostname.toLowerCase()}`
+  const aliases = []
+  if (identity.includes('chase')) aliases.push('chase')
+  if (identity.includes('outlook') || (identity.includes('microsoft') && identity.includes('mail'))) aliases.push('microsoft-outlook')
+  if (identity.includes('entra')) aliases.push('microsoft-azure')
+  return [...new Set([...aliases, ...serviceIconSlugs(title, destinationUrl)])].flatMap((slug) => [
     { url: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${slug}.svg`, source: 'dashboard-icons' },
     { url: `https://cdn.simpleicons.org/${slug.replaceAll('-', '')}`, source: 'simple-icons' },
   ])
@@ -191,16 +207,6 @@ function conventionalCandidates(value) {
 
 function googleCandidate(value) {
   return { url: `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(new URL(value).toString())}&sz=256`, source: 'google' }
-}
-
-function isLegacyFaviconResolver(value) {
-  if (!value) return false
-  try {
-    const url = new URL(value)
-    return /(^|\.)google\.com$/i.test(url.hostname) && url.pathname === '/s2/favicons'
-  } catch {
-    return false
-  }
 }
 
 function isObviouslyPrivateDestination(value) {
@@ -263,14 +269,33 @@ export async function generateShortcutIcon(client, title, destinationUrl) {
   return storedResult(client, { mimeType: 'image/svg+xml', content: generatedShortcutSvg(title, destinationUrl), sourceUrl: null })
 }
 
-async function bestFetchedIcon(candidates) {
-  const unique = [...new Map(candidates.map((candidate) => [candidate.url, candidate])).values()]
+function contentSha256(content) {
+  return crypto.createHash('sha256').update(content).digest('hex')
+}
+
+function candidateIsExcluded(image, excludedContentSha256) {
+  return Boolean(excludedContentSha256 && contentSha256(image.content) === excludedContentSha256)
+}
+
+function usableTileImage(image) {
+  return image.vector || image.quality >= MIN_FULL_TILE_SIZE || (image.markLike && image.quality >= 32)
+}
+
+export function shortcutIconPreference(image) {
+  return Number(image.markLike) * 1_000_000 + Number(image.vector) * 100_000 + Math.min(Number(image.quality) || 0, 4096)
+}
+
+async function bestFetchedIcon(candidates, { excludedUrls = new Set(), excludedContentSha256 = null } = {}) {
+  const unique = [...new Map(candidates
+    .filter((candidate) => !excludedUrls.has(candidate.url))
+    .map((candidate) => [candidate.url, candidate])).values()]
   let bestLowQuality = null
   for (const candidate of unique) {
     try {
       const image = await fetchPublicImage(candidate.url)
+      if (candidateIsExcluded(image, excludedContentSha256)) continue
       image.source = candidate.source
-      if (image.vector || image.quality >= MIN_FULL_TILE_SIZE) return { image, lowQuality: bestLowQuality }
+      if (usableTileImage(image)) return { image, lowQuality: bestLowQuality }
       if (!bestLowQuality || image.quality > bestLowQuality.quality) bestLowQuality = image
     } catch {
       // Candidate failures are expected; continue through the resolver chain.
@@ -279,30 +304,39 @@ async function bestFetchedIcon(candidates) {
   return { image: null, lowQuality: bestLowQuality }
 }
 
-async function bestFetchedIconParallel(candidates) {
-  const unique = [...new Map(candidates.map((candidate) => [candidate.url, candidate])).values()]
+async function bestFetchedIconParallel(candidates, { excludedUrls = new Set(), excludedContentSha256 = null } = {}) {
+  const unique = [...new Map(candidates
+    .filter((candidate) => !excludedUrls.has(candidate.url))
+    .map((candidate) => [candidate.url, candidate])).values()]
   const images = await Promise.all(unique.map(async (candidate) => {
     try {
-      return { ...(await fetchPublicImage(candidate.url)), source: candidate.source }
+      const image = await fetchPublicImage(candidate.url)
+      if (candidateIsExcluded(image, excludedContentSha256)) return null
+      return { ...image, source: candidate.source }
     } catch {
       return null
     }
   }))
   const available = images.filter(Boolean)
+  const preferred = available.filter(usableTileImage).sort((left, right) => shortcutIconPreference(right) - shortcutIconPreference(left))[0] || null
   return {
-    image: available.find((image) => image.vector || image.quality >= MIN_FULL_TILE_SIZE) || null,
-    lowQuality: available.filter((image) => !image.vector && image.quality < MIN_FULL_TILE_SIZE)
+    image: preferred,
+    lowQuality: available.filter((image) => !usableTileImage(image))
       .sort((left, right) => right.quality - left.quality)[0] || null,
   }
 }
 
-async function resolveAutomaticIcon(destinationUrl, title) {
+async function resolveAutomaticIcon(destinationUrl, title, { excludeSourceUrls = [], excludeContentSha256 = null } = {}) {
+  const excludedUrls = new Set(excludeSourceUrls.filter(Boolean))
+  const exclusions = { excludedUrls, excludedContentSha256: excludeContentSha256 }
   let lowQuality = null
+  let discoveredImage = null
   let privateDestination = isObviouslyPrivateDestination(destinationUrl)
   if (!privateDestination) {
     try {
-      const discovered = await bestFetchedIcon(await discoverPageIcons(destinationUrl))
-      if (discovered.image) return discovered.image
+      const discovered = await bestFetchedIconParallel(await discoverPageIcons(destinationUrl), exclusions)
+      discoveredImage = discovered.image
+      if (discoveredImage?.markLike) return discoveredImage
       lowQuality = discovered.lowQuality
     } catch (error) {
       privateDestination = String(error?.message || '').includes('non-public address')
@@ -310,41 +344,48 @@ async function resolveAutomaticIcon(destinationUrl, title) {
     }
   }
 
-  const catalog = await bestFetchedIconParallel(catalogCandidates(title, destinationUrl))
-  if (catalog.image) return catalog.image
+  const catalog = await bestFetchedIconParallel(catalogCandidates(title, destinationUrl), exclusions)
+  if (catalog.image && (!discoveredImage || shortcutIconPreference(catalog.image) > shortcutIconPreference(discoveredImage))) return catalog.image
+  if (discoveredImage) return discoveredImage
   if (!lowQuality || (catalog.lowQuality?.quality || 0) > lowQuality.quality) lowQuality = catalog.lowQuality
 
   if (!privateDestination) {
-    const conventional = await bestFetchedIconParallel(conventionalCandidates(destinationUrl))
+    const conventional = await bestFetchedIconParallel(conventionalCandidates(destinationUrl), exclusions)
     if (conventional.image) return conventional.image
     if (!lowQuality || (conventional.lowQuality?.quality || 0) > lowQuality.quality) lowQuality = conventional.lowQuality
 
-    const google = await bestFetchedIcon([googleCandidate(destinationUrl)])
+    const google = await bestFetchedIcon([googleCandidate(destinationUrl)], exclusions)
     if (google.image) return google.image
   }
   return lowQuality
 }
 
-export async function resolveShortcutIcon(client, destinationUrl, overrideUrl, { title = '' } = {}) {
+export async function resolveShortcutIcon(client, destinationUrl, overrideUrl, {
+  title = '',
+  excludeSourceUrls = [],
+  excludeContentSha256 = null,
+  allowGeneratedFallback = true,
+  minimumPreference = Number.NEGATIVE_INFINITY,
+} = {}) {
   let warning = null
-  const effectiveOverride = isLegacyFaviconResolver(overrideUrl) ? null : overrideUrl
-  if (effectiveOverride) {
+  if (overrideUrl) {
     try {
-      const image = await fetchPublicImage(effectiveOverride)
+      const image = await fetchPublicImage(overrideUrl)
       return storedResult(client, image)
     } catch (error) {
       warning = `Shortcut image URL could not be used: ${error.message}`
     }
     try {
-      const image = await resolveAutomaticIcon(effectiveOverride, title)
-      if (image && (image.vector || image.quality >= MIN_FULL_TILE_SIZE)) return storedResult(client, image)
+      const image = await resolveAutomaticIcon(overrideUrl, title)
+      if (image) return storedResult(client, image)
     } catch {
       // Continue with the shortcut destination before generating a fallback.
     }
   }
 
-  const image = await resolveAutomaticIcon(destinationUrl, title)
-  if (image && (image.vector || image.quality >= MIN_FULL_TILE_SIZE)) return storedResult(client, image, warning)
+  const image = await resolveAutomaticIcon(destinationUrl, title, { excludeSourceUrls, excludeContentSha256 })
+  if (image && usableTileImage(image) && shortcutIconPreference(image) > minimumPreference) return storedResult(client, image, warning)
+  if (!allowGeneratedFallback) return null
   return generateShortcutIcon(client, title, destinationUrl)
 }
 

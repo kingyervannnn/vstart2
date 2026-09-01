@@ -207,8 +207,8 @@ export function FolderPopover({ folder, children, placements, profile, anchorRec
 
 export function ShortcutIcon({ item }) {
   const sources = [...new Set([
-    item.iconAssetId ? `/api/assets/${item.iconAssetId}` : null,
     item.iconOverrideUrl || null,
+    item.iconAssetId ? `/api/assets/${item.iconAssetId}` : null,
     item.faviconUrl || null,
   ].filter(Boolean))]
   const [failedSources, setFailedSources] = useState(() => new Set())

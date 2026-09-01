@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('node:dns/promises', () => ({
@@ -36,7 +37,7 @@ describe('shortcut image URL resolution', () => {
     const result = await resolveShortcutIcon(client(), 'https://destination.example/app', 'https://alternate.example/logo-page')
 
     expect(result).toEqual({ iconAssetId: 'asset-1', faviconUrl: 'https://alternate.example/brand.svg', warning: null })
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === 'https://alternate.example/brand.svg')).toBe(true)
   })
 
   it('recognizes image bytes when a host returns a generic MIME type', async () => {
@@ -94,18 +95,58 @@ describe('shortcut image URL resolution', () => {
     expect(database.query.mock.calls[0][1][1]).toBe('image/svg+xml')
   })
 
-  it('replaces legacy Google favicon override URLs with a higher-quality catalog match', async () => {
+  it('treats legacy Google favicon URLs as explicit overrides too', async () => {
     const legacy = 'https://www.google.com/s2/favicons?domain=github.com&sz=64'
-    const catalog = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github.svg'
     const fetchMock = vi.fn(async (url) => {
-      if (String(url) === catalog) return new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+      if (String(url) === legacy) return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } })
       throw new Error(`Unavailable: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await resolveShortcutIcon(client(), 'https://github.com/', legacy, { title: 'GitHub' })
 
-    expect(result.faviconUrl).toBe(catalog)
-    expect(fetchMock.mock.calls.some(([url]) => String(url) === legacy)).toBe(false)
+    expect(result.faviconUrl).toBe(legacy)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('finds a genuinely different automatic candidate when the current source and bytes are excluded', async () => {
+    const first = 'https://variants.example/current.svg'
+    const second = 'https://variants.example/alternate.svg'
+    const currentBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1v1z"/></svg>')
+    const alternateBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><circle cx="1" cy="1" r="1"/></svg>')
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url) === 'https://variants.example/app') {
+        return new Response(`<link rel="icon" type="image/svg+xml" href="${first}"><link rel="icon" type="image/svg+xml" href="${second}">`, { status: 200, headers: { 'content-type': 'text/html' } })
+      }
+      if (String(url) === second) return new Response(alternateBytes, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await resolveShortcutIcon(client(), 'https://variants.example/app', null, {
+      title: 'Variants',
+      excludeSourceUrls: [first],
+      excludeContentSha256: crypto.createHash('sha256').update(currentBytes).digest('hex'),
+      allowGeneratedFallback: false,
+    })
+
+    expect(result.faviconUrl).toBe(second)
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === first)).toBe(false)
+  })
+
+  it('prefers a transparent brand mark over an opaque app-card icon', async () => {
+    const opaque = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="#fff"/><path d="M32 32h64v64H32z" fill="#06c"/></svg>')
+    const mark = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><path d="M24 64 64 24l40 40-40 40z" fill="#06c"/></svg>')
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url) === 'https://www.chase.com/') return new Response('<link rel="icon" type="image/svg+xml" href="/app-card.svg">', { status: 200, headers: { 'content-type': 'text/html' } })
+      if (String(url) === 'https://www.chase.com/app-card.svg') return new Response(opaque, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+      if (String(url) === 'https://cdn.simpleicons.org/chase') return new Response(mark, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+      return new Response('missing', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await resolveShortcutIcon(client(), 'https://www.chase.com/', null, { title: 'Chase' })
+
+    expect(result.faviconUrl).toBe('https://cdn.simpleicons.org/chase')
   })
 })
