@@ -13,6 +13,7 @@ import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { glowStrength } from './lib/glowIntensity.js'
+import { shouldHoldBaseWorkspaceUrl } from './lib/workspaceRoute.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -215,6 +216,10 @@ export function App() {
   const agentMode = Boolean(routedWorkspace && location.pathname.includes('/agent'))
   const agentTarget = agentMode ? decodeURIComponent(workspaceRoute?.[2] || 'new') : 'new'
   const settings = bootstrap?.settings?.document || EMPTY_SETTINGS
+  const workspaceUrlConfirmationPending = !routedWorkspace && shouldHoldBaseWorkspaceUrl(
+    location.pathname,
+    settings.general?.holdBaseUrlUntilWorkspaceConfirmed,
+  )
   const activeBackgroundRotation = useMemo(() => backgroundRotationSettings(settings, activeWorkspace?.id), [activeWorkspace?.id, settings])
   const appReady = bootstrapReady
   const backgroundId = settings.backgrounds?.workspaceSpecific && activeWorkspace?.backgroundAssetId
@@ -346,8 +351,9 @@ export function App() {
   useEffect(() => {
     if (!bootstrap || !workspaces.length) return
     if (routedWorkspace) return
+    if (workspaceUrlConfirmationPending) return
     navigate({ pathname: `/w/${fallbackWorkspace.slug}`, search: location.search }, { replace: true })
-  }, [bootstrap, fallbackWorkspace, location.search, navigate, routedWorkspace, workspaces.length])
+  }, [bootstrap, fallbackWorkspace, location.search, navigate, routedWorkspace, workspaces.length, workspaceUrlConfirmationPending])
 
   useEffect(() => {
     if (!activeWorkspace || activeRef.current === activeWorkspace.id) return
@@ -1214,6 +1220,7 @@ export function App() {
           workspaces={workspaces}
           items={bootstrap.items}
           activeWorkspaceId={activeWorkspace.id}
+          workspaceConfirmationPending={workspaceUrlConfirmationPending}
           onWorkspaceSelect={selectWorkspace}
           onWorkspaceContextMenu={(payload) => { setContextMenu(null); setWorkspaceMenu(payload) }}
           onWorkspaceLayoutCommit={(profileName, layout) => patchSettings({ search: { workspaceOffset: { [profileName]: layout.offset }, workspaceSide: { [profileName]: layout.side } } })}

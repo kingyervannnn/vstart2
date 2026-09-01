@@ -7,7 +7,8 @@ VALUES (
       "openLinksInNewTab": true,
       "autofocusSearch": true,
       "mirrorLayout": false,
-      "innerOutline": true
+      "innerOutline": true,
+      "holdBaseUrlUntilWorkspaceConfirmed": false
     },
     "speedDial": {
       "alwaysShowNames": true,

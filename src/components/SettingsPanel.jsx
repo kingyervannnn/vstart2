@@ -285,6 +285,7 @@ export function SettingsPanel({ settings, workspaces, backgroundAssets, backgrou
               <Toggle label="Mirror two-column layout" detail="Moves the widget rail to the right without changing shortcut positions." checked={settings.general?.mirrorLayout} onChange={(value) => onPatch({ general: { mirrorLayout: value } })} />
               <Toggle label="Open links in a new tab" checked={settings.general?.openLinksInNewTab} onChange={(value) => onPatch({ general: { openLinksInNewTab: value } })} />
               <Toggle label="Autofocus search bar" checked={settings.general?.autofocusSearch} onChange={(value) => onPatch({ general: { autofocusSearch: value } })} />
+              <Toggle label="Confirm workspace URL on new tabs" detail="Keeps the base URL until you switch workspaces or click the selected workspace button." checked={settings.general?.holdBaseUrlUntilWorkspaceConfirmed === true} onChange={(value) => onPatch({ general: { holdBaseUrlUntilWorkspaceConfirmed: value } })} />
               <Toggle label="Inner outline" detail="Frames the compact marquee, shortcuts, search bar, and widget controls as one composition." checked={settings.general?.innerOutline} onChange={(value) => onPatch({ general: { innerOutline: value } })} />
             </>}
             {page === 'workspaces' && <>

@@ -1,12 +1,12 @@
 import { Move } from 'lucide-react'
 import { getWorkspaceIcon } from '../lib/workspaceIcons.jsx'
 
-export function WorkspaceSwitcher({ workspaces, activeId, onSelect, compact, editMode, offsetX = 0, side = 'top', hiddenBySuggestions = false, onContextMenu, onMovePointerDown }) {
+export function WorkspaceSwitcher({ workspaces, activeId, confirmationPending = false, onSelect, compact, editMode, offsetX = 0, side = 'top', hiddenBySuggestions = false, onContextMenu, onMovePointerDown }) {
   if (compact) return null
   const activeIndex = Math.max(0, workspaces.findIndex((workspace) => workspace.id === activeId))
   return (
     <nav
-      className={`workspace-switcher workspace-switcher-${side} ${editMode ? 'editing' : ''} ${hiddenBySuggestions ? 'suggestion-collision' : ''}`}
+      className={`workspace-switcher workspace-switcher-${side} ${confirmationPending ? 'confirmation-pending' : ''} ${editMode ? 'editing' : ''} ${hiddenBySuggestions ? 'suggestion-collision' : ''}`}
       aria-label="Workspaces"
       aria-hidden={hiddenBySuggestions || undefined}
       style={{ '--workspace-active-x': `${activeIndex * 35}px`, '--workspace-offset-x': `${offsetX}px` }}
@@ -15,14 +15,15 @@ export function WorkspaceSwitcher({ workspaces, activeId, onSelect, compact, edi
       {!!workspaces.length && <span className="workspace-switcher-active" aria-hidden="true" />}
       {workspaces.map((workspace) => {
         const Icon = getWorkspaceIcon(workspace.icon)
+        const pending = confirmationPending && workspace.id === activeId
         return <button
           key={workspace.id}
           type="button"
-          className={workspace.id === activeId ? 'active' : ''}
+          className={`${workspace.id === activeId ? 'active' : ''}${pending ? ' pending-confirmation' : ''}`}
           onClick={() => onSelect(workspace)}
-          aria-label={workspace.name}
+          aria-label={pending ? `${workspace.name}, confirm workspace` : workspace.name}
           aria-current={workspace.id === activeId ? 'page' : undefined}
-          title={workspace.name}
+          title={pending ? `${workspace.name} · click to confirm workspace URL` : workspace.name}
           onContextMenu={(event) => {
             event.preventDefault()
             event.stopPropagation()

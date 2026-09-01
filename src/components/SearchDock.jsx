@@ -24,6 +24,7 @@ export function SearchDock({
   workspaces,
   items = [],
   activeWorkspaceId,
+  workspaceConfirmationPending = false,
   onWorkspaceSelect,
   onWorkspaceContextMenu,
   onGeometryCommit,
@@ -665,7 +666,7 @@ export function SearchDock({
       onPointerCancel={agentMode || inlineView ? undefined : endInteraction}
       onLostPointerCapture={agentMode || inlineView ? undefined : endInteraction}
     >
-      {!agentMode && !inlineView && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
+      {!agentMode && !inlineView && <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} confirmationPending={workspaceConfirmationPending} onSelect={onWorkspaceSelect} compact={compact} editMode={editMode} offsetX={workspaceOffset} side={effectiveWorkspaceSide} hiddenBySuggestions={workspaceHiddenBySuggestions} onContextMenu={onWorkspaceContextMenu} onMovePointerDown={beginWorkspaceMove} />}
       <form
         className={`search-dock ${inline ? 'inline-mode' : ''} ${agentMode ? 'agent-dock-active' : ''} ${searchAppearance.outline === false ? 'no-outline' : ''} search-glow-${searchGlowStyle} glow-trigger-${searchGlowTrigger} ${query.trim() || imageAttachment ? 'has-query' : ''} ${imageDragActive ? 'image-drop-active' : ''}`}
         onSubmit={submit}

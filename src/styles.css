@@ -487,9 +487,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .workspace-switcher.suggestion-collision { visibility: hidden; opacity: 0; transform: translateX(var(--workspace-offset-x, 0)) scale(.94); pointer-events: none; transition: opacity 140ms ease, transform 180ms ease, visibility 0s linear 180ms; }
 .workspace-moving .workspace-switcher { transition: opacity 120ms ease; }
 .workspace-switcher-active { position: absolute; z-index: 0; top: 5px; left: 7px; width: 27px; height: 27px; border-radius: 50%; transform: translate3d(var(--workspace-active-x, 0), 0, 0); background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); box-shadow: 0 6px 18px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.15); transition: transform 440ms cubic-bezier(.16,1,.3,1); will-change: transform; pointer-events: none; }
+.workspace-switcher.confirmation-pending .workspace-switcher-active { background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 36%, rgba(255,255,255,.17)), color-mix(in srgb, var(--app-accent) 14%, rgba(255,255,255,.06))); box-shadow: 0 6px 18px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.15), 0 0 16px color-mix(in srgb, var(--app-accent) 22%, transparent); }
 .workspace-switcher button { position: relative; z-index: 1; width: 27px; height: 27px; display: grid; place-items: center; border: 0; border-radius: 50%; color: color-mix(in srgb, var(--app-text) 52%, transparent); background: transparent; cursor: pointer; transition: transform 180ms cubic-bezier(.2,.8,.2,1), color 180ms; }
 .workspace-switcher button:hover { transform: translateY(-2px); color: var(--app-text); }
 .workspace-switcher button.active { color: var(--app-text); }
+.workspace-switcher button.pending-confirmation { color: color-mix(in srgb, var(--app-accent) 74%, var(--app-text)); }
 .workspace-switcher .workspace-offset-handle { position: absolute; z-index: 3; left: -35px; top: 50%; width: 27px; height: 27px; border: 1px solid color-mix(in srgb, var(--app-accent) 55%, transparent); background: rgba(8,12,18,.72); transform: translateY(-50%); cursor: ew-resize; touch-action: none; }
 .workspace-switcher .workspace-offset-handle:hover { transform: translateY(-50%) scale(1.06); }
 .workspace-offset-handle svg { width: 13px; height: 13px; }
