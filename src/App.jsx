@@ -13,7 +13,7 @@ import { backgroundZoomScale } from './lib/backgroundZoom.js'
 import { headerScrollDuration } from './lib/headerScroll.js'
 import { extractAdaptiveGlowColor, normalizeHexColor } from './lib/glowColor.js'
 import { glowStrength } from './lib/glowIntensity.js'
-import { shouldHoldBaseWorkspaceUrl } from './lib/workspaceRoute.js'
+import { shouldHoldBaseWorkspaceUrl, shouldReturnWorkspaceUrlToBase, withActiveWorkspaceState, WORKSPACE_URL_PREVIEW_MS } from './lib/workspaceRoute.js'
 import { DialCanvas } from './components/DialCanvas.jsx'
 import { FolderPopover } from './components/FolderPopover.jsx'
 import { InlineResults } from './components/InlineResults.jsx'
@@ -107,6 +107,7 @@ export function App() {
   const backgroundChannelRef = useRef(null)
   const agentRef = useRef(null)
   const shortcutSpotlightTimerRef = useRef(null)
+  const workspacePreviewTimerRef = useRef(null)
   const settingsQueueRef = useRef(Promise.resolve())
   const wheelRef = useRef({ total: 0, cooldown: false, timer: null })
 
@@ -363,8 +364,26 @@ export function App() {
   }, [activeWorkspace])
 
   const selectWorkspace = useCallback((workspace) => {
-    if (workspace) navigate({ pathname: agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`, search: agentMode ? '' : location.search })
-  }, [agentMode, location.search, navigate])
+    if (!workspace) return
+    window.clearTimeout(workspacePreviewTimerRef.current)
+    workspacePreviewTimerRef.current = null
+    const returnToBase = shouldReturnWorkspaceUrlToBase({
+      enabled: settings.general?.holdBaseUrlUntilWorkspaceConfirmed,
+      agentMode,
+      currentWorkspaceId: activeWorkspace?.id,
+      nextWorkspaceId: workspace.id,
+    })
+    applyBootstrap(withActiveWorkspaceState(bootstrapRef.current, workspace.id))
+    navigate({ pathname: agentMode ? `/w/${workspace.slug}/agent/new` : `/w/${workspace.slug}`, search: agentMode ? '' : location.search })
+    if (returnToBase) {
+      workspacePreviewTimerRef.current = window.setTimeout(() => {
+        workspacePreviewTimerRef.current = null
+        navigate({ pathname: '/', search: '' }, { replace: true })
+      }, WORKSPACE_URL_PREVIEW_MS)
+    }
+  }, [activeWorkspace?.id, agentMode, applyBootstrap, location.search, navigate, settings.general?.holdBaseUrlUntilWorkspaceConfirmed])
+
+  useEffect(() => () => window.clearTimeout(workspacePreviewTimerRef.current), [])
 
   const openShortcutFromSearch = useCallback((item) => {
     if (!item?.url) return

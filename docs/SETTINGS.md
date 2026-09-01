@@ -36,8 +36,9 @@ mode. On narrow viewports, navigation becomes a list/detail stack.
 - Open links in a new tab.
 - Restore last active workspace (on by default; `/` still resolves deterministically).
 - Optional workspace URL confirmation: a new tab opened at `/` may retain the base URL while
-  displaying the last active workspace. Switching workspaces or clicking the selected workspace
-  button confirms the choice and moves to its stable `/w/slug` URL.
+  displaying the last active workspace. Switching workspaces briefly previews the new `/w/slug`
+  URL before returning to `/`; clicking the already-selected workspace confirms the choice and
+  keeps its stable workspace URL.
 
 ### Layout
 
