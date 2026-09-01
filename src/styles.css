@@ -162,7 +162,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-days small { overflow: hidden; font-size: 7px; white-space: nowrap; text-overflow: ellipsis; }
 .weather-days strong, .weather-days em { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .weather-days em { opacity: .5; }
-.mirrored .weather-widget { margin-right: 0; margin-left: auto; }
+.mirrored .weather-widget { margin-right: 0; margin-left: auto; text-align: right; }
+.mirrored .weather-current { flex-direction: row-reverse; justify-content: flex-start; }
+.mirrored .weather-current > div { align-items: flex-end; }
 
 .widget-access-list { display: flex; gap: 11px; margin-top: 26px; flex-wrap: wrap; }
 .widget-access {
