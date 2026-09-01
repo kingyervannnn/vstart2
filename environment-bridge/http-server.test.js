@@ -5,8 +5,8 @@ import { EnvironmentBridgeHttpServer } from './http-server.mjs'
 const servers = []
 afterEach(async () => Promise.all(servers.splice(0).map((server) => server.stop())))
 
-async function start(service) {
-  const server = new EnvironmentBridgeHttpServer({ service, port: 0 })
+async function start(service, projectService) {
+  const server = new EnvironmentBridgeHttpServer({ service, projectService, port: 0 })
   servers.push(server)
   await server.start()
   return `http://127.0.0.1:${server.port}`
@@ -33,6 +33,35 @@ describe('EnvironmentBridgeHttpServer', () => {
     expect(power.status).toBe(200)
     expect(state.status).toBe(200)
     expect(calls).toEqual([['power', true], ['state', 'red', 50]])
+  })
+
+  it('publishes a typed read-only project snapshot', async () => {
+    const paths = ['/Users/vbitzx/SS/trucking saas', '/Users/vbitzx/SS/PAYMENT WATCH']
+    const projectService = {
+      snapshot: async (receivedPaths) => ({
+        projects: receivedPaths.map((path) => ({ path, name: path.split('/').at(-1), available: false })),
+      }),
+    }
+    const base = await start({ snapshot: async () => ({ devices: [] }) }, projectService)
+    const response = await fetch(`${base}/v1/projects/snapshot`, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ paths }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      protocolVersion: 1,
+      projects: [
+        { path: paths[0], name: 'trucking saas', available: false },
+        { path: paths[1], name: 'PAYMENT WATCH', available: false },
+      ],
+    })
+  })
+
+  it('rejects project snapshots without a JSON request body', async () => {
+    const base = await start({ snapshot: async () => ({ devices: [] }) }, { snapshot: async () => ({ projects: [] }) })
+    const response = await fetch(`${base}/v1/projects/snapshot`, { method: 'POST', headers: { origin } })
+    expect(response.status).toBe(415)
   })
 
   it('rejects unapproved origins', async () => {

@@ -240,6 +240,7 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 - Notes.
 - Email.
 - Music.
+- Mission Glance.
 
 ### Minimal per-widget settings
 
@@ -250,6 +251,7 @@ No uploaded background is stored in IndexedDB or a browser blob database.
 - Email: account/filter/default mailbox behavior retained only where functional.
 - Music: enabled and glass blur amount. Provider configuration lives on the dedicated
   Music page.
+- Mission Glance: enabled and a bounded list of absolute host Git project paths.
 
 Clock, weather, notes, and email do not expose background/blur/card controls because their
 V Start 2 surfaces are always transparent. Music is the sole exception.

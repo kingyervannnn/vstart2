@@ -15,7 +15,7 @@ describe('Widget rail city clocks', () => {
     const onMapResultsHost = vi.fn()
     const props = {
       compact: false,
-      settings: { widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false }, music: { sources: [] } },
+      settings: { widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false, missionGlance: false }, music: { sources: [] } },
       onOpenWidget: vi.fn(),
       onPatch: vi.fn(),
       onMapResultsHost,
@@ -39,7 +39,7 @@ describe('Widget rail city clocks', () => {
     const onInlineResultsHost = vi.fn()
     const { container } = render(<WidgetRail
       compact={false}
-      settings={{ widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false }, music: { sources: [] } }}
+      settings={{ widgets: { clock: true, weather: false, notes: false, email: false, music: false, environment: false, missionGlance: false }, music: { sources: [] } }}
       inlineFrameActive
       onInlineDockHost={onInlineDockHost}
       onInlineResultsHost={onInlineResultsHost}
@@ -75,6 +75,7 @@ describe('Widget rail city clocks', () => {
           notes: false,
           email: false,
           music: false,
+          missionGlance: false,
           primaryLocationId: 'new-york',
           secondaryLocationIds: ['yerevan', 'vienna'],
           activeWeatherLocationId: 'new-york',
@@ -107,7 +108,7 @@ describe('Widget rail city clocks', () => {
     const { container } = render(<WidgetRail
       compact={false}
       settings={{
-        widgets: { clock: false, weather: true, notes: false, email: false, music: false, environment: false },
+        widgets: { clock: false, weather: true, notes: false, email: false, music: false, environment: false, missionGlance: false },
         music: { sources: [] },
       }}
       onOpenWidget={onOpenWidget}

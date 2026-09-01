@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 
+import { GitProjectService } from './git-project-service.mjs'
 import { EnvironmentBridgeError, LightCliService } from './light-cli-service.mjs'
 
 const PROTOCOL_VERSION = 1
@@ -7,8 +8,9 @@ const MAX_BODY_BYTES = 8 * 1_024
 const DEFAULT_ALLOWED_ORIGINS = new Set(['http://localhost:3000', 'http://127.0.0.1:3000'])
 
 export class EnvironmentBridgeHttpServer {
-  constructor({ service = new LightCliService(), host = '127.0.0.1', port = 3140, allowedOrigins = DEFAULT_ALLOWED_ORIGINS } = {}) {
+  constructor({ service = new LightCliService(), projectService = new GitProjectService(), host = '127.0.0.1', port = 3140, allowedOrigins = DEFAULT_ALLOWED_ORIGINS } = {}) {
     this.service = service
+    this.projectService = projectService
     this.host = host
     this.port = port
     this.allowedOrigins = new Set(allowedOrigins)
@@ -49,6 +51,10 @@ export class EnvironmentBridgeHttpServer {
       }
       if (request.method === 'GET' && url.pathname === '/v1/environment') {
         return this.#send(response, 200, await this.service.snapshot())
+      }
+      if (request.method === 'POST' && url.pathname === '/v1/projects/snapshot') {
+        const body = await this.#readJson(request)
+        return this.#send(response, 200, await this.projectService.snapshot(body.paths))
       }
       if (request.method === 'POST' && url.pathname === '/v1/lights/room-light/power') {
         const body = await this.#readJson(request)
