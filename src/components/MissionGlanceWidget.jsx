@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GitBranch } from 'lucide-react'
+import { GitBranch, X } from 'lucide-react'
 
 import { isRecentCommit, missionGlanceApi, missionGlanceProjectName, normalizeMissionGlancePaths, relativeCommitTime, truncateCommitSubject } from '../lib/missionGlance.js'
 
@@ -32,7 +32,7 @@ function normalizedSnapshot(paths, body) {
   })
 }
 
-export function MissionGlanceWidget({ paths }) {
+export function MissionGlanceWidget({ paths, expanded = false, onClose }) {
   const pathKey = JSON.stringify(normalizeMissionGlancePaths(paths))
   const projectPaths = useMemo(() => JSON.parse(pathKey), [pathKey])
   const [state, setState] = useState({ loading: true, projects: [] })
@@ -59,8 +59,11 @@ export function MissionGlanceWidget({ paths }) {
   }, [projectPaths])
 
   return (
-    <section className="mission-glance-widget" aria-label="Mission Glance">
-      <header><span><GitBranch /><strong>Mission Glance</strong></span><small>Read-only</small></header>
+    <section className={`mission-glance-widget ${expanded ? 'expanded' : ''}`} aria-label="Mission Glance projects">
+      <header>
+        <span><GitBranch /><span>{expanded && <small>PROJECT STATUS</small>}<strong>Mission Glance</strong></span></span>
+        <span className="mission-glance-header-actions"><small>Read-only</small>{expanded && <button type="button" onClick={onClose} aria-label="Close Mission Glance"><X /></button>}</span>
+      </header>
       {state.loading && <p className="mission-glance-state">Loading project status…</p>}
       {!state.loading && !state.projects.length && <p className="mission-glance-state">No projects configured</p>}
       {!state.loading && !!state.projects.length && <ul>

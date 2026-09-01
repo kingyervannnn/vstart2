@@ -11,6 +11,25 @@ afterEach(() => {
 })
 
 describe('Widget rail city clocks', () => {
+  it('places Mission Glance before Notes and opens it as a service', () => {
+    const onOpenWidget = vi.fn()
+    const { container } = render(<WidgetRail
+      compact={false}
+      settings={{ widgets: { clock: false, weather: false, missionGlance: true, notes: true, email: true, music: false, environment: false }, music: { sources: [] } }}
+      onOpenWidget={onOpenWidget}
+      onPatch={vi.fn()}
+    />)
+
+    const launchers = [...container.querySelectorAll('.widget-access')]
+    expect(launchers.map((button) => button.textContent)).toEqual([
+      expect.stringContaining('Mission Glance'),
+      expect.stringContaining('Notes'),
+      expect.stringContaining('Mail'),
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Open Mission Glance' }))
+    expect(onOpenWidget).toHaveBeenCalledWith('mission-glance')
+  })
+
   it('keeps widget content mounted while exposing a wide-map result host', () => {
     const onMapResultsHost = vi.fn()
     const props = {

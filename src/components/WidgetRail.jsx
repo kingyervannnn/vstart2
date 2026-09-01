@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, CloudSun, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { ChevronDown, CloudSun, GitBranch, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
 import { EnvironmentControl } from './EnvironmentControl.jsx'
-import { MissionGlanceWidget } from './MissionGlanceWidget.jsx'
 
 function ClockFace({ location, now, twentyFourHour, primary = false, active = false, onSelect }) {
   const time = formatLocationTime(now, location, twentyFourHour)
@@ -82,7 +81,7 @@ function WeatherWidget({ compact, settings, onOpen }) {
 
 function WidgetAccess({ icon: Icon, label, detail, onClick }) {
   return (
-    <button type="button" className="widget-access" onClick={onClick}>
+    <button type="button" className="widget-access" onClick={onClick} aria-label={`Open ${label}`}>
       <Icon size={18} strokeWidth={1.45} />
       <span>{label}</span>
       <small>{detail}</small>
@@ -230,6 +229,7 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
     return (
       <nav className="compact-widget-dock" aria-label="Widget access">
         {widgets.weather !== false && <button type="button" onClick={() => onOpenWidget('weather')} aria-label="Open weather"><CloudSun /></button>}
+        {widgets.missionGlance !== false && <button type="button" onClick={() => onOpenWidget('mission-glance')} aria-label="Open Mission Glance"><GitBranch /></button>}
         {widgets.notes !== false && <button type="button" onClick={() => onOpenWidget('notes')} aria-label="Open notes"><NotebookPen /></button>}
         {widgets.email !== false && <button type="button" onClick={() => onOpenWidget('mail')} aria-label="Open inbox"><Mail /></button>}
         {widgets.music !== false && <button type="button" onClick={() => onOpenWidget('music')} aria-label="Open music queue"><Music2 /></button>}
@@ -244,10 +244,10 @@ export function WidgetRail({ compact, settings, mapActive = false, inlineFrameAc
       {widgets.clock !== false && <ClockWidget settings={widgets} onLocationSelect={(locationId) => onPatch({ widgets: { activeWeatherLocationId: locationId } })} />}
       {widgets.weather !== false && <WeatherWidget compact={compact} settings={widgets} onOpen={() => onOpenWidget('weather')} />}
       <div className="widget-access-list">
+        {widgets.missionGlance !== false && <WidgetAccess icon={GitBranch} label="Mission Glance" detail="Project status" onClick={() => onOpenWidget('mission-glance')} />}
         {widgets.notes !== false && <WidgetAccess icon={NotebookPen} label="Notes" detail="Open notes" onClick={() => onOpenWidget('notes')} />}
         {widgets.email !== false && <WidgetAccess icon={Mail} label="Mail" detail="Open inbox" onClick={() => onOpenWidget('mail')} />}
       </div>
-      {widgets.missionGlance !== false && <MissionGlanceWidget paths={settings.missionGlance?.projectPaths} />}
       {widgets.environment !== false && <EnvironmentControl onOpen={() => onOpenWidget('environment')} />}
       {widgets.music !== false && (
         <section className={`music-widget music-glow-${musicGlowStyle} glow-trigger-${musicGlowTrigger} ${musicState.data && !musicState.error ? 'music-connected' : ''} ${musicState.data?.isPlaying ? 'music-playing' : ''} ${widgets.musicOutline === true ? 'music-outline' : 'music-no-outline'}`} style={{ '--music-blur': `${widgets.musicBlur ?? 18}px` }}>

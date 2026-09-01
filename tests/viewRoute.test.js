@@ -14,6 +14,7 @@ describe('URL-backed active views', () => {
 
   it('restores services and rejects unsafe frame URLs', () => {
     expect(parseViewSearch('?view=mail')).toEqual({ type: 'service', kind: 'mail' })
+    expect(parseViewSearch('?view=mission-glance')).toEqual({ type: 'service', kind: 'mission-glance' })
     expect(parseViewSearch('?view=weather')).toEqual({ type: 'service', kind: 'weather' })
     expect(parseViewSearch('?view=frame&url=javascript%3Aalert%281%29')).toEqual({ type: 'dial' })
     expect(parseViewSearch('?view=map')).toEqual({ type: 'dial' })
@@ -24,6 +25,7 @@ describe('URL-backed active views', () => {
   it('closes the active widget and switches directly to a different widget', () => {
     expect(toggledServiceView({ type: 'service', kind: 'mail' }, 'mail')).toEqual({ type: 'dial' })
     expect(toggledServiceView({ type: 'service', kind: 'mail' }, 'music')).toEqual({ type: 'service', kind: 'music' })
+    expect(toggledServiceView({ type: 'dial' }, 'mission-glance')).toEqual({ type: 'service', kind: 'mission-glance' })
     expect(toggledServiceView({ type: 'dial' }, 'weather')).toEqual({ type: 'service', kind: 'weather' })
   })
 

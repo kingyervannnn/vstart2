@@ -253,6 +253,10 @@ No uploaded background is stored in IndexedDB or a browser blob database.
   Music page.
 - Mission Glance: enabled and a bounded list of absolute host Git project paths.
 
+Mission Glance appears as a compact launcher before Notes. Opening it uses the same
+URL-backed main service area as Notes and Mail; project details are not rendered permanently
+inside the widget rail.
+
 Clock, weather, notes, and email do not expose background/blur/card controls because their
 V Start 2 surfaces are always transparent. Music is the sole exception.
 

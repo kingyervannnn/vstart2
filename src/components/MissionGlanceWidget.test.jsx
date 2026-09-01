@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../lib/missionGlance.js', async (importOriginal) => ({
@@ -62,5 +62,15 @@ describe('MissionGlanceWidget', () => {
     expect(await screen.findByText('one')).toBeInTheDocument()
     expect(screen.getByText('two')).toBeInTheDocument()
     expect(screen.getAllByText('unavailable')).toHaveLength(2)
+  })
+
+  it('renders as a closable expanded service view', async () => {
+    const onClose = vi.fn()
+    missionGlanceApi.snapshot.mockResolvedValue({ projects: [] })
+    render(<MissionGlanceWidget paths={[]} expanded onClose={onClose} />)
+
+    expect(screen.getByText('PROJECT STATUS')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Mission Glance' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

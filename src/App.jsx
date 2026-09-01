@@ -1160,6 +1160,7 @@ export function App() {
             onMusicSettingsPatch={(patch) => patchSettings({ music: patch })}
             notesSettings={settings.notes}
             onNotesSettingsPatch={(patch) => patchSettings({ notes: patch })}
+            missionGlanceSettings={settings.missionGlance}
             weatherSettings={settings.widgets}
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspace.id}
