@@ -66,7 +66,7 @@ function WeatherWidget({ compact, settings, onOpen }) {
   return (
     <button type="button" className="weather-widget" aria-label="Open weather details" onClick={onOpen}>
       <div className="weather-current">
-        <CloudSun size={compact ? 20 : 28} strokeWidth={1.35} />
+        <CloudSun size={compact ? 20 : 32} strokeWidth={1.35} />
         <div>
           <small>{location.city.toLocaleUpperCase()}</small>
           <strong>{weather?.current ? Math.round(weather.current.temperature_2m) + '°' + (celsius ? 'C' : 'F') : '—°' + (celsius ? 'C' : 'F')}</strong>

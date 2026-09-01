@@ -153,7 +153,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mirrored .primary-clock-time { justify-content: flex-end; }
 
 .weather-widget { width: min(100%, 360px); display: grid; gap: 12px; margin-top: 28px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.weather-current { display: flex; align-items: center; gap: 13px; }
+.weather-current { display: flex; flex-direction: row-reverse; align-items: center; justify-content: flex-end; gap: 13px; }
 .weather-current > div { display: flex; flex-direction: column; gap: 3px; }
 .weather-widget small { font-size: 10px; letter-spacing: .16em; }
 .weather-widget strong { font-size: 32px; font-weight: 560; letter-spacing: -.04em; }
@@ -163,7 +163,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-days strong, .weather-days em { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .weather-days em { opacity: .5; }
 .mirrored .weather-widget { margin-right: 0; margin-left: auto; text-align: right; }
-.mirrored .weather-current { flex-direction: row-reverse; justify-content: flex-start; }
+.mirrored .weather-current { flex-direction: row; justify-content: flex-end; }
 .mirrored .weather-current > div { align-items: flex-end; }
 
 .widget-access-list { display: flex; gap: 11px; margin-top: 26px; flex-wrap: wrap; }
