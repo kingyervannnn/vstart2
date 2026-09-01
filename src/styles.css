@@ -153,10 +153,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .mirrored .primary-clock-time { justify-content: flex-end; }
 
 .weather-widget { width: min(100%, 360px); display: grid; gap: 12px; margin-top: 28px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.weather-overview { display: flex; align-items: end; justify-content: space-between; gap: 18px; }
 .weather-current { display: flex; flex-direction: row-reverse; align-items: center; justify-content: flex-end; gap: 13px; }
 .weather-current > div { display: flex; flex-direction: column; gap: 3px; }
 .weather-widget small { font-size: 10px; letter-spacing: .16em; }
 .weather-widget strong { font-size: 32px; font-weight: 560; letter-spacing: -.04em; }
+.weather-quick-stats { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-bottom: 2px; }
+.weather-quick-stats > span { min-width: 0; display: grid; gap: 3px; }
+.weather-quick-stats small { overflow: hidden; font-size: 6px; letter-spacing: .11em; opacity: .52; text-overflow: ellipsis; white-space: nowrap; }
+.weather-quick-stats strong { overflow: hidden; font-size: 9px; font-weight: 570; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
 .weather-days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; width: 100%; }
 .weather-days > span { min-width: 0; display: grid; justify-items: center; gap: 2px; padding: 6px 3px; border-top: 1px solid rgba(255,255,255,.18); text-align: center; }
 .weather-days small { overflow: hidden; font-size: 7px; white-space: nowrap; text-overflow: ellipsis; }
@@ -164,6 +169,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-days strong, .weather-days em { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .weather-days em { opacity: .5; }
 .mirrored .weather-widget { margin-right: 0; margin-left: auto; text-align: right; }
+.mirrored .weather-overview { flex-direction: row-reverse; }
+.mirrored .weather-quick-stats > span { justify-items: end; }
 .mirrored .weather-current { flex-direction: row; justify-content: flex-end; }
 .mirrored .weather-current > div { align-items: flex-end; }
 

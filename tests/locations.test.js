@@ -37,7 +37,7 @@ describe('time and weather locations', () => {
     const date = new Date('2026-01-01T12:05:00.000Z')
     const location = locationById('new-york')
 
-    expect(formatLocationTime(date, location, false)).toMatchObject({ hour: '07', minute: '05', period: 'AM' })
+    expect(formatLocationTime(date, location, false)).toMatchObject({ hour: '7', minute: '05', period: 'AM' })
     expect(formatLocationTime(date, location, true)).toMatchObject({ hour: '07', minute: '05', period: '' })
   })
 })

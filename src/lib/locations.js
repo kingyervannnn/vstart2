@@ -50,9 +50,7 @@ export function weatherForecastUrl(location, { celsius = false, detailed = false
   const url = new URL('https://api.open-meteo.com/v1/forecast')
   url.searchParams.set('latitude', String(location.latitude))
   url.searchParams.set('longitude', String(location.longitude))
-  url.searchParams.set('current', detailed
-    ? 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m'
-    : 'temperature_2m,weather_code')
+  url.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m')
   url.searchParams.set('daily', detailed
     ? 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
     : 'weather_code,temperature_2m_max,temperature_2m_min')
@@ -68,7 +66,7 @@ export function weatherForecastUrl(location, { celsius = false, detailed = false
 
 export function formatLocationTime(date, location, twentyFourHour = false) {
   const parts = new Intl.DateTimeFormat([], {
-    hour: '2-digit',
+    hour: twentyFourHour ? '2-digit' : 'numeric',
     minute: '2-digit',
     ...(twentyFourHour ? { hourCycle: 'h23' } : { hour12: true }),
     timeZone: location.timeZone,

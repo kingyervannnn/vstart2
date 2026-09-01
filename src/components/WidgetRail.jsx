@@ -66,15 +66,24 @@ function WeatherWidget({ compact, settings, onOpen }) {
   }))
   const currentCondition = weatherCondition(weather?.current?.weather_code)
   const CurrentConditionIcon = currentCondition.Icon
+  const metric = (value, suffix = '') => Number.isFinite(Number(value)) ? `${Math.round(Number(value))}${suffix}` : '—'
+  const current = weather?.current
 
   return (
     <button type="button" className="weather-widget" aria-label="Open weather details" onClick={onOpen}>
-      <div className="weather-current" title={currentCondition.label}>
-        <CurrentConditionIcon size={compact ? 20 : 32} strokeWidth={1.35} aria-hidden="true" />
-        <div>
-          <small>{location.city.toLocaleUpperCase()}</small>
-          <strong>{weather?.current ? Math.round(weather.current.temperature_2m) + '°' + (celsius ? 'C' : 'F') : '—°' + (celsius ? 'C' : 'F')}</strong>
+      <div className="weather-overview">
+        <div className="weather-current" title={currentCondition.label}>
+          <CurrentConditionIcon size={compact ? 20 : 32} strokeWidth={1.35} aria-hidden="true" />
+          <div>
+            <small>{location.city.toLocaleUpperCase()}</small>
+            <strong>{current ? Math.round(current.temperature_2m) + '°' + (celsius ? 'C' : 'F') : '—°' + (celsius ? 'C' : 'F')}</strong>
+          </div>
         </div>
+        {!compact && current && <div className="weather-quick-stats" aria-label="Current weather details">
+          <span><small>FEELS</small><strong>{metric(current.apparent_temperature, '°')}</strong></span>
+          <span><small>HUMID</small><strong>{metric(current.relative_humidity_2m, '%')}</strong></span>
+          <span><small>WIND</small><strong>{metric(current.wind_speed_10m, celsius ? ' km/h' : ' mph')}</strong></span>
+        </div>}
       </div>
       {!compact && <div className="weather-days" aria-label="Five-day forecast">
         {days.map((day, index) => {

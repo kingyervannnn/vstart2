@@ -118,7 +118,7 @@ describe('Widget rail city clocks', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        current: { temperature_2m: 72, weather_code: 2 },
+        current: { temperature_2m: 72, apparent_temperature: 69, relative_humidity_2m: 56, wind_speed_10m: 8, weather_code: 2 },
         daily: {
           time: ['2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23'],
           weather_code: [0, 61, 71, 95, 45],
@@ -140,6 +140,7 @@ describe('Widget rail city clocks', () => {
 
     expect(await screen.findByLabelText('NOW: Clear')).toBeTruthy()
     expect(container.querySelector('.weather-current').getAttribute('title')).toBe('Partly cloudy')
+    expect(screen.getByLabelText('Current weather details').textContent).toContain('FEELS69°HUMID56%WIND8 mph')
     expect(screen.getByLabelText('Mon: Rain')).toBeTruthy()
     expect(screen.getByLabelText('Tue: Snow')).toBeTruthy()
     expect(screen.getByLabelText('Wed: Thunderstorms')).toBeTruthy()
