@@ -763,6 +763,23 @@ export function App() {
     }
   }
 
+  const refreshShortcutIcon = async (item, mode = 'auto') => {
+    if (item.kind !== 'shortcut') return
+    setBusy(true)
+    try {
+      const result = await api.refreshShortcutIcon(item.id, { mode, version: item.version })
+      applyBootstrap(result.bootstrap)
+      setToast({
+        type: result.iconWarning ? 'warning' : 'success',
+        message: result.iconWarning || (mode === 'generated' ? `Generated a new preview for ${item.title}.` : `Refreshed ${item.title}'s icon.`),
+      })
+    } catch (error) {
+      setToast({ type: 'error', message: error.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const moveItem = async (item, next) => {
     const old = bootstrapRef.current.placements.find((value) => value.itemId === item.id && value.profile === profile)
     if (!old) return
@@ -1281,6 +1298,7 @@ export function App() {
         onCreateFolder={(point) => setDialog({ item: null, kind: 'folder', point })}
         onToggleEdit={() => setEditMode((value) => !value)}
         onEditItem={(item) => { setFolderId(null); setDialog({ item, point: null }) }}
+        onRefreshIcon={refreshShortcutIcon}
         onMoveItem={moveItemToWorkspace}
         onPinItem={pinItemAcrossWorkspaces}
         onUnpinItem={unpinItemAcrossWorkspaces}

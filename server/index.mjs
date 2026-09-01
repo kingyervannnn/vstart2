@@ -3,7 +3,7 @@ import http from 'node:http'
 import { z } from 'zod'
 import { migrate, pool, transaction } from './db.mjs'
 import { handleError, HttpError, readBuffer, readJson, routeMatch, sendEmpty, sendJson } from './http.mjs'
-import { insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
+import { generateShortcutIcon, insertUploadedIcon, resolveShortcutIcon } from './icons.mjs'
 import { addMusicQueueItem, controlMusic, playMusicItem, readMusicQueue, readMusicState, searchMusic, seekMusic, selectMusicQueueItem, setMusicVolume } from './music.mjs'
 import { loadBootstrap } from './queries.mjs'
 import { predictShortcutTitle } from './shortcut-metadata.mjs'
@@ -57,6 +57,12 @@ const shortcutUpdateSchema = z.object({
   iconOverrideUrl: z.union([httpUrl, z.literal(''), z.null()]).optional(),
   iconData: z.string().max(1_100_000).optional(),
   iconMimeType: z.string().max(80).optional(),
+  version: z.number().int().positive(),
+  mutationId: z.string().max(200).optional(),
+})
+
+const shortcutIconRefreshSchema = z.object({
+  mode: z.enum(['auto', 'generated']).default('auto'),
   version: z.number().int().positive(),
   mutationId: z.string().max(200).optional(),
 })
@@ -680,7 +686,7 @@ async function handleRequest(request, response) {
             faviconUrl: null,
             warning: null,
           }
-        : await resolveShortcutIcon(client, data.url, data.iconOverrideUrl || null)
+        : await resolveShortcutIcon(client, data.url, data.iconOverrideUrl || null, { title: data.title })
       const id = crypto.randomUUID()
       await client.query(`
         INSERT INTO shortcut_items(
@@ -748,7 +754,7 @@ async function handleRequest(request, response) {
           warning: null,
         }
       } else if (row.kind === 'shortcut' && (data.url !== undefined || data.iconOverrideUrl !== undefined)) {
-        icon = await resolveShortcutIcon(client, destination, override)
+        icon = await resolveShortcutIcon(client, destination, override, { title: data.title ?? row.title })
       }
       const itemSelector = row.pin_group_id ? 'pin_group_id = $1' : 'id = $1'
       await client.query(`
@@ -760,6 +766,30 @@ async function handleRequest(request, response) {
     })
   }
 
+  match = routeMatch(pathname, /^\/api\/items\/([0-9a-f-]+)\/icon$/)
+  if (request.method === 'POST' && match) {
+    const body = await readJson(request)
+    const data = parse(shortcutIconRefreshSchema, body)
+    return mutate(request, response, `item.icon.refresh:${match[0]}`, data, async (client) => {
+      const current = await client.query('SELECT * FROM shortcut_items WHERE id = $1 FOR UPDATE', [match[0]])
+      if (!current.rowCount) throw new HttpError(404, 'Shortcut not found')
+      const row = current.rows[0]
+      if (row.kind !== 'shortcut') throw new HttpError(400, 'Folders do not have shortcut icons')
+      if (Number(row.version) !== data.version) throw new HttpError(409, 'Shortcut changed elsewhere')
+      const icon = data.mode === 'generated'
+        ? await generateShortcutIcon(client, row.title, row.url)
+        : await resolveShortcutIcon(client, row.url, row.icon_override_url, { title: row.title })
+      const itemSelector = row.pin_group_id ? 'pin_group_id = $1' : 'id = $1'
+      await client.query(`
+        UPDATE shortcut_items
+        SET icon_asset_id = $2, favicon_url = $3, version = version + 1, updated_at = now()
+        WHERE ${itemSelector}
+      `, [row.pin_group_id || match[0], icon.iconAssetId, icon.faviconUrl])
+      return bootstrapResponse(client, { iconWarning: icon.warning })
+    })
+  }
+
+  match = routeMatch(pathname, /^\/api\/items\/([0-9a-f-]+)$/)
   if (request.method === 'DELETE' && match) {
     const body = await readJson(request)
     return mutate(request, response, `item.delete:${match[0]}`, body, async (client) => {

@@ -45,6 +45,7 @@ export const api = {
   createShortcut: (values) => mutation('/api/shortcuts', 'POST', values, 'shortcut-create'),
   createFolder: (values) => mutation('/api/folders', 'POST', values, 'folder-create'),
   updateItem: (id, values) => mutation(`/api/items/${id}`, 'PATCH', values, 'item-update'),
+  refreshShortcutIcon: (id, values) => mutation(`/api/items/${id}/icon`, 'POST', values, 'item-icon-refresh'),
   deleteItem: (id, action = 'deleteChildren') => mutation(`/api/items/${id}`, 'DELETE', { action }, 'item-delete'),
   movePlacement: (id, values) => mutation(`/api/items/${id}/placement`, 'PUT', values, 'placement'),
   moveItemToWorkspace: (id, values) => mutation(`/api/items/${id}/workspace`, 'PUT', values, 'item-workspace'),

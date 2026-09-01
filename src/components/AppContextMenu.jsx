@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUpRight, FolderInput, FolderPlus, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowUpRight, FolderInput, FolderPlus, Pencil, Pin, PinOff, Plus, RefreshCw, Trash2, WandSparkles } from 'lucide-react'
 
 function MenuButton({ children, icon: Icon, danger = false, disabled = false, onClick }) {
   return (
@@ -11,7 +11,7 @@ function MenuButton({ children, icon: Icon, danger = false, disabled = false, on
   )
 }
 
-export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onCreateFolder, onToggleEdit, onEditItem, onMoveItem, onMoveOut, onPinItem, onUnpinItem, onDeleteItem }) {
+export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, onCreateFolder, onToggleEdit, onEditItem, onRefreshIcon, onMoveItem, onMoveOut, onPinItem, onUnpinItem, onDeleteItem }) {
   const ref = useRef(null)
   const [position, setPosition] = useState({ left: menu.x, top: menu.y })
 
@@ -56,6 +56,10 @@ export function AppContextMenu({ menu, workspaces, editMode, onClose, onCreate, 
       </> : <>
         <div className="context-menu-heading"><strong>{item.title}</strong><span>{item.kind === 'folder' ? 'Folder' : item.pinGroupId ? 'Pinned shortcut' : 'Shortcut'}</span></div>
         <MenuButton icon={Pencil} onClick={run(() => onEditItem(item))}>{item.kind === 'folder' ? 'Rename folder' : 'Rename / change icon'}</MenuButton>
+        {item.kind === 'shortcut' && <>
+          <MenuButton icon={RefreshCw} onClick={run(() => onRefreshIcon(item, 'auto'))}>Find a better icon</MenuButton>
+          <MenuButton icon={WandSparkles} onClick={run(() => onRefreshIcon(item, 'generated'))}>Use generated preview</MenuButton>
+        </>}
         {item.parentFolderId && <MenuButton icon={ArrowUpRight} onClick={run(() => onMoveOut(item))}>Move out of folder</MenuButton>}
         {!!destinations.length && <>
           <div className="context-menu-separator" />

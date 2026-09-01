@@ -29,6 +29,7 @@ describe('folder shortcut context menu', () => {
       onCreateFolder={vi.fn()}
       onToggleEdit={vi.fn()}
       onEditItem={onEditItem}
+      onRefreshIcon={vi.fn()}
       onMoveItem={onMoveItem}
       onMoveOut={onMoveOut}
       onPinItem={vi.fn()}
@@ -40,6 +41,8 @@ describe('folder shortcut context menu', () => {
     expect(view.container.contains(menu)).toBe(false)
     expect(menu.parentElement).toBe(document.body)
     expect(screen.getByRole('menuitem', { name: 'Rename / change icon' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Find a better icon' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Use generated preview' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Move out of folder' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Work' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
