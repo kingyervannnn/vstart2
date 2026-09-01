@@ -114,6 +114,38 @@ describe('Widget rail city clocks', () => {
     expect(onPatch).toHaveBeenCalledWith({ widgets: { activeWeatherLocationId: 'yerevan' } })
   })
 
+  it('renders forecast glyphs from the daily weather codes returned by the weather service', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        current: { temperature_2m: 72, weather_code: 2 },
+        daily: {
+          time: ['2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23'],
+          weather_code: [0, 61, 71, 95, 45],
+          temperature_2m_max: [81, 84, 81, 82, 78],
+          temperature_2m_min: [65, 59, 62, 70, 64],
+        },
+      }),
+    }))
+
+    const { container } = render(<WidgetRail
+      compact={false}
+      settings={{
+        widgets: { clock: false, weather: true, notes: false, email: false, music: false, environment: false, missionGlance: false },
+        music: { sources: [] },
+      }}
+      onOpenWidget={vi.fn()}
+      onPatch={vi.fn()}
+    />)
+
+    expect(await screen.findByLabelText('NOW: Clear')).toBeTruthy()
+    expect(container.querySelector('.weather-current').getAttribute('title')).toBe('Partly cloudy')
+    expect(screen.getByLabelText('Mon: Rain')).toBeTruthy()
+    expect(screen.getByLabelText('Tue: Snow')).toBeTruthy()
+    expect(screen.getByLabelText('Wed: Thunderstorms')).toBeTruthy()
+    expect(screen.getByLabelText('Thu: Foggy')).toBeTruthy()
+  })
+
   it('dismisses an open service from empty rail space without swallowing widget clicks', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

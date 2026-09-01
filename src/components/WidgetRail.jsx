@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, CloudSun, GitBranch, Lightbulb, ListMusic, Mail, Music2, NotebookPen, Pause, Play, Repeat2, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { activeWeatherLocation, configuredWeatherLocations, formatLocationTime, weatherForecastUrl } from '../lib/locations.js'
 import { musicApi } from '../lib/music.js'
+import { weatherCondition } from '../lib/weatherCondition.js'
 import { EnvironmentControl } from './EnvironmentControl.jsx'
 
 function ClockFace({ location, now, twentyFourHour, primary = false, active = false, onSelect }) {
@@ -61,19 +62,27 @@ function WeatherWidget({ compact, settings, onOpen }) {
     date,
     high: weather.daily.temperature_2m_max[index],
     low: weather.daily.temperature_2m_min[index],
+    weatherCode: weather.daily.weather_code?.[index],
   }))
+  const currentCondition = weatherCondition(weather?.current?.weather_code)
+  const CurrentConditionIcon = currentCondition.Icon
 
   return (
     <button type="button" className="weather-widget" aria-label="Open weather details" onClick={onOpen}>
-      <div className="weather-current">
-        <CloudSun size={compact ? 20 : 32} strokeWidth={1.35} />
+      <div className="weather-current" title={currentCondition.label}>
+        <CurrentConditionIcon size={compact ? 20 : 32} strokeWidth={1.35} aria-hidden="true" />
         <div>
           <small>{location.city.toLocaleUpperCase()}</small>
           <strong>{weather?.current ? Math.round(weather.current.temperature_2m) + '°' + (celsius ? 'C' : 'F') : '—°' + (celsius ? 'C' : 'F')}</strong>
         </div>
       </div>
       {!compact && <div className="weather-days" aria-label="Five-day forecast">
-        {days.map((day, index) => <span key={day.date}><small>{index === 0 ? 'NOW' : new Intl.DateTimeFormat([], { weekday: 'short' }).format(new Date(`${day.date}T12:00:00`))}</small><strong>{Math.round(day.high)}°</strong><em>{Math.round(day.low)}°</em></span>)}
+        {days.map((day, index) => {
+          const dayLabel = index === 0 ? 'NOW' : new Intl.DateTimeFormat([], { weekday: 'short' }).format(new Date(`${day.date}T12:00:00`))
+          const condition = weatherCondition(day.weatherCode)
+          const ConditionIcon = condition.Icon
+          return <span key={day.date} aria-label={`${dayLabel}: ${condition.label}`} title={condition.label}><small>{dayLabel}</small><ConditionIcon aria-hidden="true" /><strong>{Math.round(day.high)}°</strong><em>{Math.round(day.low)}°</em></span>
+        })}
       </div>}
     </button>
   )

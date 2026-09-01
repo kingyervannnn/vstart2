@@ -158,8 +158,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weather-widget small { font-size: 10px; letter-spacing: .16em; }
 .weather-widget strong { font-size: 32px; font-weight: 560; letter-spacing: -.04em; }
 .weather-days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; width: 100%; }
-.weather-days > span { min-width: 0; display: grid; gap: 2px; padding: 6px 3px; border-top: 1px solid rgba(255,255,255,.18); }
+.weather-days > span { min-width: 0; display: grid; justify-items: center; gap: 2px; padding: 6px 3px; border-top: 1px solid rgba(255,255,255,.18); text-align: center; }
 .weather-days small { overflow: hidden; font-size: 7px; white-space: nowrap; text-overflow: ellipsis; }
+.weather-days svg { width: 14px; height: 14px; margin: 2px 0 1px; color: color-mix(in srgb, var(--app-text) 82%, var(--app-accent)); stroke-width: 1.5; }
 .weather-days strong, .weather-days em { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .weather-days em { opacity: .5; }
 .mirrored .weather-widget { margin-right: 0; margin-left: auto; text-align: right; }
