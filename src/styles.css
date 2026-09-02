@@ -1383,7 +1383,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .workspace-dialog-icon-grid button.active { color: #fff; border-color: var(--app-accent); background: color-mix(in srgb, var(--app-accent) 24%, transparent); }
 .workspace-dialog-icon-grid svg { width: 16px; height: 16px; }
 
-.folder-popover { width: min(680px, calc(100vw - 44px)); height: min(590px, calc(100vh - 64px)); overflow: hidden; opacity: 0; border: 0; border-radius: 25px; color: #f4f6ff; background: rgba(15,20,29,.22); box-shadow: 0 24px 68px rgba(0,0,0,.2); backdrop-filter: blur(16px) saturate(1.12); -webkit-backdrop-filter: blur(16px) saturate(1.12); transform: scale(.84) translateY(9px); transform-origin: var(--folder-origin-x, 50%) var(--folder-origin-y, 50%); transition: opacity 260ms ease, transform 330ms cubic-bezier(.16,1,.3,1); will-change: opacity, transform; }
+.folder-popover { width: min(680px, calc(100vw - 44px)); height: min(590px, calc(100vh - 64px)); overflow: hidden; opacity: 0; border: 0; border-radius: 25px; color: #f4f6ff; background: linear-gradient(145deg, rgba(42,49,63,.42), rgba(12,18,28,.35)); box-shadow: 0 24px 68px rgba(0,0,0,.22); backdrop-filter: blur(18px) saturate(1.16); -webkit-backdrop-filter: blur(18px) saturate(1.16); transform: scale(.84) translateY(9px); transform-origin: var(--folder-origin-x, 50%) var(--folder-origin-y, 50%); transition: opacity 260ms ease, transform 330ms cubic-bezier(.16,1,.3,1); will-change: opacity, transform; }
 .folder-popover.open { opacity: 1; transform: scale(1) translateY(0); }
 .folder-popover.closing { transition-duration: 190ms; transition-timing-function: cubic-bezier(.7,0,.84,0); }
 .folder-popover > header { height: 58px; display: flex; align-items: center; gap: 10px; padding: 0 17px; border-bottom: 0; }
